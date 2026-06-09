@@ -781,7 +781,30 @@ body::after {
     </div>
   </div>
 
+  <!-- Daily Tasks -->
   <div class="section">
+    <div class="section-title">Daily Tasks</div>
+    <div class="dt-card" id="dtCard">
+      <div class="dt-header">
+        <div class="dt-title-col">
+          <div class="dt-eyebrow">Every day</div>
+          <div style="display:flex;align-items:baseline;gap:5px;">
+            <span class="dt-count" id="dtDone">0</span>
+            <span class="dt-count-total" id="dtTotal">/ 0</span>
+            <span class="dt-count-label">complete</span>
+          </div>
+        </div>
+        <button type="button" class="dt-edit-btn" id="dtEditBtn">✏️ Edit</button>
+      </div>
+      <ul class="dt-list" id="dtList"></ul>
+      <div class="dt-add-row" id="dtAddRow">
+        <input class="dt-input" id="dtInput" type="text" placeholder="New daily task…" autocomplete="off">
+        <button type="button" class="dt-add" id="dtAddBtn">+ Add</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="section" style="margin-top:22px;">
     <div class="section-title">To Do List</div>
 
     <!-- TODAY -->
@@ -832,28 +855,6 @@ body::after {
     </div>
   </div>
 
-  <!-- Daily Tasks -->
-  <div class="section" style="margin-top:22px;">
-    <div class="section-title">Daily Tasks</div>
-    <div class="dt-card" id="dtCard">
-      <div class="dt-header">
-        <div class="dt-title-col">
-          <div class="dt-eyebrow">Every day</div>
-          <div style="display:flex;align-items:baseline;gap:5px;">
-            <span class="dt-count" id="dtDone">0</span>
-            <span class="dt-count-total" id="dtTotal">/ 0</span>
-            <span class="dt-count-label">complete</span>
-          </div>
-        </div>
-        <button type="button" class="dt-edit-btn" id="dtEditBtn">✏️ Edit</button>
-      </div>
-      <ul class="dt-list" id="dtList"></ul>
-      <div class="dt-add-row" id="dtAddRow">
-        <input class="dt-input" id="dtInput" type="text" placeholder="New daily task…" autocomplete="off">
-        <button type="button" class="dt-add" id="dtAddBtn">+ Add</button>
-      </div>
-    </div>
-  </div>
 
 </div>
 
