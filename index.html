@@ -804,7 +804,7 @@ body::after {
       <div class="gm-bar" id="gmBar"></div>
       <ul id="goalList" class="goal-list gm-list"></ul>
       <div id="emptyState" class="empty-state">No goals for today yet — add one below.</div>
-      <button type="button" id="gmPushBtn" class="gm-push-btn" style="display:none;">Push remaining to tomorrow</button>
+      <button type="button" id="gmPushBtn" class="gm-push-btn" style="display:none;" hidden>Push remaining to upcoming</button>
       <div class="goal-input-wrap gm-input-wrap">
         <input id="goalInput" class="gm-input" type="text" placeholder="Add a goal for today…" autocomplete="off">
         <button type="button" id="goalAddBtn"    class="gm-add">+ Add</button>
@@ -813,19 +813,18 @@ body::after {
       </div>
     </div>
 
-    <!-- PLAN TOMORROW -->
+    <!-- UPCOMING IMPORTANT -->
     <div class="gm-card gm-card-tomorrow" id="gmCardTomorrow">
       <div class="gm-header">
         <div class="gm-header-left">
-          <div class="gm-eyebrow" id="tomorrowLabel">Plan tomorrow —</div>
-          <div class="gm-tomorrow-sub">Write tonight, locked until 6 AM.</div>
+          <div class="gm-eyebrow" id="tomorrowLabel">Upcoming Important</div>
         </div>
-        <div class="gm-tomorrow-count" id="gmTomorrowCount">0 planned</div>
+        <div class="gm-tomorrow-count" id="gmTomorrowCount">0 items</div>
       </div>
       <ul id="tomorrowList" class="goal-list gm-list"></ul>
-      <div id="tomorrowEmpty" class="empty-state">Nothing planned for tomorrow yet</div>
+      <div id="tomorrowEmpty" class="empty-state">No upcoming items — add something important below.</div>
       <div class="goal-input-wrap gm-input-wrap">
-        <input id="tomorrowInput" class="gm-input" type="text" placeholder="Add a goal for tomorrow…" autocomplete="off">
+        <input id="tomorrowInput" class="gm-input" type="text" placeholder="Add something important to remember…" autocomplete="off">
         <button type="button" id="tomorrowAddBtn"    class="gm-add">+ Add</button>
         <button type="button" id="tomorrowPolishBtn" class="gm-polish">✨ Polish</button>
         <div class="gm-status" id="tomorrowStatus"></div>
@@ -915,7 +914,7 @@ body::after {
   }
 
   function todayKey()    { return 'goals:' + getActiveDateString(); }
-  function tomorrowKey() { return 'goals:' + getTomorrowDateString(); }
+  function tomorrowKey() { return 'important_v1'; }
 
   function getGoals(key) {
     const g = storeGet(key);
@@ -1289,8 +1288,8 @@ body::after {
     const card = document.getElementById('gmCardToday');
     card.classList.toggle('gm-all-done', total > 0 && done === total);
 
-    const pushBtn = document.getElementById('gmPushBtn');
-    pushBtn.style.display = (total > 0 && done < total) ? 'block' : 'none';
+    // push button hidden (upcoming list is no longer tomorrow)
+    document.getElementById('gmPushBtn').style.display = 'none';
   }
 
   function renderStreak() {
@@ -1301,9 +1300,9 @@ body::after {
 
   function renderTomorrowCount() {
     const list = getGoals(tomorrowKey());
-    document.getElementById('gmTomorrowCount').textContent = list.length + ' planned';
-    document.getElementById('tomorrowLabel').textContent =
-      'Plan tomorrow — ' + formatDate(getTomorrowDateString());
+    const done = list.filter(g => g.done).length;
+    document.getElementById('gmTomorrowCount').textContent =
+      list.length === 0 ? '0 items' : (done + '/' + list.length + ' done');
   }
 
   function renderListInto(goals, listEl, emptyEl, key, readOnly) {
@@ -1348,7 +1347,7 @@ body::after {
   }
   function loadTomorrow() {
     const goals = getGoals(tomorrowKey());
-    renderListInto(goals, document.getElementById('tomorrowList'), document.getElementById('tomorrowEmpty'), tomorrowKey(), true);
+    renderListInto(goals, document.getElementById('tomorrowList'), document.getElementById('tomorrowEmpty'), tomorrowKey(), false);
   }
 
   // ---------- Push remaining ----------
