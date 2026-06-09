@@ -1730,19 +1730,15 @@ img, video, canvas, svg { max-width: 100%; }
       </div>
     </div>
 
-    <!-- Exercise -->
-    <div class="po-sub-section">
-      <div class="po-sub-title">Exercise</div>
-      <div class="po-exercise-bar">
-        <select class="po-ex-select" id="exSelect"></select>
-        <button class="po-btn-icon" id="addExBtn" title="Add exercise" aria-label="Add">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-        </button>
-        <button class="po-btn-icon" id="editExBtn" title="Edit / delete" aria-label="Edit">
-          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
-        </button>
+    <!-- WORKOUT LIST -->
+    <div class="wl-section">
+      <div id="wlList" class="wl-list"></div>
+      <div class="wl-adhoc-form" id="wlAdhocForm">
+        <input type="text" class="wl-adhoc-input" id="wlAdhocInput" placeholder="Exercise name…" autocomplete="off">
+        <button class="wl-adhoc-save" id="wlAdhocSave">Add</button>
+        <button class="wl-adhoc-cancel" id="wlAdhocCancel">✕</button>
       </div>
-      <div class="po-no-ex" id="noExMsg" style="display:none">No exercises here yet. Tap <strong>+</strong> to add one.</div>
+      <button class="wl-add-btn" id="wlAddBtn">+ Add exercise</button>
     </div>
 
     <!-- Log a set -->
@@ -1858,6 +1854,18 @@ img, video, canvas, svg { max-width: 100%; }
         <span class="po-tw-past-arrow" id="poTwPastArrow">▾</span>
       </button>
       <div class="po-tw-past-body" id="poTwPastBody" style="display:none"></div>
+    </div>
+  </div>
+
+  <!-- SUBSTITUTION PICKER MODAL -->
+  <div class="sub-modal-bg" id="subModalBg">
+    <div class="sub-modal">
+      <div class="sub-modal-title" id="subModalTitle">Choose variation</div>
+      <div id="subModalOptions"></div>
+      <div class="sub-modal-actions">
+        <button class="sub-set-default" id="subSetDefault">Set as default</button>
+        <button class="sub-cancel" id="subCancel">Cancel</button>
+      </div>
     </div>
   </div>
 </div>
