@@ -2548,7 +2548,7 @@ img, video, canvas, svg { max-width: 100%; }
   function isRestName(name) { return /^rest\b/i.test(name || ''); }
   function splitLabel(name) {
     if (!name) return '—';
-    return (isRestName(name) ? 'REST DAY' : (name + ' DAY')).toUpperCase();
+    return (isRestName(name) ? 'REST DAY — pick a day below ↓' : (name + ' DAY')).toUpperCase();
   }
   function renderDayPill() {
     const split = todaySplit();
