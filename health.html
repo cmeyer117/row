@@ -86,6 +86,93 @@ main {
 }
 .section-title::before { content: '≡'; font-size: 14px; opacity: 0.5; }
 
+/* ===== Meal Plan ===== */
+.meal-card {
+  background: var(--bg-card);
+  border-radius: 16px;
+  padding: 20px 22px 14px;
+  margin-bottom: 14px;
+  backdrop-filter: blur(24px) saturate(1.2);
+  -webkit-backdrop-filter: blur(24px) saturate(1.2);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.45);
+}
+.meal-card-head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 16px;
+}
+.meal-progress-text {
+  font-family: var(--font-mono);
+  font-size: 11px; color: var(--text-tertiary);
+}
+.meal-all-done .meal-progress-text { color: var(--accent); }
+
+.meal-row {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 11px 12px;
+  margin-bottom: 6px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  transition: background 0.2s, opacity 0.3s;
+}
+.meal-row:hover { background: rgba(255,255,255,0.055); }
+.meal-row.meal-done { opacity: 0.42; background: rgba(29,158,117,0.05); }
+.meal-row.meal-done .meal-name { text-decoration: line-through; text-decoration-color: rgba(255,255,255,0.35); }
+.meal-row.meal-intra { border-left: 2px solid rgba(255,138,77,0.5); }
+
+.meal-check {
+  appearance: none; -webkit-appearance: none;
+  width: 22px; height: 22px; flex-shrink: 0; margin-top: 1px;
+  border: 1.5px solid rgba(255,255,255,0.18);
+  background: var(--bg-input);
+  border-radius: 7px; position: relative; cursor: pointer;
+  transition: background 0.2s, border-color 0.2s, box-shadow 0.25s;
+}
+.meal-check:checked {
+  background: var(--accent); border-color: var(--accent);
+  box-shadow: 0 0 10px var(--accent-glow);
+}
+.meal-check:checked::after {
+  content: '';
+  position: absolute; left: 6px; top: 2px;
+  width: 6px; height: 11px;
+  border: solid #0A0A0B; border-width: 0 2.5px 2.5px 0;
+  transform: rotate(45deg);
+  animation: meal-pop 0.25s cubic-bezier(0.34,1.56,0.64,1);
+}
+@keyframes meal-pop { from { transform: rotate(45deg) scale(0); } to { transform: rotate(45deg) scale(1); } }
+
+.meal-body { flex: 1; min-width: 0; }
+.meal-name {
+  font-size: 13px; font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 3px;
+}
+.meal-items {
+  font-size: 12px; color: var(--text-secondary);
+  line-height: 1.55;
+}
+.meal-items em { color: var(--text-tertiary); font-style: normal; font-size: 11px; }
+.meal-modifier-wrap { margin-top: 6px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.meal-modifier-btn {
+  font-size: 10.5px; font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; font-family: var(--font-mono);
+  padding: 3px 10px; border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background: transparent; color: var(--text-tertiary);
+  cursor: pointer; transition: all 0.18s;
+}
+.meal-modifier-btn:hover { color: var(--text-primary); border-color: rgba(255,255,255,0.28); }
+.meal-modifier-btn.active {
+  background: rgba(255,138,77,0.15); color: #FF8A4D;
+  border-color: rgba(255,138,77,0.45);
+}
+.meal-modifier-note {
+  font-size: 11px; font-family: var(--font-mono);
+  color: #FF8A4D; display: none;
+}
+.meal-modifier-btn.active + .meal-modifier-note { display: inline; }
+
 .water-embed { margin-top: 56px; }
 .water-iframe {
   display: block;
@@ -473,7 +560,16 @@ main {
 <body>
 
 <main>
-  <div class="section-title">Daily Stack</div>
+  <div class="section-title">Meal Plan</div>
+  <div class="meal-card" id="mealCard">
+    <div class="meal-card-head">
+      <div class="sf-eyebrow">Tap each meal as you eat it</div>
+      <div class="meal-progress-text" id="mealProgressText">0 / 6 eaten · resets at 6 AM</div>
+    </div>
+    <div id="mealList"></div>
+  </div>
+
+  <div class="section-title" style="margin-top:40px;">Daily Stack</div>
 
   <div class="stack-card">
     <div class="stack-ticker" id="stackTicker">
@@ -527,6 +623,130 @@ main {
 (() => {
   'use strict';
 
+  const _get = (k) => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } };
+  const _set = (k, v) => localStorage.setItem(k, JSON.stringify(v));
+
+  function mealActiveDate() {
+    const now = new Date();
+    if (now.getHours() < 6) now.setDate(now.getDate() - 1);
+    return now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0');
+  }
+
+  const MEALS = [
+    { id: 'meal1', name: 'Meal 1',
+      items: '2 whole eggs · 45g egg whites · 2 slices turkey bacon · 200g fruit\n30g oats or 20g cream of rice · 1 cup green veggies',
+      note: 'Meat measured cooked · eggs as-is' },
+    { id: 'meal2', name: 'Meal 2',
+      items: '6oz chicken / tilapia / 99% ground turkey\n200g rice or 525g potatoes · 1 cup veggies',
+      note: 'Potatoes uncooked · rice & pasta cooked' },
+    { id: 'meal3', name: 'Meal 3',
+      items: '6oz chicken / tilapia / 99% ground turkey\n200g rice or 525g potatoes · 1 cup veggies', note: '' },
+    { id: 'intra', name: 'Intra Workout', isIntra: true,
+      items: '15g EAAs · 1g salt · 10g creatine',
+      note: 'Lift days only — skip on rest days' },
+    { id: 'meal4', name: 'Meal 4',
+      items: '6oz chicken / tilapia / 99% ground turkey\n200g rice or 525g potatoes · 1 cup veggies', note: '' },
+    { id: 'meal5', name: 'Meal 5',
+      items: '6oz 93/7 ground beef or salmon · 65g sourdough bread\n1 cup veggies · 8oz kombucha · 200g fruit',
+      note: 'No low-fat bread' },
+  ];
+
+  function getMealEaten() { return _get('meals:eaten:' + mealActiveDate()) || {}; }
+  function setMealEaten(map) { _set('meals:eaten:' + mealActiveDate(), map); }
+  function getMealMods() { return _get('meals:mods') || {}; } // persistent
+  function setMealMods(map) { _set('meals:mods', map); }
+
+  function renderMeals() {
+    const eaten = getMealEaten();
+    const mods  = getMealMods();
+    const list  = document.getElementById('mealList');
+    const card  = document.getElementById('mealCard');
+    const prog  = document.getElementById('mealProgressText');
+    if (!list) return;
+
+    const eatableMeals = MEALS.filter(m => !m.isIntra);
+    const doneCount = eatableMeals.filter(m => eaten[m.id]).length;
+    prog.textContent = doneCount + ' / ' + eatableMeals.length + ' eaten · resets at 6 AM';
+    card.classList.toggle('meal-all-done', doneCount === eatableMeals.length);
+
+    list.innerHTML = '';
+    MEALS.forEach(meal => {
+      const isDone = !meal.isIntra && !!eaten[meal.id];
+      const mod    = mods[meal.id] || null; // 'pre' | 'post' | null
+
+      const row = document.createElement('div');
+      row.className = 'meal-row' + (isDone ? ' meal-done' : '') + (meal.isIntra ? ' meal-intra' : '');
+
+      // Checkbox (not on intra)
+      if (!meal.isIntra) {
+        const cb = document.createElement('input');
+        cb.type = 'checkbox'; cb.className = 'meal-check'; cb.checked = isDone;
+        cb.addEventListener('change', () => {
+          const e = getMealEaten();
+          if (cb.checked) e[meal.id] = Date.now(); else delete e[meal.id];
+          setMealEaten(e); renderMeals();
+        });
+        row.appendChild(cb);
+      } else {
+        // spacer so text aligns
+        const sp = document.createElement('div');
+        sp.style.cssText = 'width:22px;flex-shrink:0';
+        row.appendChild(sp);
+      }
+
+      const body = document.createElement('div');
+      body.className = 'meal-body';
+
+      const nameEl = document.createElement('div');
+      nameEl.className = 'meal-name';
+      nameEl.textContent = meal.name + (meal.isIntra ? ' 🔥' : '');
+      body.appendChild(nameEl);
+
+      const itemsEl = document.createElement('div');
+      itemsEl.className = 'meal-items';
+      itemsEl.innerHTML = meal.items.replace(/\n/g, '<br>');
+      if (meal.note) itemsEl.innerHTML += '<br><em>' + meal.note + '</em>';
+      body.appendChild(itemsEl);
+
+      // Pre/Post modifier (not on intra)
+      if (!meal.isIntra) {
+        const modWrap = document.createElement('div');
+        modWrap.className = 'meal-modifier-wrap';
+
+        ['pre','post'].forEach(type => {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'meal-modifier-btn' + (mod === type ? ' active' : '');
+          btn.textContent = type.toUpperCase() + ' workout';
+          btn.addEventListener('click', () => {
+            const m = getMealMods();
+            m[meal.id] = (m[meal.id] === type) ? null : type;
+            setMealMods(m); renderMeals();
+          });
+          const note = document.createElement('span');
+          note.className = 'meal-modifier-note';
+          note.textContent = '+50g rice  or  +75g potatoes';
+          modWrap.appendChild(btn);
+          modWrap.appendChild(note);
+        });
+
+        body.appendChild(modWrap);
+      }
+
+      row.appendChild(body);
+      list.appendChild(row);
+    });
+  }
+
+  renderMeals();
+  window.addEventListener('storage', renderMeals);
+})();
+</script>
+
+<script>
+(() => {
+  'use strict';
+
   const storeGet = (k) => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } };
   const storeSet = (k, v) => localStorage.setItem(k, JSON.stringify(v));
 
@@ -539,17 +759,21 @@ main {
     return `${y}-${m}-${d}`;
   }
 
-  const TEMPLATE_VERSION = 5;
+  const TEMPLATE_VERSION = 6;
 
   const STACK_DEFAULTS = [
-    { id: 'm1', name: 'XXXXX - Supplement of choice', dose: '', window: 'morning', note: 'how much MG, meal times, any data below', tag: null,    ordered: true  },
-    { id: 'm2', name: 'XXXXX - Supplement of choice', dose: '', window: 'morning', note: 'how much MG, meal times, any data below', tag: 'stack', ordered: true  },
-    { id: 'm3', name: 'XXXXX - Supplement of choice', dose: '', window: 'morning', note: 'how much MG, meal times, any data below', tag: null,    ordered: true  },
-    { id: 'l1', name: 'XXXXX - Supplement of choice', dose: '', window: 'lunch',   note: 'how much MG, meal times, any data below', tag: null,    ordered: true  },
-    { id: 'l2', name: 'XXXXX - Supplement of choice', dose: '', window: 'lunch',   note: 'how much MG, meal times, any data below', tag: null,    ordered: true  },
-    { id: 'e1', name: 'XXXXX - Supplement of choice', dose: '', window: 'evening', note: 'how much MG, meal times, any data below', tag: null,    ordered: true  },
-    { id: 'e2', name: 'XXXXX - Supplement of choice', dose: '', window: 'evening', note: 'how much MG, meal times, any data below', tag: 'not-ordered', ordered: false },
-    { id: 'e3', name: 'XXXXX - Supplement of choice', dose: '', window: 'evening', note: 'how much MG, meal times, any data below', tag: null,    ordered: true  },
+    // Morning
+    { id: 'reta',     name: 'Retatrutide',                  dose: '0.5mg',        window: 'morning', note: 'Mon & Fri only — inject morning',                      tag: null, ordered: true },
+    { id: 'enzymes',  name: 'Digestive Enzymes (Morphogen)', dose: '1 pill',       window: 'morning', note: 'Take with meals 1, 2, and 5',                          tag: null, ordered: true },
+    // During day
+    { id: 'testc',    name: 'Test C',                        dose: '100mg/shot',   window: 'anytime', note: '4x/week: Mon, Wed, Fri, Sat — space shots evenly',     tag: null, ordered: true },
+    { id: 'eq',       name: 'EQ (Boldenone)',                dose: '50mg/shot',    window: 'anytime', note: '4x/week: Mon, Wed, Fri, Sat — can pin with Test C',    tag: null, ordered: true },
+    // Afternoon
+    { id: 'hgh',      name: 'HGH',                          dose: '3 IU',         window: 'lunch',   note: '3 PM — at least 30 min after Meal 5',                  tag: null, ordered: true },
+    // Evening / before bed
+    { id: 'fishoil',  name: 'Fish Oil',                     dose: '3000mg',       window: 'evening', note: 'Take at night',                                        tag: null, ordered: true },
+    { id: 'magnesium',name: 'Calm Magnesium (Glycinate)',   dose: '500–1000mg',   window: 'evening', note: 'Before bed',                                           tag: null, ordered: true },
+    { id: 'k2d3',     name: 'K2 / D3',                      dose: '1 serving',    window: 'evening', note: 'Before bed — take together',                          tag: null, ordered: true },
   ];
 
   const STACK_WINDOWS = [
