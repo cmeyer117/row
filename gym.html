@@ -2773,9 +2773,7 @@ img, video, canvas, svg { max-width: 100%; }
     if (match) state.filterDay = match.id;
   })();
 
-  $('exSelect').addEventListener('change', e => {
-    state.currentEx = e.target.value; saveState(); renderAll();
-  });
+  // $('exSelect') removed — selection is now handled by workout list row clicks
   $('weightDownBtn').addEventListener('click', () => {
     const ex = getCurrentEx(); if (!ex || ex.bw) return;
     const w = parseFloat($('weightInput').value) || 0;
@@ -2903,11 +2901,7 @@ img, video, canvas, svg { max-width: 100%; }
     $('exStepField').style.display = isBw ? 'none' : '';
   }
   $('exBw').addEventListener('change', toggleBwFields);
-  $('addExBtn').addEventListener('click', () => openExModal('add'));
-  $('editExBtn').addEventListener('click', () => {
-    const ex = getCurrentEx();
-    if (ex) openExModal('edit', ex);
-  });
+  // addExBtn / editExBtn removed — replaced by wlAddBtn (ad-hoc) and settings modal
   $('exModalCancel').addEventListener('click', () => $('exModalBg').classList.remove('show'));
   $('exModalSave').addEventListener('click', () => {
     const name = $('exName').value.trim();
