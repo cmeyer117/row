@@ -1312,6 +1312,234 @@ img, video, canvas, svg { max-width: 100%; }
 }
 
 .hidden { display: none !important; }
+
+/* ============================================================
+   WORKOUT LIST
+   ============================================================ */
+.wl-section { margin-bottom: 18px; }
+
+.wl-list { display: flex; flex-direction: column; gap: 6px; }
+
+.wl-row {
+  display: grid;
+  grid-template-columns: 28px 1fr auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  background: rgba(255,255,255,0.035);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.wl-row:hover { background: rgba(255,255,255,0.06); }
+.wl-row.is-active {
+  background: rgba(255,255,255,0.07);
+  border-color: rgba(255,255,255,0.18);
+}
+.wl-row.is-done {
+  opacity: 0.55;
+  background: rgba(110,231,183,0.04);
+  border-color: rgba(110,231,183,0.12);
+}
+
+.wl-num {
+  font-size: 11px; font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--text-4);
+  text-align: center;
+}
+.wl-row.is-active .wl-num { color: var(--text-1); }
+
+.wl-name {
+  font-size: 14px; font-weight: 600;
+  color: var(--text-1);
+  line-height: 1.25;
+  min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.wl-variant-tag {
+  display: inline-block;
+  font-size: 10px; font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--good);
+  margin-left: 6px;
+  letter-spacing: 0.04em;
+}
+
+.wl-badge {
+  font-size: 11px; font-weight: 700;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-3);
+  white-space: nowrap;
+}
+.wl-badge.is-done { color: var(--good); }
+
+.wl-alt-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-3);
+  font-family: var(--font-mono);
+  font-size: 10px; font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 5px 9px; border-radius: 6px;
+  cursor: pointer; white-space: nowrap;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.wl-alt-btn:hover {
+  color: var(--text-1);
+  border-color: rgba(255,255,255,0.25);
+  background: rgba(255,255,255,0.04);
+}
+
+/* Add exercise button */
+.wl-add-btn {
+  width: 100%; margin-top: 8px;
+  padding: 12px;
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  background: transparent;
+  color: var(--text-3);
+  font-family: inherit; font-size: 12px; font-weight: 600;
+  letter-spacing: 0.06em; text-transform: uppercase;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.wl-add-btn:hover { color: var(--text-1); border-color: rgba(255,255,255,0.22); }
+
+/* Adhoc inline form */
+.wl-adhoc-form {
+  display: none;
+  gap: 8px; align-items: center;
+  margin-top: 8px;
+  padding: 12px 14px;
+  background: rgba(255,255,255,0.025);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.wl-adhoc-form.is-open { display: flex; }
+.wl-adhoc-input {
+  flex: 1; min-width: 0;
+  padding: 9px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  background: rgba(0,0,0,0.28);
+  color: var(--text-1);
+  font-family: inherit; font-size: 14px;
+  outline: none;
+}
+.wl-adhoc-input:focus { border-color: rgba(255,255,255,0.35); }
+.wl-adhoc-input::placeholder { color: var(--text-4); }
+.wl-adhoc-save {
+  padding: 9px 16px;
+  border: 1px solid rgba(255,255,255,0.85);
+  border-radius: 10px;
+  background: linear-gradient(180deg,#fff 0%,#e8e5dd 100%);
+  color: #0a0a0b;
+  font-family: inherit; font-size: 13px; font-weight: 700;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.wl-adhoc-cancel {
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-2);
+  font-family: inherit; font-size: 13px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ============================================================
+   SUBSTITUTION PICKER MODAL
+   ============================================================ */
+.sub-modal-bg {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.65);
+  backdrop-filter: blur(6px);
+  z-index: 200;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0 0 env(safe-area-inset-bottom);
+}
+.sub-modal-bg.show { display: flex; }
+
+.sub-modal {
+  width: 100%; max-width: 480px;
+  background: #111113;
+  border: 1px solid var(--border-strong);
+  border-radius: 20px 20px 0 0;
+  padding: 22px 20px 32px;
+  max-height: 72vh;
+  overflow-y: auto;
+}
+.sub-modal-title {
+  font-size: 13px; font-weight: 700;
+  letter-spacing: 0.10em; text-transform: uppercase;
+  color: var(--text-3);
+  margin-bottom: 14px;
+}
+.sub-option {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px;
+  padding: 13px 14px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: rgba(255,255,255,0.025);
+  margin-bottom: 6px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.sub-option:hover { background: rgba(255,255,255,0.055); }
+.sub-option.is-active {
+  background: rgba(110,231,183,0.08);
+  border-color: rgba(110,231,183,0.25);
+}
+.sub-option-name {
+  font-size: 14px; font-weight: 600;
+  color: var(--text-1);
+  flex: 1; min-width: 0;
+}
+.sub-option.is-active .sub-option-name { color: var(--good); }
+.sub-option-stars {
+  font-size: 11px;
+  color: var(--text-3);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+.sub-option.is-active .sub-option-stars { color: rgba(110,231,183,0.7); }
+
+.sub-modal-actions {
+  display: flex; gap: 8px; margin-top: 14px;
+}
+.sub-set-default {
+  flex: 1; padding: 11px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-2);
+  font-family: inherit; font-size: 13px; font-weight: 600;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.sub-set-default:hover { background: rgba(255,255,255,0.04); color: var(--text-1); }
+.sub-cancel {
+  padding: 11px 18px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-3);
+  font-family: inherit; font-size: 13px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
