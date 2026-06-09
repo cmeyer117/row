@@ -242,16 +242,18 @@ main {
 .stack-window-time { font-size: 11px; color: var(--text-tertiary); font-weight: 500; }
 
 .stack-item {
-  display: grid;
-  grid-template-columns: 32px 1fr auto auto;
-  gap: 10px;
-  align-items: center;
   padding: 10px 12px;
   border-radius: 10px;
   background: var(--bg-secondary);
   margin-bottom: 6px;
   border: 1px solid transparent;
   transition: background 0.2s, border-color 0.2s;
+}
+.stack-item-row {
+  display: grid;
+  grid-template-columns: 32px 1fr auto auto;
+  gap: 10px;
+  align-items: center;
 }
 .stack-item:hover { background: rgba(255,255,255,0.05); }
 .stack-item.taken { background: rgba(29,158,117,0.08); }
@@ -325,25 +327,51 @@ main {
 .stack-item-tag.tag-stack { background: var(--tag-stack-bg); color: var(--tag-stack); }
 .stack-item-tag.tag-not-ordered { background: var(--warning-bg); color: var(--text-tertiary); }
 
-.stack-low-btn {
+.stack-edit-btn {
   background: transparent;
   border: 1px solid var(--border-strong);
   color: var(--text-tertiary);
-  font-size: 10px;
-  padding: 5px 9px; border-radius: 6px;
+  font-size: 13px;
+  padding: 4px 9px; border-radius: 6px;
   cursor: pointer;
-  font-family: var(--font-mono);
-  font-weight: 600; letter-spacing: 0.04em;
-  white-space: nowrap;
-  display: inline-flex; align-items: center; gap: 4px;
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 28px; min-height: 28px;
   transition: all 0.15s;
+  opacity: 0.6;
 }
-.stack-low-btn:hover { border-color: rgba(163,45,45,0.4); color: var(--warning); }
-.stack-low-btn.is-low {
-  background: var(--warning-bg);
-  border-color: rgba(163,45,45,0.4);
-  color: var(--warning);
+.stack-item:hover .stack-edit-btn { opacity: 1; }
+.stack-edit-btn:hover { border-color: rgba(255,255,255,0.28); color: var(--text-primary); }
+.stack-edit-btn.active { color: var(--accent); border-color: rgba(29,158,117,0.4); opacity: 1; }
+
+.stack-edit-panel {
+  display: none;
+  flex-direction: column; gap: 6px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-soft);
 }
+.stack-edit-panel.open { display: flex; }
+.stack-edit-row { display: flex; gap: 6px; flex-wrap: wrap; }
+.stack-edit-input {
+  flex: 1; min-width: 80px;
+  font-size: 12px; padding: 7px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border-strong);
+  background: var(--bg-input);
+  color: var(--text-primary);
+  font-family: inherit; outline: none;
+  transition: border-color 0.18s;
+}
+.stack-edit-input::placeholder { color: var(--text-tertiary); }
+.stack-edit-input:focus { border-color: rgba(255,255,255,0.35); }
+.stack-edit-save {
+  font-size: 12px; padding: 7px 14px;
+  border-radius: 8px; border: 0;
+  background: var(--accent); color: #fff;
+  font-weight: 700; cursor: pointer;
+  transition: filter 0.15s;
+}
+.stack-edit-save:hover { filter: brightness(1.1); }
 
 .stack-item-del {
   background: transparent;
@@ -922,10 +950,11 @@ main {
     setItems(items);
   }
 
+  let editingId = null;
+
   function render() {
     const items = getItems();
     const taken = getTaken();
-    const low = getLow();
     const totalCount = items.length;
     const takenCount = items.filter(i => taken[i.id]).length;
     document.getElementById('stackProgressText').textContent =
@@ -936,58 +965,48 @@ main {
     const groupsEl = document.getElementById('stackGroups');
     groupsEl.innerHTML = '';
 
-    const now = new Date();
-    const nowHour = now.getHours() + (now.getMinutes() / 60);
-
-    STACK_WINDOWS.forEach(win => {
-      const winItems = items.filter(i => (i.window || 'anytime') === win.key);
-      if (winItems.length === 0) return;
-
-      const group = document.createElement('div');
-      group.className = 'stack-window';
-      group.innerHTML = `
-        <div class="stack-window-header">
-          <span class="stack-window-icon">${win.icon}</span>
-          <span class="stack-window-title">${win.title}</span>
-          <span class="stack-window-time">${win.time}</span>
-        </div>`;
-
-      const isPastCutoff = win.cutoffHour !== null && nowHour > win.cutoffHour;
-
-      winItems.forEach(item => {
-        const isTaken = !!taken[item.id];
-        const isLow = low.includes(item.id);
-        const isMissed = !isTaken && isPastCutoff;
-
-        const row = document.createElement('div');
-        row.className = 'stack-item' + (isTaken ? ' taken' : '') + (isMissed ? ' missed' : '');
-
-        let tagHtml = '';
-        if (item.tag === 'stack') tagHtml = '<span class="stack-item-tag tag-stack">stack</span>';
-        else if (item.tag === 'not-ordered') tagHtml = '<span class="stack-item-tag tag-not-ordered">not ordered</span>';
-
-        row.innerHTML = `
-          <button class="stack-check ${isTaken ? 'checked' : ''}" data-action="toggle" data-id="${item.id}" aria-label="Mark taken">${isTaken ? '✓' : ''}</button>
-          <div class="stack-item-body">
-            <div class="stack-item-name" data-edit="name" data-id="${item.id}">
-              <span class="stack-item-name-text">${escapeHtml(item.name)}</span>${tagHtml}
-            </div>
-            <div class="stack-item-meta" data-edit="meta" data-id="${item.id}">${escapeHtml(metaText(item))}</div>
-          </div>
-          <button class="stack-low-btn ${isLow ? 'is-low' : ''}" data-action="low" data-id="${item.id}">↓ Running low</button>
-          <button class="stack-item-del" data-action="del" data-id="${item.id}" aria-label="Delete">×</button>`;
-
-        group.appendChild(row);
-      });
-
-      groupsEl.appendChild(group);
-    });
-
-    if (groupsEl.children.length === 0) {
+    if (items.length === 0) {
       groupsEl.innerHTML = `<div class="stack-window-empty">No items yet — add one below to start your stack.</div>`;
+      renderTicker(); return;
     }
 
-    // Sync ticker after every render
+    items.forEach(item => {
+      const isTaken = !!taken[item.id];
+      const isEditing = editingId === item.id;
+
+      const el = document.createElement('div');
+      el.className = 'stack-item' + (isTaken ? ' taken' : '');
+
+      // main row
+      const mainRow = document.createElement('div');
+      mainRow.className = 'stack-item-row';
+      mainRow.innerHTML = `
+        <button class="stack-check ${isTaken ? 'checked' : ''}" data-action="toggle" data-id="${item.id}" aria-label="Mark taken">${isTaken ? '✓' : ''}</button>
+        <div class="stack-item-body">
+          <div class="stack-item-name"><span class="stack-item-name-text">${escapeHtml(item.name)}</span></div>
+          <div class="stack-item-meta">${escapeHtml(metaText(item))}</div>
+        </div>
+        <button class="stack-edit-btn${isEditing ? ' active' : ''}" data-action="edit" data-id="${item.id}" aria-label="Edit">✏️</button>
+        <button class="stack-item-del" data-action="del" data-id="${item.id}" aria-label="Delete">×</button>`;
+      el.appendChild(mainRow);
+
+      // edit panel
+      const panel = document.createElement('div');
+      panel.className = 'stack-edit-panel' + (isEditing ? ' open' : '');
+      panel.innerHTML = `
+        <div class="stack-edit-row">
+          <input class="stack-edit-input" data-field="name" placeholder="Name" value="${escapeHtml(item.name)}">
+          <input class="stack-edit-input" data-field="dose" placeholder="Dose" value="${escapeHtml(item.dose || '')}">
+        </div>
+        <div class="stack-edit-row">
+          <input class="stack-edit-input" data-field="note" placeholder="When to take / notes" value="${escapeHtml(item.note || '')}" style="flex:2">
+          <button class="stack-edit-save" data-id="${item.id}">Save</button>
+        </div>`;
+      el.appendChild(panel);
+
+      groupsEl.appendChild(el);
+    });
+
     renderTicker();
   }
 
@@ -1084,82 +1103,32 @@ main {
 
   document.getElementById('stackGroups').addEventListener('click', (e) => {
     const btn = e.target.closest('[data-action]');
-    if (!btn) return;
-    e.stopPropagation();
-    const id = btn.dataset.id;
-    if (btn.dataset.action === 'toggle') toggleTaken(id);
-    else if (btn.dataset.action === 'low') toggleLow(id);
-    else if (btn.dataset.action === 'del') deleteItem(id);
-  });
-  document.getElementById('stackGroups').addEventListener('pointerdown', (e) => {
-    const btn = e.target.closest('[data-action="del"]');
-    if (!btn) return;
-    e.preventDefault(); e.stopPropagation();
-    deleteItem(btn.dataset.id);
-  });
-  document.getElementById('stackGroups').addEventListener('click', (e) => {
-    const editEl = e.target.closest('[data-edit]');
-    if (!editEl) return;
-    if (e.target.closest('[data-action]')) return;
-    if (editEl.getAttribute('contenteditable') === 'true') return;
-    startEdit(editEl);
-  });
-
-  function startEdit(el) {
-    const id = el.dataset.id;
-    const field = el.dataset.edit;
-    if (field === 'name') {
-      const textSpan = el.querySelector('.stack-item-name-text');
-      if (!textSpan) return;
-      textSpan.setAttribute('contenteditable', 'true');
-      textSpan.style.outline = '1px solid rgba(255,255,255,0.25)';
-      textSpan.style.outlineOffset = '4px';
-      textSpan.style.borderRadius = '4px';
-      textSpan.focus();
-      placeCaretAtEnd(textSpan);
-      const finish = (commit) => {
-        textSpan.removeAttribute('contenteditable');
-        textSpan.style.outline = ''; textSpan.style.outlineOffset = '';
-        if (commit) {
-          const newVal = textSpan.textContent.trim();
-          if (newVal) updateItem(id, 'name', newVal); else render();
-        } else render();
-      };
-      textSpan.addEventListener('blur', () => finish(true), { once: true });
-      textSpan.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') { e.preventDefault(); textSpan.blur(); }
-        if (e.key === 'Escape') { textSpan.blur(); render(); }
-      });
-    }
-    if (field === 'meta') {
-      el.setAttribute('contenteditable', 'true');
-      el.focus(); placeCaretAtEnd(el);
-      const finish = (commit) => {
-        el.removeAttribute('contenteditable');
-        if (commit) {
-          const text = el.textContent.trim();
-          const parts = text.split(/\s*·\s*/);
-          updateItem(id, 'dose', parts[0] || '');
-          updateItem(id, 'note', parts.slice(1).join(' · '));
-        }
+    if (btn) {
+      e.stopPropagation();
+      const id = btn.dataset.id;
+      if (btn.dataset.action === 'toggle') toggleTaken(id);
+      else if (btn.dataset.action === 'del') deleteItem(id);
+      else if (btn.dataset.action === 'edit') {
+        editingId = (editingId === id) ? null : id;
         render();
-      };
-      el.addEventListener('blur', () => finish(true), { once: true });
-      el.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') { e.preventDefault(); el.blur(); }
-        if (e.key === 'Escape') { el.blur(); render(); }
-      });
+      }
+      return;
     }
-  }
-
-  function placeCaretAtEnd(el) {
-    const range = document.createRange();
-    range.selectNodeContents(el);
-    range.collapse(false);
-    const sel = window.getSelection();
-    sel.removeAllRanges();
-    sel.addRange(range);
-  }
+    // Save button inside edit panel
+    const saveBtn = e.target.closest('.stack-edit-save');
+    if (saveBtn) {
+      const id = saveBtn.dataset.id;
+      const panel = saveBtn.closest('.stack-edit-panel');
+      const nameVal = panel.querySelector('[data-field="name"]').value.trim();
+      const doseVal = panel.querySelector('[data-field="dose"]').value.trim();
+      const noteVal = panel.querySelector('[data-field="note"]').value.trim();
+      if (nameVal) updateItem(id, 'name', nameVal);
+      updateItem(id, 'dose', doseVal);
+      updateItem(id, 'note', noteVal);
+      editingId = null;
+      render();
+    }
+  });
 
   // ====== ADD FORM + SEARCH AUTOCOMPLETE ======
   const nameInput = document.getElementById('stackAddName');
