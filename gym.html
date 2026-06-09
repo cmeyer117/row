@@ -1806,9 +1806,14 @@ img, video, canvas, svg { max-width: 100%; }
 
   function getSession(exId) {
     const dk = getActiveDate();
+    return (state.sessions[dk] || {})[exId] || { activeVariant: null };
+  }
+
+  function setSessionVariant(exId, variant) {
+    const dk = getActiveDate();
     if (!state.sessions[dk]) state.sessions[dk] = {};
     if (!state.sessions[dk][exId]) state.sessions[dk][exId] = { activeVariant: null };
-    return state.sessions[dk][exId];
+    state.sessions[dk][exId].activeVariant = variant;
   }
 
   function getTodaySets(exId) {
