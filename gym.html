@@ -476,6 +476,22 @@ img, video, canvas, svg { max-width: 100%; }
   color: #0a0a0b; border-color: transparent;
   font-weight: 800;
 }
+.po-reps-custom {
+  width: 100%; margin-top: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(0,0,0,0.28);
+  color: var(--text-1);
+  font-family: inherit; font-size: 14px; font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  outline: none;
+  -moz-appearance: textfield;
+}
+.po-reps-custom::-webkit-outer-spin-button,
+.po-reps-custom::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.po-reps-custom:focus { border-color: rgba(255,255,255,0.35); }
+.po-reps-custom::placeholder { color: var(--text-4); font-weight: 400; }
 
 /* ----- Primary button ----- */
 .po-btn-primary {
@@ -1742,7 +1758,7 @@ img, video, canvas, svg { max-width: 100%; }
     </div>
 
     <!-- Log a set -->
-    <div class="po-sub-section">
+    <div class="po-sub-section" id="logFormWrap">
       <div class="po-sub-title">Log today's top set</div>
       <div class="po-bw-banner" id="bwBanner">Bodyweight — log reps only</div>
       <div class="po-last-set" id="lastSet">
@@ -1772,6 +1788,7 @@ img, video, canvas, svg { max-width: 100%; }
             <button type="button" class="po-reps-pill" data-v="11">11</button>
             <button type="button" class="po-reps-pill" data-v="12">12</button>
           </div>
+          <input type="number" id="repsCustom" class="po-reps-custom" inputmode="numeric" min="1" max="99" placeholder="or type a number">
         </div>
       </div>
       <button class="po-btn-primary" id="logBtn">Log set</button>
@@ -2086,8 +2103,10 @@ img, video, canvas, svg { max-width: 100%; }
   function estimate1RM(w, r) { if (r < 2) return w; return w * (1 + r / 30); }
   function roundToStep(v, s) { return Math.round(v / s) * s; }
   function getFiltered() {
-    return state.exercises.filter(e =>
+    const program = state.exercises.filter(e =>
       (e.gym === state.filterGym || e.gym === 'both') && e.day === state.filterDay);
+    const adhoc = getAdhocExercises().filter(a => a.day === state.filterDay);
+    return [...program, ...adhoc];
   }
   function getCurrentEx() {
     const f = getFiltered();
@@ -2150,26 +2169,204 @@ img, video, canvas, svg { max-width: 100%; }
       });
     });
   }
-  function renderSelect() {
-    const sel = $('exSelect');
-    const f = getFiltered();
-    const noMsg = $('noExMsg');
-    const editBtn = $('editExBtn');
-    const logBtn = $('logBtn');
-    if (!f.length) {
-      sel.innerHTML = '<option>—</option>';
-      sel.disabled = true; editBtn.disabled = true; logBtn.disabled = true;
-      noMsg.style.display = 'block'; state.currentEx = null;
+  function renderWorkoutList() {
+    const listEl = document.getElementById('wlList');
+    if (!listEl) return;
+    const exercises = getFiltered();
+    const adhoc = getAdhocExercises();
+
+    listEl.innerHTML = '';
+
+    const allItems = [
+      ...exercises.map(ex => ({ ex, isAdhoc: false })),
+      ...adhoc.map(a  => ({ ex: a, isAdhoc: true  }))
+    ];
+
+    if (!allItems.length) {
+      listEl.innerHTML = '<div class="po-no-ex">No exercises for this day — add one below.</div>';
       return;
     }
-    sel.disabled = false; editBtn.disabled = false; logBtn.disabled = false;
-    noMsg.style.display = 'none';
-    if (!f.find(e => e.id === state.currentEx)) state.currentEx = f[0].id;
-    sel.innerHTML = f.map(e => {
-      const wLbl = e.bw ? ' · BW' : (e.startWeight ? ' · ' + e.startWeight + unit() : '');
-      const sh = e.gym === 'both' ? ' ★' : '';
-      return '<option value="' + e.id + '"' + (e.id === state.currentEx ? ' selected' : '') + '>' + escape(e.name) + wLbl + sh + '</option>';
-    }).join('');
+
+    allItems.forEach(({ ex, isAdhoc }, idx) => {
+      const sess    = getSession(ex.id);
+      const variant = sess.activeVariant;
+      const displayName = variant || ex.name;
+      const numSets = ex.numSets || 2;
+      const todaySets = getTodaySets(ex.id);
+      const setsDone = todaySets.length;
+      const isDone   = setsDone >= numSets;
+      const isActive = state.currentEx === ex.id;
+      const hasSubs  = Array.isArray(ex.subs) && ex.subs.length > 0;
+
+      const row = document.createElement('div');
+      row.className = 'wl-row' +
+        (isActive ? ' is-active' : '') +
+        (isDone   ? ' is-done'   : '');
+      row.dataset.exId = ex.id;
+
+      const numEl = document.createElement('div');
+      numEl.className = 'wl-num';
+      numEl.textContent = isDone ? '✓' : (idx + 1);
+      row.appendChild(numEl);
+
+      const nameEl = document.createElement('div');
+      nameEl.className = 'wl-name';
+      nameEl.textContent = displayName;
+      if (variant) {
+        const tag = document.createElement('span');
+        tag.className = 'wl-variant-tag';
+        tag.textContent = '★'.repeat(Math.min(ex.subs.find(s => s.name === variant)?.stars || 0, 6));
+        nameEl.appendChild(tag);
+      }
+      row.appendChild(nameEl);
+
+      const badgeEl = document.createElement('div');
+      badgeEl.className = 'wl-badge' + (isDone ? ' is-done' : '');
+      badgeEl.textContent = setsDone + '/' + numSets;
+      row.appendChild(badgeEl);
+
+      const altEl = document.createElement('button');
+      altEl.type = 'button';
+      if (hasSubs && !isAdhoc) {
+        altEl.className = 'wl-alt-btn';
+        altEl.textContent = 'Alt';
+        altEl.addEventListener('click', e => {
+          e.stopPropagation();
+          openSubPicker(ex.id);
+        });
+      } else {
+        altEl.style.visibility = 'hidden';
+        altEl.style.pointerEvents = 'none';
+        altEl.className = 'wl-alt-btn';
+        altEl.textContent = 'Alt';
+      }
+      row.appendChild(altEl);
+
+      row.addEventListener('click', () => {
+        state.currentEx = ex.id;
+        saveState();
+        renderAll();
+        const formEl = document.getElementById('logFormWrap');
+        if (formEl) formEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+
+      listEl.appendChild(row);
+    });
+  }
+  function renderSelect() {
+    // replaced by renderWorkoutList()
+  }
+
+  // ============================================================
+  // SUBSTITUTION PICKER
+  // ============================================================
+  let subPickerExId = null;
+  let subPickerSelected = null;
+
+  function openSubPicker(exId) {
+    const ex = state.exercises.find(e => e.id === exId);
+    if (!ex || !ex.subs || !ex.subs.length) return;
+    subPickerExId = exId;
+    const sess = getSession(exId);
+    subPickerSelected = sess.activeVariant;
+
+    document.getElementById('subModalTitle').textContent = ex.name;
+
+    const optionsEl = document.getElementById('subModalOptions');
+    optionsEl.innerHTML = '';
+    optionsEl.appendChild(buildSubOption(null, ex.name + ' (primary)', null, subPickerSelected === null));
+    ex.subs.forEach(sub => {
+      optionsEl.appendChild(buildSubOption(sub.name, sub.name, sub.stars, subPickerSelected === sub.name));
+    });
+
+    document.getElementById('subModalBg').classList.add('show');
+  }
+
+  function buildSubOption(value, label, stars, isActive) {
+    const div = document.createElement('div');
+    div.className = 'sub-option' + (isActive ? ' is-active' : '');
+    div.dataset.value = value || '';
+
+    const nameEl = document.createElement('div');
+    nameEl.className = 'sub-option-name';
+    nameEl.textContent = label;
+    div.appendChild(nameEl);
+
+    if (stars !== null) {
+      const starsEl = document.createElement('div');
+      starsEl.className = 'sub-option-stars';
+      starsEl.textContent = '★'.repeat(Math.min(stars, 6)) + (stars > 5 ? '+' : '');
+      div.appendChild(starsEl);
+    }
+
+    div.addEventListener('click', () => {
+      subPickerSelected = value || null;
+      div.closest('#subModalOptions').querySelectorAll('.sub-option').forEach(o => o.classList.remove('is-active'));
+      div.classList.add('is-active');
+      applySubVariant(false);
+    });
+
+    return div;
+  }
+
+  function applySubVariant(setDefault) {
+    if (!subPickerExId) return;
+    setSessionVariant(subPickerExId, subPickerSelected);
+    if (setDefault) {
+      const ex = state.exercises.find(e => e.id === subPickerExId);
+      if (ex && subPickerSelected) ex.name = subPickerSelected;
+    }
+    saveState();
+    closeSubPicker();
+    renderAll();
+  }
+
+  function closeSubPicker() {
+    document.getElementById('subModalBg').classList.remove('show');
+    subPickerExId = null;
+  }
+
+  // ============================================================
+  // AD-HOC EXERCISE
+  // ============================================================
+  function openAdhocForm() {
+    const form = document.getElementById('wlAdhocForm');
+    const input = document.getElementById('wlAdhocInput');
+    form.classList.add('is-open');
+    input.value = '';
+    input.focus();
+  }
+
+  function closeAdhocForm() {
+    document.getElementById('wlAdhocForm').classList.remove('is-open');
+    document.getElementById('wlAdhocInput').value = '';
+  }
+
+  function saveAdhocExercise() {
+    const name = document.getElementById('wlAdhocInput').value.trim();
+    if (!name) return;
+    const dk = getActiveDate();
+    if (!state.sessions[dk]) state.sessions[dk] = {};
+    const id = 'adhoc_' + Date.now() + '_' + Math.random().toString(36).slice(2, 5);
+    state.sessions[dk][id] = {
+      id, name,
+      isAdhoc: true,
+      day: state.filterDay,
+      gym: state.filterGym,
+      repMin: 8, repMax: 12,
+      numSets: 2,
+      step: 2.5, startWeight: 0,
+      subs: [],
+      activeVariant: null
+    };
+    state.currentEx = id;
+    saveState();
+    closeAdhocForm();
+    renderAll();
+    setTimeout(() => {
+      const formEl = document.getElementById('logFormWrap');
+      if (formEl) formEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 50);
   }
   function renderForm() {
     const ex = getCurrentEx();
@@ -2380,9 +2577,12 @@ img, video, canvas, svg { max-width: 100%; }
     }
     row.innerHTML = html;
     row.dataset.value = String(active);
+    const custom = document.getElementById('repsCustom');
+    if (custom) custom.value = '';  // clear custom so pills show the active selection
   }
 
   function renderAll() {
+    renderWorkoutList();
     renderDayPill();
     renderFilters(); renderSelect(); renderForm(); renderLastSet();
     renderRepsRow();
@@ -2595,6 +2795,32 @@ img, video, canvas, svg { max-width: 100%; }
     $('repsRow').querySelectorAll('.po-reps-pill').forEach(x => x.classList.remove('active'));
     p.classList.add('active');
     $('repsRow').dataset.value = p.dataset.v;
+    const custom = $('repsCustom');
+    if (custom) custom.value = '';  // clear custom input — pill selection takes over
+  });
+  $('repsCustom').addEventListener('input', () => {
+    const v = parseInt($('repsCustom').value, 10);
+    if (v > 0) {
+      $('repsRow').dataset.value = String(v);
+      // deactivate all pills since we have a custom value
+      $('repsRow').querySelectorAll('.po-reps-pill').forEach(x => x.classList.remove('active'));
+    }
+  });
+
+  // Sub picker modal buttons
+  document.getElementById('subSetDefault').addEventListener('click', () => applySubVariant(true));
+  document.getElementById('subCancel').addEventListener('click', closeSubPicker);
+  document.getElementById('subModalBg').addEventListener('click', e => {
+    if (e.target === document.getElementById('subModalBg')) closeSubPicker();
+  });
+
+  // Ad-hoc exercise buttons
+  document.getElementById('wlAddBtn').addEventListener('click', openAdhocForm);
+  document.getElementById('wlAdhocSave').addEventListener('click', saveAdhocExercise);
+  document.getElementById('wlAdhocCancel').addEventListener('click', closeAdhocForm);
+  document.getElementById('wlAdhocInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') saveAdhocExercise();
+    if (e.key === 'Escape') closeAdhocForm();
   });
   $('logBtn').addEventListener('click', () => {
     const ex = getCurrentEx();
