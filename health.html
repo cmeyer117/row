@@ -251,7 +251,7 @@ main {
 }
 .stack-item-row {
   display: grid;
-  grid-template-columns: 32px 1fr auto auto;
+  grid-template-columns: 32px 1fr auto;
   gap: 10px;
   align-items: center;
 }
@@ -986,8 +986,7 @@ main {
           <div class="stack-item-name"><span class="stack-item-name-text">${escapeHtml(item.name)}</span></div>
           <div class="stack-item-meta">${escapeHtml(metaText(item))}</div>
         </div>
-        <button class="stack-edit-btn${isEditing ? ' active' : ''}" data-action="edit" data-id="${item.id}" aria-label="Edit">✏️</button>
-        <button class="stack-item-del" data-action="del" data-id="${item.id}" aria-label="Delete">×</button>`;
+        <button class="stack-edit-btn${isEditing ? ' active' : ''}" data-action="edit" data-id="${item.id}" aria-label="Edit">✏️</button>`;
       el.appendChild(mainRow);
 
       // edit panel
@@ -1001,6 +1000,7 @@ main {
         <div class="stack-edit-row">
           <input class="stack-edit-input" data-field="note" placeholder="When to take / notes" value="${escapeHtml(item.note || '')}" style="flex:2">
           <button class="stack-edit-save" data-id="${item.id}">Save</button>
+          <button class="stack-item-del" data-action="del" data-id="${item.id}" aria-label="Delete" style="opacity:1">🗑</button>
         </div>`;
       el.appendChild(panel);
 
