@@ -1766,6 +1766,7 @@ img, video, canvas, svg { max-width: 100%; }
     s.days  = (Array.isArray(s.days)  && s.days.length)  ? s.days  : CONFIG.days.slice();
     s.exercises = Array.isArray(s.exercises) ? s.exercises : buildDefaultExercises();
     s.logs = (s.logs && typeof s.logs === 'object') ? s.logs : {};
+    if (!s.sessions || typeof s.sessions !== 'object') s.sessions = {};
     s.filterGym = s.filterGym || s.gyms[0].id;
     s.filterDay = s.filterDay || s.days[0].id;
     // Split rotation lives in state so the user can edit it via the pill modal.
@@ -1794,6 +1795,39 @@ img, video, canvas, svg { max-width: 100%; }
     }
     return s;
   }
+
+  function getActiveDate() {
+    const now = new Date();
+    if (now.getHours() < 6) now.setDate(now.getDate() - 1);
+    return now.getFullYear() + '-' +
+      String(now.getMonth() + 1).padStart(2, '0') + '-' +
+      String(now.getDate()).padStart(2, '0');
+  }
+
+  function getSession(exId) {
+    const dk = getActiveDate();
+    if (!state.sessions[dk]) state.sessions[dk] = {};
+    if (!state.sessions[dk][exId]) state.sessions[dk][exId] = { activeVariant: null };
+    return state.sessions[dk][exId];
+  }
+
+  function getTodaySets(exId) {
+    const dk = getActiveDate();
+    return (state.logs[exId] || []).filter(l => {
+      const d = new Date(l.date);
+      const localDk = d.getFullYear() + '-' +
+        String(d.getMonth() + 1).padStart(2, '0') + '-' +
+        String(d.getDate()).padStart(2, '0');
+      return localDk === dk;
+    });
+  }
+
+  function getAdhocExercises() {
+    const dk = getActiveDate();
+    const sess = state.sessions[dk] || {};
+    return Object.values(sess).filter(v => v.isAdhoc);
+  }
+
   function saveState() {
     try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch (e) {}
   }
