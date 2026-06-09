@@ -507,6 +507,14 @@ img, video, canvas, svg { max-width: 100%; }
 .po-btn-primary:hover { transform: translateY(-1px); }
 .po-btn-primary:active { transform: translateY(0) scale(0.98); }
 .po-btn-primary:disabled { opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: none; }
+.po-undo-btn {
+  width: 100%; margin-top: 8px; padding: 11px;
+  border: 1px solid var(--border); border-radius: 12px;
+  background: transparent; color: var(--text-3);
+  font-family: inherit; font-size: 13px; font-weight: 600;
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.po-undo-btn:hover { color: var(--text-1); border-color: rgba(255,255,255,0.22); }
 
 .po-btn-secondary {
   padding: 12px 18px;
@@ -1792,6 +1800,7 @@ img, video, canvas, svg { max-width: 100%; }
         </div>
       </div>
       <button class="po-btn-primary" id="logBtn">Log set</button>
+      <button class="po-undo-btn" id="undoBtn" type="button" style="display:none">↩ Undo last set</button>
     </div>
 
     <!-- Prescription -->
@@ -2583,6 +2592,12 @@ img, video, canvas, svg { max-width: 100%; }
 
   function renderAll() {
     renderWorkoutList();
+    // Show undo only if current exercise has sets logged today
+    const undoBtn = $('undoBtn');
+    if (undoBtn) {
+      const ex = getCurrentEx();
+      undoBtn.style.display = (ex && getTodaySets(ex.id).length > 0) ? 'block' : 'none';
+    }
     renderDayPill();
     renderFilters(); renderSelect(); renderForm(); renderLastSet();
     renderRepsRow();
@@ -2833,11 +2848,24 @@ img, video, canvas, svg { max-width: 100%; }
     saveState(); renderAll();
     // Strength changed → composition estimate may shift
     if (typeof wtRender === 'function') wtRender();
+    // Show undo button after logging
+    $('undoBtn').style.display = 'block';
     // Tiny pulse on the button so the user feels the save
     const btn = $('logBtn');
     btn.style.transition = 'transform 0.15s';
     btn.style.transform = 'scale(0.96)';
     setTimeout(() => { btn.style.transform = ''; }, 160);
+  });
+
+  $('undoBtn').addEventListener('click', () => {
+    const ex = getCurrentEx();
+    if (!ex) return;
+    const arr = state.logs[ex.id] || [];
+    if (!arr.length) return;
+    arr.pop();
+    state.logs[ex.id] = arr;
+    if (!arr.length) $('undoBtn').style.display = 'none';
+    saveState(); renderAll();
   });
 
   // ============================================================
