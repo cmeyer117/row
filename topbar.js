@@ -11,7 +11,7 @@
   'use strict';
 
   // -------- Auth gate — blocks page until correct passphrase entered --------
-  const AUTH_PASS = 'rowdash';
+  const AUTH_PASS = '007007';
   const AUTH_KEY  = 'row_auth';
 
   function authGate() {
