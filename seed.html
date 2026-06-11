@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Seeding data…</title>
+<style>
+  body { background: #0a0a0b; color: #fff; font-family: -apple-system, sans-serif;
+    display: flex; align-items: center; justify-content: center; min-height: 100vh;
+    margin: 0; flex-direction: column; gap: 12px; }
+  p { color: rgba(255,255,255,0.5); font-size: 14px; margin: 0; }
+</style>
+</head>
+<body>
+<div id="msg">Seeding data…</div>
+<p id="sub"></p>
+<script>
+(function() {
+  // ── 1. Bodyweight history ──────────────────────────────────────────────────
+  const WT_KEY = 'po_coach_weights';
+  const seed = [
+    {dateKey:'2026-04-17',weight:229.9},{dateKey:'2026-04-18',weight:230.0},
+    {dateKey:'2026-04-19',weight:229.5},{dateKey:'2026-04-20',weight:229.0},
+    {dateKey:'2026-04-21',weight:228.6},{dateKey:'2026-04-22',weight:228.0},
+    {dateKey:'2026-04-23',weight:228.1},{dateKey:'2026-04-24',weight:227.3},
+    {dateKey:'2026-04-25',weight:226.9},{dateKey:'2026-04-26',weight:226.1},
+    {dateKey:'2026-04-27',weight:225.5},{dateKey:'2026-04-28',weight:225.1},
+    {dateKey:'2026-04-29',weight:224.7},{dateKey:'2026-04-30',weight:224.4},
+    {dateKey:'2026-05-01',weight:224.2},{dateKey:'2026-05-02',weight:223.7},
+    {dateKey:'2026-05-03',weight:223.8},{dateKey:'2026-05-04',weight:223.0},
+    {dateKey:'2026-05-05',weight:221.7},{dateKey:'2026-05-06',weight:221.4},
+    {dateKey:'2026-05-07',weight:221.1},{dateKey:'2026-05-08',weight:220.7},
+    {dateKey:'2026-05-09',weight:220.5},{dateKey:'2026-05-10',weight:220.6},
+    {dateKey:'2026-05-11',weight:220.3},{dateKey:'2026-05-12',weight:219.9},
+    {dateKey:'2026-05-13',weight:219.9},{dateKey:'2026-05-14',weight:219.6},
+    {dateKey:'2026-05-15',weight:219.5},{dateKey:'2026-05-16',weight:219.4},
+    {dateKey:'2026-05-17',weight:219.4},{dateKey:'2026-05-18',weight:219.0},
+    {dateKey:'2026-05-19',weight:218.8},{dateKey:'2026-05-20',weight:218.3},
+    {dateKey:'2026-05-21',weight:218.2},{dateKey:'2026-05-22',weight:218.0},
+    {dateKey:'2026-05-23',weight:217.5},{dateKey:'2026-05-24',weight:217.2},
+    {dateKey:'2026-05-28',weight:216.0},{dateKey:'2026-05-29',weight:215.6},
+    {dateKey:'2026-05-30',weight:215.2},{dateKey:'2026-05-31',weight:215.0},
+    {dateKey:'2026-06-01',weight:214.7},{dateKey:'2026-06-02',weight:215.5},
+    {dateKey:'2026-06-03',weight:214.2},{dateKey:'2026-06-04',weight:214.2},
+    {dateKey:'2026-06-05',weight:213.9},{dateKey:'2026-06-06',weight:213.2},
+    {dateKey:'2026-06-07',weight:212.6},{dateKey:'2026-06-08',weight:212.3},
+    {dateKey:'2026-06-09',weight:211.9},{dateKey:'2026-06-10',weight:212.0}
+  ];
+  const existing = JSON.parse(localStorage.getItem(WT_KEY) || '[]');
+  const existingKeys = new Set(existing.map(e => e.dateKey));
+  const merged = existing.concat(seed.filter(e => !existingKeys.has(e.dateKey)));
+  merged.sort((a, b) => a.dateKey.localeCompare(b.dateKey));
+  localStorage.setItem(WT_KEY, JSON.stringify(merged));
+
+  // ── 2. Exercise starting weights ──────────────────────────────────────────
+  const GYM_KEY = 'po_coach_v1';
+  const weightMap = {
+    'Neutral Grip Shoulder Press Machine': 185,
+    'Smith Machine Flat Chest Press':      250,
+    'Incline Cable Pec Fly':               52.5,
+    'Dumbbell Lateral Raise':              35,
+    'Cable Front Raise':                   30,
+    'Cable Triceps Overhead Extension':    50,
+    'Lat Pulldown':                        100,
+    'Cable Seated Row (Neutral Grip)':     245,
+    'Machine High Row':                    135,
+    'Machine Low Row':                     90,
+    'Cable Lat Pushdown/Pullover':         72.5,
+    'Cable Rear Delt Fly':                 15,
+    'Seated Behind-the-Back Cable Curl':   35,
+    'Hack Squat':                          200,
+    'Sissy Leg Press':                     540,
+    'Seated Hamstrings Curl':              110,
+    'Dumbbell Incline Chest Press':        105,
+    'Chest Supported T-Bar Row':           135,
+    'Smith Machine Narrow Grip Bench':     225,
+    'Neutral Grip Lat Pulldown':           100,
+    'Low Cable Lateral Raise':             20,
+    'Dumbbell Front Raise':                30,
+    'Machine Preacher Curl':               110,
+    'Cable Triceps Pushdown':              87.5,
+    'Smith Machine RDL':                   225,
+    'Lying Hamstrings Curl':               140,
+    'Cybex Leg Press':                     405,
+    'Dumbbell Heel Elevated Lunge':        40,
+    'Leg Extension':                       220,
+    'Seated Calf Raise':                   180,
+  };
+  try {
+    const gymRaw = localStorage.getItem(GYM_KEY);
+    if (gymRaw) {
+      const gymState = JSON.parse(gymRaw);
+      if (Array.isArray(gymState.exercises)) {
+        gymState.exercises.forEach(ex => {
+          if (weightMap[ex.name] !== undefined) ex.startWeight = weightMap[ex.name];
+        });
+        localStorage.setItem(GYM_KEY, JSON.stringify(gymState));
+      }
+    }
+  } catch (e) {}
+
+  // ── Done ──────────────────────────────────────────────────────────────────
+  document.getElementById('msg').textContent = '✓ Done — ' + merged.length + ' weight entries seeded';
+  document.getElementById('sub').textContent = 'Redirecting to gym…';
+  setTimeout(() => { window.location.href = 'gym.html'; }, 1200);
+})();
+</script>
+</body>
+</html>
