@@ -2002,12 +2002,12 @@ img, video, canvas, svg { max-width: 100%; }
 
 <script>
 // ── Seed: bodyweight history (Apr 17 – Jun 10 2026) ──────────────────────────
-// Runs once on first load; skipped if data already exists.
+// Merges historical entries with existing data — never overwrites a date the
+// user already logged manually.
 (function seedWeightHistory() {
   try {
-    const raw = localStorage.getItem('po_coach_weights');
-    if (raw && JSON.parse(raw).length > 0) return;
-    const entries = [
+    const KEY = 'po_coach_weights';
+    const seed = [
       {dateKey:'2026-04-17',weight:229.9},{dateKey:'2026-04-18',weight:230.0},
       {dateKey:'2026-04-19',weight:229.5},{dateKey:'2026-04-20',weight:229.0},
       {dateKey:'2026-04-21',weight:228.6},{dateKey:'2026-04-22',weight:228.0},
@@ -2035,7 +2035,11 @@ img, video, canvas, svg { max-width: 100%; }
       {dateKey:'2026-06-07',weight:212.6},{dateKey:'2026-06-08',weight:212.3},
       {dateKey:'2026-06-09',weight:211.9},{dateKey:'2026-06-10',weight:212.0}
     ];
-    localStorage.setItem('po_coach_weights', JSON.stringify(entries));
+    const existing = JSON.parse(localStorage.getItem(KEY) || '[]');
+    const existingKeys = new Set(existing.map(e => e.dateKey));
+    const merged = existing.concat(seed.filter(e => !existingKeys.has(e.dateKey)));
+    merged.sort((a, b) => a.dateKey.localeCompare(b.dateKey));
+    localStorage.setItem(KEY, JSON.stringify(merged));
   } catch (e) {}
 })();
 
@@ -2140,11 +2144,12 @@ img, video, canvas, svg { max-width: 100%; }
   }
   let state = loadState();
 
-  // One-time migration: update startWeight for any exercise with no logs yet,
-  // using Week 8 working weights from the cut (Jun 10 2026).
+  // One-time migration: set startWeight on all exercises to Week 8 working
+  // weights. startWeight is safe to overwrite — it's only used as the initial
+  // pre-fill when an exercise has no logs; it never changes logged history.
   (function migrateStartWeights() {
     try {
-      const MIG_KEY = 'po_coach_sw_mig_v1';
+      const MIG_KEY = 'po_coach_sw_mig_v2';
       if (localStorage.getItem(MIG_KEY)) return;
       const map = {
         'Neutral Grip Shoulder Press Machine': 185,
@@ -2179,9 +2184,7 @@ img, video, canvas, svg { max-width: 100%; }
         'Seated Calf Raise':                   180,
       };
       state.exercises.forEach(ex => {
-        if (map[ex.name] !== undefined && !(state.logs[ex.id] || []).length) {
-          ex.startWeight = map[ex.name];
-        }
+        if (map[ex.name] !== undefined) ex.startWeight = map[ex.name];
       });
       saveState();
       localStorage.setItem(MIG_KEY, '1');
