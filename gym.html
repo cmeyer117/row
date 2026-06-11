@@ -598,19 +598,20 @@ img, video, canvas, svg { max-width: 100%; }
   font-style: italic;
 }
 .po-hist-row {
-  display: grid; grid-template-columns: 60px 1fr auto; gap: 12px;
+  display: grid; grid-template-columns: 60px 1fr auto auto; gap: 12px;
   padding: 10px 4px; align-items: center;
   border-bottom: 1px solid var(--border);
 }
 .po-hist-row:last-child { border-bottom: none; }
 .po-hist-date { font-size: 11px; color: var(--text-3); font-family: var(--font-mono); }
 .po-hist-set { font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; }
-.po-hist-del {
+.po-hist-del, .po-hist-edit {
   background: transparent; border: none; color: var(--text-4);
   font-size: 16px; cursor: pointer; padding: 4px 8px;
   -webkit-tap-highlight-color: transparent;
 }
 .po-hist-del:hover { color: var(--bad); }
+.po-hist-edit:hover { color: var(--text-1); }
 
 /* ----- Modals ----- */
 .po-modal-bg {
@@ -1284,6 +1285,66 @@ img, video, canvas, svg { max-width: 100%; }
 .wt-viewer-compare { color: var(--good); border-color: rgba(110,231,183,0.30); }
 .wt-viewer-back    { color: var(--good); border-color: rgba(110,231,183,0.30); }
 
+/* ----- Date picker chip (log form + weight input) ----- */
+.po-date-row {
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 12px;
+}
+.po-date-label {
+  font-size: 10px; font-weight: 700; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--text-3);
+  white-space: nowrap;
+}
+.po-date-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 12px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-2);
+  font-family: inherit; font-size: 12px; font-weight: 600;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.15s, border-color 0.15s;
+}
+.po-date-chip:hover { background: rgba(255,255,255,0.08); border-color: var(--border-strong); }
+.po-date-chip.is-past { color: var(--warn); border-color: rgba(251,191,36,0.3); }
+.po-date-chip input[type="date"] {
+  position: absolute; opacity: 0; pointer-events: none; width: 0; height: 0;
+}
+
+/* ----- Weight history list (inside weight card) ----- */
+.wt-hist-list {
+  margin-top: 16px; display: flex; flex-direction: column; gap: 4px;
+}
+.wt-hist-row {
+  display: grid; grid-template-columns: 76px 1fr auto auto;
+  align-items: center; gap: 10px;
+  padding: 9px 10px;
+  background: rgba(255,255,255,0.025);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+}
+.wt-hist-date { font-size: 11px; color: var(--text-3); font-family: var(--font-mono); }
+.wt-hist-val { font-weight: 700; font-variant-numeric: tabular-nums; }
+.wt-hist-btn {
+  background: transparent; border: none; color: var(--text-4);
+  font-size: 15px; cursor: pointer; padding: 3px 6px;
+  -webkit-tap-highlight-color: transparent;
+}
+.wt-hist-btn:hover { color: var(--text-1); }
+.wt-hist-btn.del:hover { color: var(--bad); }
+.wt-hist-toggle {
+  width: 100%; margin-top: 10px; padding: 10px;
+  background: rgba(255,255,255,0.025);
+  border: 1px dashed var(--border);
+  border-radius: 8px; cursor: pointer;
+  font-family: inherit; font-size: 12px; color: var(--text-3);
+  -webkit-tap-highlight-color: transparent;
+}
+.wt-hist-toggle:hover { color: var(--text-1); border-color: rgba(255,255,255,0.18); }
+
 /* Mode toggle: hide the inactive mode */
 .wt-viewer .wt-viewer-single,
 .wt-viewer .wt-viewer-compare-view {
@@ -1640,12 +1701,22 @@ img, video, canvas, svg { max-width: 100%; }
       </div>
 
       <div class="wt-input-row" id="wtInputRow">
+        <div class="po-date-row">
+          <span class="po-date-label">Date</span>
+          <button class="po-date-chip" id="wtDateChip" type="button">
+            Today
+            <input type="date" id="wtDateInput">
+          </button>
+        </div>
         <div class="wt-input-top">
           <input type="number" step="0.1" class="wt-input" id="wtInput" placeholder="Enter weight" inputmode="decimal" aria-label="Today's weight">
           <span class="wt-unit-static" id="wtUnitStatic">kg</span>
           <button class="wt-save-btn" id="wtSaveBtn">Save</button>
         </div>
       </div>
+
+      <button class="wt-hist-toggle" id="wtHistToggle" type="button">Weight history ▾</button>
+      <div id="wtHistList" class="wt-hist-list" style="display:none"></div>
     </div>
 
     <button class="wt-progress-link" id="wtProgressLink" type="button" aria-label="Open progress photos">
@@ -1767,7 +1838,13 @@ img, video, canvas, svg { max-width: 100%; }
 
     <!-- Log a set -->
     <div class="po-sub-section" id="logFormWrap">
-      <div class="po-sub-title">Log today's top set</div>
+      <div class="po-sub-title" style="justify-content:space-between">
+        <span>Log a set</span>
+        <button class="po-date-chip" id="logDateChip" type="button" style="font-size:11px;padding:5px 10px">
+          Today
+          <input type="date" id="logDateInput">
+        </button>
+      </div>
       <div class="po-bw-banner" id="bwBanner">Bodyweight — log reps only</div>
       <div class="po-last-set" id="lastSet">
         <span class="po-last-label">Last time</span>
@@ -2596,9 +2673,40 @@ img, video, canvas, svg { max-width: 100%; }
       return '<div class="po-hist-row">'
         + '<div class="po-hist-date">' + dStr + '</div>'
         + '<div class="po-hist-set">' + setStr + '</div>'
+        + '<button class="po-hist-edit" data-idx="' + realIdx + '" aria-label="Edit">✎</button>'
         + '<button class="po-hist-del" data-idx="' + realIdx + '" aria-label="Delete">×</button>'
         + '</div>';
     }).join('');
+    wrap.querySelectorAll('.po-hist-edit').forEach(b => {
+      b.addEventListener('click', () => {
+        const realIdx = parseInt(b.dataset.idx, 10);
+        const arr = state.logs[state.currentEx] || [];
+        const origIdx = arr.length - 1 - realIdx;
+        const entry = arr[origIdx];
+        if (!entry) return;
+        // Pre-fill weight input
+        if (!ex.bw) $('weightInput').value = entry.weight;
+        // Set rep pills
+        $('repsRow').dataset.value = entry.reps;
+        $('repsRow').querySelectorAll('.po-rep-pill').forEach(p => {
+          p.classList.toggle('active', parseInt(p.dataset.v, 10) === entry.reps);
+        });
+        // Set date chip to entry's date
+        const entryDate = entry.date.slice(0, 10);
+        const chip = $('logDateChip');
+        const input = $('logDateInput');
+        if (input) input.value = entryDate;
+        if (chip) chip.querySelector('span') && (chip.querySelector('span').textContent = fmtDateChipLabel(entryDate));
+        // Remove old entry so logging replaces it
+        arr.splice(origIdx, 1);
+        if (!arr.length) delete state.logs[state.currentEx];
+        else state.logs[state.currentEx] = arr;
+        saveState(); renderAll();
+        // Scroll to log form
+        const logBtn = $('logBtn');
+        if (logBtn) logBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      });
+    });
     wrap.querySelectorAll('.po-hist-del').forEach(b => {
       b.addEventListener('click', () => {
         if (!confirm('Delete this log?')) return;
@@ -2935,6 +3043,8 @@ img, video, canvas, svg { max-width: 100%; }
     if (e.key === 'Enter') saveAdhocExercise();
     if (e.key === 'Escape') closeAdhocForm();
   });
+  initDateChip('logDateChip', 'logDateInput');
+
   $('logBtn').addEventListener('click', () => {
     const ex = getCurrentEx();
     if (!ex) return;
@@ -2942,9 +3052,13 @@ img, video, canvas, svg { max-width: 100%; }
     if (reps <= 0) { alert('Pick a rep count.'); return; }
     const w = ex.bw ? 0 : (parseFloat($('weightInput').value) || 0);
     if (!ex.bw && w <= 0) { alert('Enter a weight.'); return; }
+    const dateKey = getChipDate('logDateInput');
+    const isoDate = new Date(dateKey + 'T12:00:00').toISOString();
     const arr = state.logs[ex.id] || [];
-    arr.push({ weight: w, reps: reps, date: new Date().toISOString() });
+    arr.push({ weight: w, reps: reps, date: isoDate });
+    arr.sort((a, b) => a.date.localeCompare(b.date));
     state.logs[ex.id] = arr;
+    resetChipToToday('logDateChip', 'logDateInput');
     saveState(); renderAll();
     // Strength changed → composition estimate may shift
     if (typeof wtRender === 'function') wtRender();
@@ -3284,6 +3398,44 @@ img, video, canvas, svg { max-width: 100%; }
     return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   }
 
+  // ── Date chip helpers ─────────────────────────────────────────────────────
+  function fmtDateChipLabel(dateKey) {
+    if (!dateKey) return 'Today';
+    const today = getActiveDate();
+    if (dateKey === today) return 'Today';
+    const [y, m, d] = dateKey.split('-').map(Number);
+    const dt = new Date(y, m - 1, d);
+    const mons = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return mons[dt.getMonth()] + ' ' + d;
+  }
+
+  function initDateChip(chipId, inputId) {
+    const chip = $(chipId), inp = $(inputId);
+    const today = getActiveDate();
+    inp.value = today;
+    inp.max = today;
+    chip.addEventListener('click', () => {
+      try { inp.showPicker(); } catch (e) { inp.click(); }
+    });
+    inp.addEventListener('change', () => {
+      const v = inp.value || today;
+      chip.childNodes[0].textContent = fmtDateChipLabel(v);
+      chip.classList.toggle('is-past', v !== today);
+    });
+  }
+
+  function getChipDate(inputId) {
+    const v = $(inputId).value;
+    return v || getActiveDate();
+  }
+
+  function resetChipToToday(chipId, inputId) {
+    const today = getActiveDate();
+    $(inputId).value = today;
+    $(chipId).childNodes[0].textContent = 'Today';
+    $(chipId).classList.remove('is-past');
+  }
+
   // ============================================================
   // WEIGHT TRACKER + COMPOSITION ESTIMATE + PROGRESS PHOTOS
   // All persisted to localStorage:
@@ -3325,13 +3477,61 @@ img, video, canvas, svg { max-width: 100%; }
 
   let wtEntries = wtLoad();
 
-  function wtSaveEntry(weight) {
-    const key = wtDateKey(new Date());
+  function wtSaveEntry(weight, dateKey) {
+    const key = dateKey || wtDateKey(new Date());
     const existing = wtEntries.find(e => e.dateKey === key);
     if (existing) existing.weight = weight;
     else { wtEntries.push({ dateKey: key, weight }); wtEntries.sort((a,b) => a.dateKey.localeCompare(b.dateKey)); }
     wtSave(wtEntries);
+    resetChipToToday('wtDateChip', 'wtDateInput');
     wtRender();
+    if ($('wtHistList').style.display !== 'none') wtRenderHistory();
+  }
+
+  function wtRenderHistory() {
+    const list = $('wtHistList');
+    if (!list) return;
+    const sorted = wtEntries.slice().reverse();
+    if (!sorted.length) {
+      list.innerHTML = '<div style="text-align:center;font-size:12px;color:var(--text-3);padding:12px">No entries yet.</div>';
+      return;
+    }
+    const u = state.units;
+    list.innerHTML = sorted.map((e, ri) => {
+      const origIdx = wtEntries.length - 1 - ri;
+      return '<div class="wt-hist-row">'
+        + '<span class="wt-hist-date">' + fmtDateChipLabel(e.dateKey) + '</span>'
+        + '<span class="wt-hist-val">' + e.weight.toFixed(1) + ' ' + u + '</span>'
+        + '<button class="wt-hist-btn" data-wt-edit="' + origIdx + '" title="Edit">✎</button>'
+        + '<button class="wt-hist-btn del" data-wt-del="' + origIdx + '" title="Delete">×</button>'
+        + '</div>';
+    }).join('');
+    list.querySelectorAll('[data-wt-edit]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const idx = parseInt(btn.dataset.wtEdit, 10);
+        const entry = wtEntries[idx];
+        $('wtInput').value = entry.weight.toFixed(1);
+        $('wtDateInput').value = entry.dateKey;
+        $('wtDateChip').childNodes[0].textContent = fmtDateChipLabel(entry.dateKey);
+        $('wtDateChip').classList.toggle('is-past', entry.dateKey !== getActiveDate());
+        wtEntries.splice(idx, 1);
+        wtSave(wtEntries);
+        $('wtLocked').classList.add('hidden');
+        $('wtInputRow').classList.remove('hidden');
+        wtRender();
+        wtRenderHistory();
+        $('wtInput').focus(); $('wtInput').select();
+      });
+    });
+    list.querySelectorAll('[data-wt-del]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (!confirm('Delete this entry?')) return;
+        wtEntries.splice(parseInt(btn.dataset.wtDel, 10), 1);
+        wtSave(wtEntries);
+        wtRender();
+        wtRenderHistory();
+      });
+    });
   }
 
   function wtRender() {
@@ -3603,10 +3803,11 @@ img, video, canvas, svg { max-width: 100%; }
   }
 
   // Wire weight UI
+  initDateChip('wtDateChip', 'wtDateInput');
   $('wtSaveBtn').addEventListener('click', () => {
     const v = parseFloat($('wtInput').value);
     if (isNaN(v) || v <= 0) return;
-    wtSaveEntry(v);
+    wtSaveEntry(v, getChipDate('wtDateInput'));
   });
   $('wtInput').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') $('wtSaveBtn').click();
@@ -3614,9 +3815,17 @@ img, video, canvas, svg { max-width: 100%; }
   $('wtEditBtn').addEventListener('click', () => {
     $('wtLocked').classList.add('hidden');
     $('wtInputRow').classList.remove('hidden');
+    resetChipToToday('wtDateChip', 'wtDateInput');
     const todayEntry = wtEntries.find(e => e.dateKey === wtDateKey(new Date()));
     if (todayEntry) $('wtInput').value = todayEntry.weight.toFixed(1);
     $('wtInput').focus(); $('wtInput').select();
+  });
+  $('wtHistToggle').addEventListener('click', () => {
+    const list = $('wtHistList');
+    const open = list.style.display !== 'none';
+    list.style.display = open ? 'none' : 'flex';
+    if (!open) { list.style.flexDirection = 'column'; wtRenderHistory(); }
+    $('wtHistToggle').textContent = open ? 'Weight history ▾' : 'Weight history ▴';
   });
 
   // ============================================================
