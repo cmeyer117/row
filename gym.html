@@ -65,41 +65,41 @@ const CONFIG = {
   // the in-app + / gear buttons; this block stays as the seed.
   defaultExercises: [
     // ── Push ──
-    { name: "Neutral Grip Shoulder Press Machine", gym: "comm", day: "push",  repMin: 4,  repMax: 8,  step: 5,   startWeight: 110, numSets: 2,
+    { name: "Neutral Grip Shoulder Press Machine", gym: "comm", day: "push",  repMin: 4,  repMax: 8,  step: 5,   startWeight: 185, numSets: 2,
       subs: [{ name: "Dumbbell Neutral Grip Shoulder Press", stars: 4 }, { name: "Smith Incline Machine Chest Press", stars: 3 }] },
-    { name: "Smith Machine Flat Chest Press",      gym: "comm", day: "push",  repMin: 4,  repMax: 8,  step: 5,   startWeight: 175, numSets: 2,
+    { name: "Smith Machine Flat Chest Press",      gym: "comm", day: "push",  repMin: 4,  repMax: 8,  step: 5,   startWeight: 250, numSets: 2,
       subs: [{ name: "Machine Flat Chest Press", stars: 5 }, { name: "Barbell / Dumbbell Flat Chest Press", stars: 4 }, { name: "Seated Cable Flat Chest Press", stars: 4 }] },
     { name: "Chest Dip",                           gym: "comm", day: "push",  repMin: 8,  repMax: 12, step: 5,   startWeight: 0,   numSets: 2, bw: true,
       subs: [{ name: "Dip Machine (Chest Bias)", stars: 5 }, { name: "Chest Dip (RG Variant)", stars: 5 }, { name: "Other Dip Variations", stars: 3 }] },
-    { name: "Incline Cable Pec Fly",               gym: "comm", day: "push",  repMin: 8,  repMax: 12, step: 5,   startWeight: 35,  numSets: 2,
+    { name: "Incline Cable Pec Fly",               gym: "comm", day: "push",  repMin: 8,  repMax: 12, step: 5,   startWeight: 52.5,numSets: 2,
       subs: [{ name: "Pec Dec Fly (Upper Chest Bias)", stars: 5 }, { name: "Incline Dumbbell Pec Fly", stars: 4 }] },
-    { name: "Dumbbell Lateral Raise",              gym: "comm", day: "push",  repMin: 8,  repMax: 16, step: 2.5, startWeight: 25,  numSets: 2,
+    { name: "Dumbbell Lateral Raise",              gym: "comm", day: "push",  repMin: 8,  repMax: 16, step: 2.5, startWeight: 35,  numSets: 2,
       subs: [{ name: "Low Cable Lateral Raise", stars: 5 }, { name: "Seated Machine Lateral Raise", stars: 4 }, { name: "Standing Machine Lateral Raise", stars: 4 }] },
-    { name: "Cable Front Raise",                   gym: "comm", day: "push",  repMin: 8,  repMax: 16, step: 5,   startWeight: 35,  numSets: 2,
+    { name: "Cable Front Raise",                   gym: "comm", day: "push",  repMin: 8,  repMax: 16, step: 5,   startWeight: 30,  numSets: 2,
       subs: [{ name: "Dumbbell Front Raise", stars: 4 }] },
-    { name: "Cable Triceps Overhead Extension",    gym: "comm", day: "push",  repMin: 8,  repMax: 16, step: 5,   startWeight: 45,  numSets: 4,
+    { name: "Cable Triceps Overhead Extension",    gym: "comm", day: "push",  repMin: 8,  repMax: 16, step: 5,   startWeight: 50,  numSets: 4,
       subs: [{ name: "Dumbbell Overhead Extension", stars: 5 }, { name: "Machine Overhead Triceps Extension", stars: 5 }, { name: "Machine Triceps Extension", stars: 4 }] },
     // ── Pull ──
-    { name: "Lat Pulldown",                        gym: "comm", day: "pull",  repMin: 4,  repMax: 8,  step: 5,   startWeight: 155, numSets: 2,
+    { name: "Lat Pulldown",                        gym: "comm", day: "pull",  repMin: 4,  repMax: 8,  step: 5,   startWeight: 100, numSets: 2,
       subs: [{ name: "Wide Grip Pullup", stars: 4 }, { name: "Lat Pulldown Machine", stars: 4 }] },
-    { name: "Cable Seated Row (Neutral Grip)",     gym: "comm", day: "pull",  repMin: 4,  repMax: 8,  step: 5,   startWeight: 155, numSets: 2,
+    { name: "Cable Seated Row (Neutral Grip)",     gym: "comm", day: "pull",  repMin: 4,  repMax: 8,  step: 5,   startWeight: 245, numSets: 2,
       subs: [{ name: "Smith Machine UH Barbell Row", stars: 5 }, { name: "Underhand Grip Barbell Row", stars: 4 }] },
-    { name: "Machine High Row",                    gym: "comm", day: "pull",  repMin: 8,  repMax: 12, step: 5,   startWeight: 130, numSets: 2,
+    { name: "Machine High Row",                    gym: "comm", day: "pull",  repMin: 8,  repMax: 12, step: 5,   startWeight: 135, numSets: 2,
       subs: [{ name: "Cable High Row", stars: 5 }, { name: "Nautilus Lat Pulldown", stars: 5 }, { name: "High Row Setup on Lat Pulldown", stars: 5 }] },
-    { name: "Machine Low Row",                     gym: "comm", day: "pull",  repMin: 8,  repMax: 12, step: 5,   startWeight: 130, numSets: 2,
+    { name: "Machine Low Row",                     gym: "comm", day: "pull",  repMin: 8,  repMax: 12, step: 5,   startWeight: 90,  numSets: 2,
       subs: [{ name: "Cable Low Row", stars: 5 }, { name: "Single Arm Landmine Row", stars: 4 }] },
-    { name: "Cable Lat Pushdown/Pullover",         gym: "comm", day: "pull",  repMin: 8,  repMax: 16, step: 5,   startWeight: 65,  numSets: 2,
+    { name: "Cable Lat Pushdown/Pullover",         gym: "comm", day: "pull",  repMin: 8,  repMax: 16, step: 5,   startWeight: 72.5,numSets: 2,
       subs: [{ name: "Machine Lat Pullover", stars: 5 }, { name: "Dumbbell Lat Pullover", stars: 4 }] },
-    { name: "Cable Rear Delt Fly",                 gym: "comm", day: "pull",  repMin: 8,  repMax: 16, step: 5,   startWeight: 35,  numSets: 2,
+    { name: "Cable Rear Delt Fly",                 gym: "comm", day: "pull",  repMin: 8,  repMax: 16, step: 5,   startWeight: 15,  numSets: 2,
       subs: [{ name: "Machine Rear Delt Fly", stars: 5 }, { name: "Dumbbell Rear Delt Fly", stars: 4 }] },
-    { name: "Seated Behind-the-Back Cable Curl",   gym: "comm", day: "pull",  repMin: 8,  repMax: 16, step: 2.5, startWeight: 25,  numSets: 4,
+    { name: "Seated Behind-the-Back Cable Curl",   gym: "comm", day: "pull",  repMin: 8,  repMax: 16, step: 2.5, startWeight: 35,  numSets: 4,
       subs: [{ name: "Bayesian Cable Curl", stars: 5 }, { name: "Seated Incline Dumbbell Curl", stars: 4 }] },
     // ── Legs A ──
-    { name: "Hack Squat",                          gym: "comm", day: "legsA", repMin: 4,  repMax: 8,  step: 10,  startWeight: 130, numSets: 2,
+    { name: "Hack Squat",                          gym: "comm", day: "legsA", repMin: 4,  repMax: 8,  step: 10,  startWeight: 200, numSets: 2,
       subs: [{ name: "Pendulum Squat", stars: 5 }, { name: "Smith Machine Squat (Quad Bias)", stars: 5 }, { name: "Barbell Squat (Quad Bias)", stars: 4 }] },
-    { name: "Sissy Leg Press",                     gym: "comm", day: "legsA", repMin: 8,  repMax: 12, step: 10,  startWeight: 175, numSets: 2,
+    { name: "Sissy Leg Press",                     gym: "comm", day: "legsA", repMin: 8,  repMax: 12, step: 10,  startWeight: 540, numSets: 2,
       subs: [{ name: "Hack Squat Sissy Squats", stars: 4 }, { name: "Sissy Squat on Sissy Stand", stars: 4 }, { name: "Leg Press Quad Bias", stars: 4 }] },
-    { name: "Seated Hamstrings Curl",              gym: "comm", day: "legsA", repMin: 8,  repMax: 12, step: 5,   startWeight: 90,  numSets: 2,
+    { name: "Seated Hamstrings Curl",              gym: "comm", day: "legsA", repMin: 8,  repMax: 12, step: 5,   startWeight: 110, numSets: 2,
       subs: [{ name: "Lying Hamstrings Curl", stars: 5 }, { name: "Glute Ham Raise", stars: 3 }] },
     { name: "Dumbbell B-Stance RDL",               gym: "comm", day: "legsA", repMin: 8,  repMax: 16, step: 5,   startWeight: 55,  numSets: 2,
       subs: [{ name: "Cable Hip Extension Machine", stars: 6 }, { name: "Single Leg Hip Extension", stars: 5 }, { name: "V-Squat Good Morning", stars: 4 }, { name: "Barbell Good Morning", stars: 4 }] },
@@ -108,34 +108,34 @@ const CONFIG = {
     { name: "Standing Calf Raise",                 gym: "comm", day: "legsA", repMin: 8,  repMax: 16, step: 5,   startWeight: 130, numSets: 4,
       subs: [{ name: "Smith Machine Calf Raise", stars: 5 }] },
     // ── Upper ──
-    { name: "Dumbbell Incline Chest Press",        gym: "comm", day: "upper", repMin: 4,  repMax: 8,  step: 5,   startWeight: 65,  numSets: 2,
+    { name: "Dumbbell Incline Chest Press",        gym: "comm", day: "upper", repMin: 4,  repMax: 8,  step: 5,   startWeight: 105, numSets: 2,
       subs: [{ name: "Machine Incline Chest Press", stars: 5 }, { name: "Smith Incline Machine Chest Press", stars: 5 }] },
-    { name: "Chest Supported T-Bar Row",           gym: "comm", day: "upper", repMin: 4,  repMax: 8,  step: 5,   startWeight: 90,  numSets: 2,
+    { name: "Chest Supported T-Bar Row",           gym: "comm", day: "upper", repMin: 4,  repMax: 8,  step: 5,   startWeight: 135, numSets: 2,
       subs: [{ name: "Smith Machine Barbell Row", stars: 5 }, { name: "Landmine T-Bar Row", stars: 5 }, { name: "Barbell Row", stars: 4 }] },
-    { name: "Smith Machine Narrow Grip Bench",     gym: "comm", day: "upper", repMin: 4,  repMax: 8,  step: 5,   startWeight: 155, numSets: 2,
+    { name: "Smith Machine Narrow Grip Bench",     gym: "comm", day: "upper", repMin: 4,  repMax: 8,  step: 5,   startWeight: 225, numSets: 2,
       subs: [{ name: "Barbell Narrow Grip Bench Press", stars: 5 }, { name: "Machine Narrow Grip Chest Press", stars: 4 }, { name: "Narrow Grip Push-up", stars: 3 }] },
-    { name: "Neutral Grip Lat Pulldown",           gym: "comm", day: "upper", repMin: 4,  repMax: 8,  step: 5,   startWeight: 145, numSets: 2,
+    { name: "Neutral Grip Lat Pulldown",           gym: "comm", day: "upper", repMin: 4,  repMax: 8,  step: 5,   startWeight: 100, numSets: 2,
       subs: [{ name: "Nautilus Lat Pulldown Machine", stars: 5 }, { name: "Single Arm Lat Pulldown", stars: 4 }] },
-    { name: "Low Cable Lateral Raise",             gym: "comm", day: "upper", repMin: 8,  repMax: 16, step: 2.5, startWeight: 25,  numSets: 2,
+    { name: "Low Cable Lateral Raise",             gym: "comm", day: "upper", repMin: 8,  repMax: 16, step: 2.5, startWeight: 20,  numSets: 2,
       subs: [{ name: "Standing Machine Lateral Raise", stars: 4 }, { name: "Seated Machine Lateral Raise", stars: 4 }] },
-    { name: "Dumbbell Front Raise",                gym: "comm", day: "upper", repMin: 8,  repMax: 16, step: 2.5, startWeight: 25,  numSets: 2,
+    { name: "Dumbbell Front Raise",                gym: "comm", day: "upper", repMin: 8,  repMax: 16, step: 2.5, startWeight: 30,  numSets: 2,
       subs: [{ name: "Cable Front Raise", stars: 4 }] },
-    { name: "Machine Preacher Curl",               gym: "comm", day: "upper", repMin: 8,  repMax: 16, step: 5,   startWeight: 65,  numSets: 2,
+    { name: "Machine Preacher Curl",               gym: "comm", day: "upper", repMin: 8,  repMax: 16, step: 5,   startWeight: 110, numSets: 2,
       subs: [{ name: "Barbell Preacher Curl", stars: 5 }, { name: "Standing Cable Curl", stars: 4 }] },
-    { name: "Cable Triceps Pushdown",              gym: "comm", day: "upper", repMin: 8,  repMax: 16, step: 5,   startWeight: 55,  numSets: 2,
+    { name: "Cable Triceps Pushdown",              gym: "comm", day: "upper", repMin: 8,  repMax: 16, step: 5,   startWeight: 87.5,numSets: 2,
       subs: [{ name: "Cable Elbow Supported Triceps Pushdown", stars: 5 }, { name: "Triceps Crossbody Extension", stars: 4 }] },
     // ── Legs B ──
-    { name: "Smith Machine RDL",                   gym: "comm", day: "legsB", repMin: 4,  repMax: 8,  step: 10,  startWeight: 175, numSets: 2,
+    { name: "Smith Machine RDL",                   gym: "comm", day: "legsB", repMin: 4,  repMax: 8,  step: 10,  startWeight: 225, numSets: 2,
       subs: [{ name: "Barbell / Dumbbell / Trap Bar RDL", stars: 5 }, { name: "V-Squat Machine Good Morning", stars: 4 }, { name: "Arsenal Posterior Chain Developer", stars: 6 }] },
-    { name: "Lying Hamstrings Curl",               gym: "comm", day: "legsB", repMin: 8,  repMax: 12, step: 5,   startWeight: 75,  numSets: 2,
+    { name: "Lying Hamstrings Curl",               gym: "comm", day: "legsB", repMin: 8,  repMax: 12, step: 5,   startWeight: 140, numSets: 2,
       subs: [{ name: "Seated Hamstrings Curl", stars: 4 }, { name: "Glute Ham Raise", stars: 3 }] },
-    { name: "Cybex Leg Press",                     gym: "comm", day: "legsB", repMin: 8,  repMax: 12, step: 10,  startWeight: 265, numSets: 2,
+    { name: "Cybex Leg Press",                     gym: "comm", day: "legsB", repMin: 8,  repMax: 12, step: 10,  startWeight: 405, numSets: 2,
       subs: [{ name: "45° Sled Leg Press", stars: 5 }, { name: "Horizontal Leg Press", stars: 4 }] },
-    { name: "Dumbbell Heel Elevated Lunge",        gym: "comm", day: "legsB", repMin: 8,  repMax: 16, step: 5,   startWeight: 45,  numSets: 2,
+    { name: "Dumbbell Heel Elevated Lunge",        gym: "comm", day: "legsB", repMin: 8,  repMax: 16, step: 5,   startWeight: 40,  numSets: 2,
       subs: [{ name: "Dumbbell Split Squat", stars: 5 }, { name: "Smith Machine Split Squat", stars: 4 }, { name: "DB/BB Walking Lunge", stars: 4 }] },
-    { name: "Leg Extension",                       gym: "comm", day: "legsB", repMin: 8,  repMax: 16, step: 5,   startWeight: 90,  numSets: 2,
+    { name: "Leg Extension",                       gym: "comm", day: "legsB", repMin: 8,  repMax: 16, step: 5,   startWeight: 220, numSets: 2,
       subs: [{ name: "Sissy Squat", stars: 2 }] },
-    { name: "Seated Calf Raise",                   gym: "comm", day: "legsB", repMin: 8,  repMax: 16, step: 5,   startWeight: 90,  numSets: 4,
+    { name: "Seated Calf Raise",                   gym: "comm", day: "legsB", repMin: 8,  repMax: 16, step: 5,   startWeight: 180, numSets: 4,
       subs: [{ name: "Bent Knee Calf Press on Leg Press", stars: 4 }] }
   ]
 };
@@ -2001,6 +2001,44 @@ img, video, canvas, svg { max-width: 100%; }
 </div>
 
 <script>
+// ── Seed: bodyweight history (Apr 17 – Jun 10 2026) ──────────────────────────
+// Runs once on first load; skipped if data already exists.
+(function seedWeightHistory() {
+  try {
+    const raw = localStorage.getItem('po_coach_weights');
+    if (raw && JSON.parse(raw).length > 0) return;
+    const entries = [
+      {dateKey:'2026-04-17',weight:229.9},{dateKey:'2026-04-18',weight:230.0},
+      {dateKey:'2026-04-19',weight:229.5},{dateKey:'2026-04-20',weight:229.0},
+      {dateKey:'2026-04-21',weight:228.6},{dateKey:'2026-04-22',weight:228.0},
+      {dateKey:'2026-04-23',weight:228.1},{dateKey:'2026-04-24',weight:227.3},
+      {dateKey:'2026-04-25',weight:226.9},{dateKey:'2026-04-26',weight:226.1},
+      {dateKey:'2026-04-27',weight:225.5},{dateKey:'2026-04-28',weight:225.1},
+      {dateKey:'2026-04-29',weight:224.7},{dateKey:'2026-04-30',weight:224.4},
+      {dateKey:'2026-05-01',weight:224.2},{dateKey:'2026-05-02',weight:223.7},
+      {dateKey:'2026-05-03',weight:223.8},{dateKey:'2026-05-04',weight:223.0},
+      {dateKey:'2026-05-05',weight:221.7},{dateKey:'2026-05-06',weight:221.4},
+      {dateKey:'2026-05-07',weight:221.1},{dateKey:'2026-05-08',weight:220.7},
+      {dateKey:'2026-05-09',weight:220.5},{dateKey:'2026-05-10',weight:220.6},
+      {dateKey:'2026-05-11',weight:220.3},{dateKey:'2026-05-12',weight:219.9},
+      {dateKey:'2026-05-13',weight:219.9},{dateKey:'2026-05-14',weight:219.6},
+      {dateKey:'2026-05-15',weight:219.5},{dateKey:'2026-05-16',weight:219.4},
+      {dateKey:'2026-05-17',weight:219.4},{dateKey:'2026-05-18',weight:219.0},
+      {dateKey:'2026-05-19',weight:218.8},{dateKey:'2026-05-20',weight:218.3},
+      {dateKey:'2026-05-21',weight:218.2},{dateKey:'2026-05-22',weight:218.0},
+      {dateKey:'2026-05-23',weight:217.5},{dateKey:'2026-05-24',weight:217.2},
+      {dateKey:'2026-05-28',weight:216.0},{dateKey:'2026-05-29',weight:215.6},
+      {dateKey:'2026-05-30',weight:215.2},{dateKey:'2026-05-31',weight:215.0},
+      {dateKey:'2026-06-01',weight:214.7},{dateKey:'2026-06-02',weight:215.5},
+      {dateKey:'2026-06-03',weight:214.2},{dateKey:'2026-06-04',weight:214.2},
+      {dateKey:'2026-06-05',weight:213.9},{dateKey:'2026-06-06',weight:213.2},
+      {dateKey:'2026-06-07',weight:212.6},{dateKey:'2026-06-08',weight:212.3},
+      {dateKey:'2026-06-09',weight:211.9},{dateKey:'2026-06-10',weight:212.0}
+    ];
+    localStorage.setItem('po_coach_weights', JSON.stringify(entries));
+  } catch (e) {}
+})();
+
 (function() {
   // ============================================================
   // STATE — all logs + edits live in browser localStorage. Each
@@ -2101,6 +2139,55 @@ img, video, canvas, svg { max-width: 100%; }
     try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch (e) {}
   }
   let state = loadState();
+
+  // One-time migration: update startWeight for any exercise with no logs yet,
+  // using Week 8 working weights from the cut (Jun 10 2026).
+  (function migrateStartWeights() {
+    try {
+      const MIG_KEY = 'po_coach_sw_mig_v1';
+      if (localStorage.getItem(MIG_KEY)) return;
+      const map = {
+        'Neutral Grip Shoulder Press Machine': 185,
+        'Smith Machine Flat Chest Press':      250,
+        'Incline Cable Pec Fly':               52.5,
+        'Dumbbell Lateral Raise':              35,
+        'Cable Front Raise':                   30,
+        'Cable Triceps Overhead Extension':    50,
+        'Lat Pulldown':                        100,
+        'Cable Seated Row (Neutral Grip)':     245,
+        'Machine High Row':                    135,
+        'Machine Low Row':                     90,
+        'Cable Lat Pushdown/Pullover':         72.5,
+        'Cable Rear Delt Fly':                 15,
+        'Seated Behind-the-Back Cable Curl':   35,
+        'Hack Squat':                          200,
+        'Sissy Leg Press':                     540,
+        'Seated Hamstrings Curl':              110,
+        'Dumbbell Incline Chest Press':        105,
+        'Chest Supported T-Bar Row':           135,
+        'Smith Machine Narrow Grip Bench':     225,
+        'Neutral Grip Lat Pulldown':           100,
+        'Low Cable Lateral Raise':             20,
+        'Dumbbell Front Raise':                30,
+        'Machine Preacher Curl':               110,
+        'Cable Triceps Pushdown':              87.5,
+        'Smith Machine RDL':                   225,
+        'Lying Hamstrings Curl':               140,
+        'Cybex Leg Press':                     405,
+        'Dumbbell Heel Elevated Lunge':        40,
+        'Leg Extension':                       220,
+        'Seated Calf Raise':                   180,
+      };
+      state.exercises.forEach(ex => {
+        if (map[ex.name] !== undefined && !(state.logs[ex.id] || []).length) {
+          ex.startWeight = map[ex.name];
+        }
+      });
+      saveState();
+      localStorage.setItem(MIG_KEY, '1');
+    } catch (e) {}
+  })();
+
   document.getElementById('appTitle').textContent = CONFIG.appTitle || 'Progressive Overload Coach';
 
   // ============================================================
