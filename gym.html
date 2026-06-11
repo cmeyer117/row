@@ -1296,6 +1296,7 @@ img, video, canvas, svg { max-width: 100%; }
   white-space: nowrap;
 }
 .po-date-chip {
+  position: relative;
   display: inline-flex; align-items: center; gap: 6px;
   padding: 7px 12px;
   background: rgba(255,255,255,0.04);
@@ -1306,11 +1307,13 @@ img, video, canvas, svg { max-width: 100%; }
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
   transition: background 0.15s, border-color 0.15s;
+  overflow: hidden;
 }
 .po-date-chip:hover { background: rgba(255,255,255,0.08); border-color: var(--border-strong); }
 .po-date-chip.is-past { color: var(--warn); border-color: rgba(251,191,36,0.3); }
 .po-date-chip input[type="date"] {
-  position: absolute; opacity: 0; pointer-events: none; width: 0; height: 0;
+  position: absolute; inset: 0; opacity: 0; cursor: pointer;
+  width: 100%; height: 100%; border: none; background: transparent;
 }
 
 /* ----- Weight history list (inside weight card) ----- */
@@ -3414,9 +3417,6 @@ img, video, canvas, svg { max-width: 100%; }
     const today = getActiveDate();
     inp.value = today;
     inp.max = today;
-    chip.addEventListener('click', () => {
-      try { inp.showPicker(); } catch (e) { inp.click(); }
-    });
     inp.addEventListener('change', () => {
       const v = inp.value || today;
       chip.childNodes[0].textContent = fmtDateChipLabel(v);
