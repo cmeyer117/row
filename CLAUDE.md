@@ -2,6 +2,15 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## ⚠️ Context Window Rule — MANDATORY
+
+**At the start of EVERY session, check context usage immediately.**
+- If context is already at **50% or higher**: stop and tell Carl before doing any work.
+- Say exactly: "⚠️ Context is at X% — recommend starting a fresh session to avoid hitting limits mid-task."
+- Do not proceed until Carl confirms or starts a new session.
+
+---
+
 ## Token Efficiency — MANDATORY (Every Session)
 
 **These rules are non-negotiable. Apply before any other work.**
