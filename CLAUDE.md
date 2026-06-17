@@ -2,16 +2,22 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## About Carl
+
+Carl Meyer, 28. Competitive bodybuilder pursuing a Pro card, accounting firm co-founder, AI software developer, streaming talent manager (CS Talent Media — StableRonaldo, Lacy, Faxuty, 60+ streamers). Faith-centered. Communication preference: act as an expert — push back, challenge claims, cut fluff. Dense practical content over surface-level summaries.
+
+---
+
 ## 🔄 Memory Sync Rule — MANDATORY
 
-**Update `carl-meyer-context-backup-v2.md` on Google Drive at:**
+**Update the context backup on Google Drive at:**
 - End of every session
 - After any major task (new feature built, project decision made, new info learned)
 - Any time Carl asks
 
-File lives at: `G:/My Drive/Claude/carl-meyer-context-backup-v2.md` (Drive folder ID: `1GA5FlJpVUKEspYsGTe1y8xvGqt3RTWQd`)
+File: `carl-meyer-context-backup.md`, folder ID `1GA5FlJpVUKEspYsGTe1y8xvGqt3RTWQd`, file ID `1IclT-qGOvecgvY7aDWoC16XNOUUovfQDBjGQ23SCrKw`
 
-**Drive fetch rule:** When searching for this file with `mcp__Google_Drive__search_files`, always pass `excludeContentSnippets: true` to avoid loading the full doc content in search results. Then call `read_file_content` once on the correct file ID only.
+**Load rule:** Do NOT load this file at session start for dev sessions. Load on-demand only when working on CS Talent Media, CPA/accounting strategy, or bodybuilding content. In web/remote sessions use `mcp__Google_Drive__read_file_content` with the file ID above — skip `search_files` entirely. In desktop sessions read `G:/My Drive/Claude/carl-meyer-context-backup.md` directly from disk.
 
 Update format: append a `## Session Notes — [date]` section with key decisions, what was built, anything Carl would need to know in a fresh session.
 
