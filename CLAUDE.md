@@ -11,6 +11,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 File lives at: `G:/My Drive/Claude/carl-meyer-context-backup-v2.md` (Drive folder ID: `1GA5FlJpVUKEspYsGTe1y8xvGqt3RTWQd`)
 
+**Drive fetch rule:** When searching for this file with `mcp__Google_Drive__search_files`, always pass `excludeContentSnippets: true` to avoid loading the full doc content in search results. Then call `read_file_content` once on the correct file ID only.
+
 Update format: append a `## Session Notes — [date]` section with key decisions, what was built, anything Carl would need to know in a fresh session.
 
 ---
