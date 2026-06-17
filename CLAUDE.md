@@ -2,6 +2,19 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## 🔄 Memory Sync Rule — MANDATORY
+
+**Update `carl-meyer-context-backup-v2.md` on Google Drive at:**
+- End of every session
+- After any major task (new feature built, project decision made, new info learned)
+- Any time Carl asks
+
+File lives at: `G:/My Drive/Claude/carl-meyer-context-backup-v2.md` (Drive folder ID: `1GA5FlJpVUKEspYsGTe1y8xvGqt3RTWQd`)
+
+Update format: append a `## Session Notes — [date]` section with key decisions, what was built, anything Carl would need to know in a fresh session.
+
+---
+
 ## ⚠️ Context Window Rule — MANDATORY
 
 **At the start of EVERY session, check context usage immediately.**
