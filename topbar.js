@@ -224,8 +224,8 @@ body.topbar-modal-open { overflow: hidden; touch-action: none; }
 
   const bottombarHtml = `
 <nav class="bottombar" id="bottombar" role="navigation" aria-label="Main tabs">
-  <a href="main.html" class="bottombar-tab" data-page="main">
-    <span class="bottombar-tab-icon">🏠</span><span>Main</span>
+  <a href="index.html" class="bottombar-tab" data-page="home">
+    <span class="bottombar-tab-icon">🏠</span><span>Home</span>
   </a>
   <a href="health.html" class="bottombar-tab" data-page="health">
     <span class="bottombar-tab-icon">💊</span><span>Health</span>
@@ -248,7 +248,8 @@ body.topbar-modal-open { overflow: hidden; touch-action: none; }
     if (p.endsWith('health.html')) return 'health';
     if (p.endsWith('gym.html')) return 'fitness';
     if (p.endsWith('main.html')) return 'main';
-    return 'main';
+    if (p.endsWith('index.html') || p === '/' || p === '') return 'home';
+    return '';
   }
 
   function injectStyleAndHTML() {
