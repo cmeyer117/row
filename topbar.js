@@ -249,19 +249,16 @@ body.topbar-modal-open { overflow: hidden; touch-action: none; }
   </a>
 </nav>`;
 
-  function isFinancePage() {
-    const p = (window.location.pathname || '').toLowerCase();
-    return p.endsWith('/finance.html') || p.endsWith('finance.html');
-  }
   function isEmbedded() {
     try { return window.self !== window.top; } catch (e) { return true; }
   }
-  function shouldShowChrome() { return !isFinancePage() && !isEmbedded(); }
+  function shouldShowChrome() { return !isEmbedded(); }
   function currentPageKey() {
     const p = (window.location.pathname || '').toLowerCase();
     if (p.endsWith('health.html')) return 'health';
     if (p.endsWith('gym.html')) return 'fitness';
     if (p.endsWith('main.html')) return 'main';
+    if (p.endsWith('finance.html')) return '';
     return 'main';
   }
 
