@@ -128,6 +128,17 @@
 .topbar-water-add.flash {
   background: linear-gradient(180deg, rgba(125, 211, 252, 0.7), rgba(110, 231, 183, 0.7));
 }
+.topbar-home-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 38px; height: 38px;
+  border: 1px solid rgba(110, 231, 183, 0.18);
+  background: rgba(110, 231, 183, 0.07);
+  border-radius: 10px; text-decoration: none; margin-right: auto;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.15s, border-color 0.15s;
+}
+.topbar-home-btn:hover { background: rgba(110, 231, 183, 0.14); border-color: rgba(110, 231, 183, 0.32); }
+.topbar-home-icon { font-size: 17px; line-height: 1; }
 .topbar-finance-btn {
   display: inline-flex; align-items: center; justify-content: center;
   width: 44px; height: 42px;
@@ -210,6 +221,9 @@ body.topbar-modal-open { overflow: hidden; touch-action: none; }
 
   const topbarHtml = `
 <header class="topbar" id="topbar" role="navigation" aria-label="Quick actions">
+  <a href="index.html" class="topbar-home-btn" aria-label="Dashboard hub">
+    <span class="topbar-home-icon">⌂</span>
+  </a>
   <div class="topbar-water-wrap">
     <a href="health.html#water" class="topbar-water-pill" id="topbarWater" aria-label="Water progress">
       <span class="topbar-pill-dot"></span>
@@ -224,8 +238,8 @@ body.topbar-modal-open { overflow: hidden; touch-action: none; }
 
   const bottombarHtml = `
 <nav class="bottombar" id="bottombar" role="navigation" aria-label="Main tabs">
-  <a href="index.html" class="bottombar-tab" data-page="home">
-    <span class="bottombar-tab-icon">🏠</span><span>Home</span>
+  <a href="main.html" class="bottombar-tab" data-page="main">
+    <span class="bottombar-tab-icon">🏠</span><span>Main</span>
   </a>
   <a href="health.html" class="bottombar-tab" data-page="health">
     <span class="bottombar-tab-icon">💊</span><span>Health</span>
@@ -248,8 +262,7 @@ body.topbar-modal-open { overflow: hidden; touch-action: none; }
     if (p.endsWith('health.html')) return 'health';
     if (p.endsWith('gym.html')) return 'fitness';
     if (p.endsWith('main.html')) return 'main';
-    if (p.endsWith('index.html') || p === '/' || p === '') return 'home';
-    return '';
+    return 'main';
   }
 
   function injectStyleAndHTML() {
