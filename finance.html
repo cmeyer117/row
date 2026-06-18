@@ -871,6 +871,20 @@ renderCoaching();
 renderBrand();
 renderWishlist();
 
+// ── Cloud sync ────────────────────────────────────────────────────
+if (typeof window.initCloudSync === 'function') {
+  window.initCloudSync({
+    appKey: 'finance',
+    syncedKeys: ['fin_networth_v1', 'fin_coaching_v1', 'fin_brand_v1', 'fin_wishlist_v1'],
+    onApplied: function() {
+      renderNetWorth();
+      renderCoaching();
+      renderBrand();
+      renderWishlist();
+    }
+  });
+}
+
 })();
 </script>
 </body>
