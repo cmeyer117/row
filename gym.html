@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0a0a0b">
 <title>Progressive Overload Coach</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,700;1,6..72,400&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
 <script src="topbar.js" defer></script>
 
 <!-- =============================================================
@@ -151,17 +154,18 @@ const CONFIG = {
   --text-4: rgba(255,255,255,0.25);
   --border: rgba(255,255,255,0.06);
   --border-strong: rgba(255,255,255,0.14);
-  --accent: #ffffff;
+  --accent: #6ee7b7;
   --good: #6ee7b7;
   --warn: #fbbf24;
   --bad: #ff8a8a;
   --font: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif;
-  --font-mono: ui-monospace, SF Mono, Menlo, Consolas, monospace;
+  --font-serif: 'Newsreader', Georgia, serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SF Mono, Menlo, Consolas, monospace;
 }
 * { box-sizing: border-box; }
 html, body {
   margin: 0; padding: 0;
-  background: radial-gradient(ellipse 80% 60% at 50% 0%, #14141a 0%, #0a0a0b 60%);
+  background: radial-gradient(ellipse 80% 60% at 75% 0%, rgba(110,231,183,0.06) 0%, #0a0a0b 60%);
   color: var(--text-1);
   font-family: var(--font);
   -webkit-font-smoothing: antialiased;
@@ -321,9 +325,9 @@ img, video, canvas, svg { max-width: 100%; }
 }
 .po-seg-btn:hover { color: var(--text-2); background: rgba(255,255,255,0.04); }
 .po-seg-btn.active {
-  background: linear-gradient(180deg, #ffffff 0%, #e8e5dd 100%);
-  color: #0a0a0b;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.5), 0 4px 12px rgba(0,0,0,0.35);
+  background: linear-gradient(135deg, #6EE7B7 0%, #34D399 100%);
+  color: #052e16;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.25), 0 4px 12px rgba(110,231,183,0.25);
 }
 
 /* ----- Sub-section title ----- */
@@ -496,12 +500,12 @@ img, video, canvas, svg { max-width: 100%; }
 /* ----- Primary button ----- */
 .po-btn-primary {
   width: 100%; padding: 14px;
-  border: 1px solid rgba(255,255,255,0.85);
-  background: linear-gradient(180deg, #ffffff 0%, #e8e5dd 100%);
-  color: #0a0a0b; border-radius: 12px;
+  border: none;
+  background: linear-gradient(135deg, #6EE7B7 0%, #34D399 100%);
+  color: #052e16; border-radius: 12px;
   font-family: inherit; font-size: 14px; font-weight: 700;
   cursor: pointer;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.55), 0 4px 14px rgba(0,0,0,0.40);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.25), 0 4px 14px rgba(110,231,183,0.25);
   -webkit-tap-highlight-color: transparent;
 }
 .po-btn-primary:hover { transform: translateY(-1px); }

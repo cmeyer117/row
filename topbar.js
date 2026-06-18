@@ -110,7 +110,7 @@
   50%      { box-shadow: 0 0 0 5px rgba(239, 68, 68, 0); }
 }
 .topbar-pill-count {
-  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-family: 'JetBrains Mono', ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   font-size: 13px; font-weight: 700; color: #FAFAFA;
   font-variant-numeric: tabular-nums; white-space: nowrap;
 }
@@ -163,9 +163,9 @@
   filter: grayscale(100%) brightness(1.2); opacity: 0.55;
   transition: opacity 0.15s, filter 0.15s, transform 0.10s;
 }
-.bottombar-tab.active { color: #FAFAFA; }
+.bottombar-tab.active { color: #6EE7B7; }
 .bottombar-tab.active .bottombar-tab-icon {
-  filter: grayscale(100%) brightness(1.6); opacity: 1;
+  filter: grayscale(0%) brightness(1.2); opacity: 1;
 }
 .bottombar-tab:active .bottombar-tab-icon { transform: scale(0.92); }
 body.has-bottombar {
