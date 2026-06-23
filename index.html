@@ -154,13 +154,21 @@ body::after {
 .tile-finance::before { background: radial-gradient(circle at 80% 20%, rgba(242,192,99,0.07), transparent 60%); }
 .tile-finance:hover   { border-color: rgba(242, 192, 99, 0.26); }
 
-.tile-jarvis  { grid-column: span 4; border-color: rgba(167, 139, 250, 0.12); }
+.tile-jarvis  { grid-column: span 2; border-color: rgba(167, 139, 250, 0.12); }
 .tile-jarvis::before  { background: radial-gradient(circle at 60% 50%, rgba(167,139,250,0.08), transparent 60%); }
 .tile-jarvis:hover    { border-color: rgba(167, 139, 250, 0.28); }
 .tile-jarvis:hover    .tile-arrow { color: #A78BFA; }
 .tile-jarvis          .tile-badge { background: rgba(167,139,250,0.10); color: #A78BFA; }
 .tile-jarvis .tile-name { font-size: 30px; }
 .tile-jarvis .tile-icon { font-size: 42px; }
+
+.tile-vessel  { grid-column: span 2; border-color: rgba(201, 168, 76, 0.14); }
+.tile-vessel::before  { background: radial-gradient(circle at 60% 50%, rgba(201,168,76,0.08), transparent 60%); }
+.tile-vessel:hover    { border-color: rgba(201, 168, 76, 0.30); }
+.tile-vessel:hover    .tile-arrow { color: #C9A84C; }
+.tile-vessel          .tile-badge { background: rgba(201,168,76,0.12); color: #C9A84C; }
+.tile-vessel .tile-name { font-size: 30px; }
+.tile-vessel .tile-icon { font-size: 42px; }
 
 /* tile content */
 .tile-num {
@@ -242,14 +250,15 @@ body::after {
   .tile-fitness { grid-column: span 2; }
   .tile-health  { grid-column: span 1; }
   .tile-finance { grid-column: span 1; }
-  .tile-jarvis  { grid-column: span 2; }
+  .tile-jarvis  { grid-column: span 1; }
+  .tile-vessel  { grid-column: span 1; }
 }
 @media (max-width: 440px) {
   .bento {
     grid-template-columns: 1fr;
     grid-template-rows: auto;
   }
-  .tile-goals, .tile-fitness, .tile-health, .tile-finance, .tile-jarvis {
+  .tile-goals, .tile-fitness, .tile-health, .tile-finance, .tile-jarvis, .tile-vessel {
     grid-column: span 1; grid-row: span 1;
   }
   .dash-title { font-size: 24px; }
@@ -328,6 +337,20 @@ body::after {
       </div>
       <div class="tile-footer">
         <span class="tile-badge">AI</span>
+        <span class="tile-arrow">→</span>
+      </div>
+    </a>
+
+    <!-- Vessel -->
+    <a href="https://vessel-carl-meyer-s-projects.vercel.app" target="_blank" rel="noopener" class="tile tile-vessel">
+      <div>
+        <div class="tile-num">·06</div>
+        <span class="tile-icon">✦</span>
+        <div class="tile-name">Vessel</div>
+        <div class="tile-sub">Faith · Manifest · Journal · Prayer.</div>
+      </div>
+      <div class="tile-footer">
+        <span class="tile-badge">DAILY</span>
         <span class="tile-arrow">→</span>
       </div>
     </a>
