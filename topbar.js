@@ -70,6 +70,11 @@
 
   authGate();
 
+  // -------- Service worker --------
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  }
+
   // -------- Supabase config (replace with your own project URL + publishable key) --------
   const TOPBAR_SUPABASE_URL = 'https://vikpcejlyxieguorwysf.supabase.co';
   const TOPBAR_SUPABASE_KEY = 'sb_publishable_EvWPtfW1FBW5Vf-H6w0yHw_PcXK4imv';
