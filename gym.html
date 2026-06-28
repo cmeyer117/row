@@ -3722,15 +3722,16 @@ img, video, canvas, svg { max-width: 100%; }
     return null;
   }
 
-  function quickLog(raw) {
+  // dateKey is optional — defaults to today. Pass 'YYYY-MM-DD' to log to a specific date.
+  function quickLog(raw, dateKey) {
     var parsed = parseQuickLog(raw);
     if (!parsed) return { ok: false, msg: 'Format: bench 225×8  ·  hack 3p×9  ·  pullups 10' };
     var namePart = parsed.namePart, weight = parsed.weight, reps = parsed.reps;
     if (!reps || reps <= 0 || reps > 99) return { ok: false, msg: 'Rep count looks off' };
 
+    var dk = dateKey || getActiveDate();
     var ex = fuzzyMatchExercise(namePart);
     if (!ex) {
-      var dk = getActiveDate();
       if (!state.sessions[dk]) state.sessions[dk] = {};
       var id = 'adhoc_' + Date.now() + '_' + Math.random().toString(36).slice(2, 5);
       ex = {
@@ -3748,7 +3749,7 @@ img, video, canvas, svg { max-width: 100%; }
     var w = ex.bw ? 0 : (weight !== null ? weight : 0);
     if (!ex.bw && w <= 0) return { ok: false, msg: 'Add a weight: bench 225×8  or  hack 3p×9' };
 
-    var isoDate = new Date(getActiveDate() + 'T12:00:00').toISOString();
+    var isoDate = new Date(dk + 'T12:00:00').toISOString();
     if (!state.logs[ex.id]) state.logs[ex.id] = [];
     var entry = { weight: w, reps: reps, date: isoDate };
     if (parsed.plates != null) { entry.plates = parsed.plates; entry.extraLbs = parsed.extraLbs || 0; }
@@ -3858,19 +3859,50 @@ img, video, canvas, svg { max-width: 100%; }
       return { name: name, sets: sets };
     }
 
+    // Parse a date header like "6-16 Pull", "5-1", "Push June 10th 2026" → 'YYYY-MM-DD' or null
+    function parseDateHeader(line) {
+      // "6-16 Pull" / "5-1 Pull" / "4-30Push"
+      var m = line.match(/^(\d{1,2})[-\/](\d{1,2})/);
+      if (m) {
+        var month = parseInt(m[1], 10), day = parseInt(m[2], 10);
+        var year = new Date().getFullYear();
+        // If month is in the future, assume last year
+        var d = new Date(year, month - 1, day);
+        if (d > new Date()) d = new Date(year - 1, month - 1, day);
+        return d.toISOString().slice(0, 10);
+      }
+      // "Push June 10th 2026" / "June 10th 2026"
+      var m2 = line.match(/(\w+)\s+(\d{1,2})(?:st|nd|rd|th)?\s+(\d{4})/i);
+      if (m2) {
+        var months = {january:0,february:1,march:2,april:3,may:4,june:5,july:6,august:7,september:8,october:9,november:10,december:11};
+        var mo = months[m2[1].toLowerCase()];
+        if (mo != null) {
+          return new Date(parseInt(m2[3],10), mo, parseInt(m2[2],10)).toISOString().slice(0,10);
+        }
+      }
+      return null;
+    }
+
     function renderPreview() {
       parsed = [];
       var lines = textarea.value.split(/[\r\n]+/).map(function(l){ return l.trim(); }).filter(Boolean);
       listEl.innerHTML = '';
+      var currentDate = null; // tracks date from headers
+
       lines.forEach(function(line) {
-        // Skip date headers like "4-30 Push", "Week 2", "5-1 Pull" etc.
-        if (/^(week\s+\d+|push|pull|legs?|upper|lower|\d{1,2}[-\/]\d{1,2})/i.test(line)) {
+        // Date/section headers: "6-16 Pull", "Week 2", "Push June 10th 2026" etc.
+        if (/^(week\s+\d+|push|pull|legs?|upper|lower|\d{1,2}[-\/]\d{1,2})/i.test(line) ||
+            /\b(january|february|march|april|may|june|july|august|september|october|november|december)\b/i.test(line)) {
+          var detected = parseDateHeader(line);
+          if (detected) currentDate = detected;
+          var label = detected ? line + ' → ' + detected : line;
           var row = document.createElement('div');
           row.className = 'import-preview-row';
-          row.innerHTML = '<span class="ipr-skip">— ' + line + '</span>';
+          row.innerHTML = '<span class="ipr-skip">— ' + label + '</span>';
           listEl.appendChild(row);
           return;
         }
+
         var result = parseDocLine(line);
         if (!result) {
           var row = document.createElement('div');
@@ -3879,13 +3911,16 @@ img, video, canvas, svg { max-width: 100%; }
           listEl.appendChild(row);
           return;
         }
+        result.dateKey = currentDate; // may be null → quickLog uses today
         parsed.push(result);
+        var dateTag = currentDate ? '<span class="ipr-skip" style="margin-left:6px">' + currentDate.slice(5) + '</span>' : '';
         var setsStr = result.sets.map(function(s){ return s.weight + 'lbs × ' + s.reps; }).join('  ·  ');
         var row = document.createElement('div');
         row.className = 'import-preview-row';
-        row.innerHTML = '<span class="ipr-name">' + result.name + '</span><span class="ipr-sets">' + setsStr + '</span>';
+        row.innerHTML = '<span class="ipr-name">' + result.name + '</span><span class="ipr-sets">' + setsStr + '</span>' + dateTag;
         listEl.appendChild(row);
       });
+
       var hasParsed = parsed.length > 0;
       previewEl.classList.toggle('has-items', lines.length > 0);
       logBtn.disabled = !hasParsed;
@@ -3907,7 +3942,7 @@ img, video, canvas, svg { max-width: 100%; }
       var ok = 0;
       parsed.forEach(function(item) {
         item.sets.forEach(function(s) {
-          var result = quickLog(item.name + ' ' + s.weight + 'x' + s.reps);
+          var result = quickLog(item.name + ' ' + s.weight + 'x' + s.reps, item.dateKey);
           if (result.ok) ok++;
         });
       });
