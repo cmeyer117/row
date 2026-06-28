@@ -3939,10 +3939,7 @@ img, video, canvas, svg { max-width: 100%; }
       return l.date.slice(0,10) + ': ' + w + ' × ' + l.reps + ' reps';
     }).join('\n');
 
-    const cues = getCues(ex.id);
-    const cueText = cues.length ? '\nCurrent cues: ' + cues.join('; ') : '';
-
-    const message = 'Give me a 2-3 sentence specific coaching insight for ' + ex.name + '. My last 10 sets:\n' + setsText + cueText + '\nFocus on: should I add weight, volume, deload, or anything else notable in my trend?';
+    const message = 'Coach me on ' + ex.name + '. My last 10 sets:\n' + setsText + '\nSearch your knowledge base for what you know about this exercise and give me: (1) one specific form cue to lock in next session based on what you know about this movement, and (2) a honest read on my progression trend — should I add weight, hold, or back off? Keep it to 3 sentences, be direct.';
 
     try {
       const res = await fetch(JARVIS_URL + '/chat', {
