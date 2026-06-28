@@ -257,13 +257,19 @@ body.topbar-modal-open { overflow: hidden; touch-action: none; }
   function isEmbedded() {
     try { return window.self !== window.top; } catch (e) { return true; }
   }
-  function shouldShowChrome() { return !isEmbedded(); }
+  function shouldShowChrome() {
+    if (isEmbedded()) return false;
+    const p = (window.location.pathname || '').toLowerCase();
+    if (p.endsWith('index.html') || p === '/' || p.endsWith('/row/')) return false;
+    return true;
+  }
   function currentPageKey() {
     const p = (window.location.pathname || '').toLowerCase();
     if (p.endsWith('health.html')) return 'health';
     if (p.endsWith('gym.html')) return 'fitness';
     if (p.endsWith('main.html')) return 'main';
     if (p.endsWith('finance.html')) return '';
+    if (p.endsWith('index.html') || p === '/' || p.endsWith('/row/')) return '';
     return 'main';
   }
 
