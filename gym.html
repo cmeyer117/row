@@ -2302,23 +2302,10 @@ img, video, canvas, svg { max-width: 100%; }
       <div id="rxWrap"></div>
     </div>
 
-    <!-- Stats -->
-    <div class="po-sub-section">
-      <div class="po-sub-title">Stats</div>
-      <div class="po-stats-row">
-        <div class="po-stat-box">
-          <div class="po-stat-label" id="oneRmLabel">Est. 1RM</div>
-          <div class="po-stat-val" id="oneRm">—<span class="po-unit" id="oneRmUnit">kg</span></div>
-        </div>
-        <div class="po-stat-box">
-          <div class="po-stat-label">Best set</div>
-          <div class="po-stat-val" id="bestSet">—</div>
-        </div>
-        <div class="po-stat-box">
-          <div class="po-stat-label">Sessions</div>
-          <div class="po-stat-val" id="sessionCount">—</div>
-        </div>
-      </div>
+    <!-- Stats (hidden) -->
+    <div style="display:none">
+      <div id="oneRmLabel"></div><div id="oneRm"></div><div id="oneRmUnit"></div>
+      <div id="bestSet"></div><div id="sessionCount"></div>
     </div>
 
     <!-- Trend -->
