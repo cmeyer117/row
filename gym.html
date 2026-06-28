@@ -669,6 +669,98 @@ img, video, canvas, svg { max-width: 100%; }
 .po-hist-del:hover { color: var(--bad); }
 .po-hist-edit:hover { color: var(--text-1); }
 
+/* ----- Cues ----- */
+.po-cues-section {
+  padding: 8px 0 4px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  margin-bottom: 8px;
+}
+.po-cues-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 4px;
+}
+.po-cues-label {
+  font-size: 10px; font-weight: 800; letter-spacing: 0.08em;
+  color: var(--text-3); text-transform: uppercase;
+}
+.po-cues-edit-btn {
+  font-size: 11px; background: none; border: none; color: var(--text-4);
+  cursor: pointer; padding: 0 4px;
+}
+.po-cues-edit-btn:hover { color: var(--text-2); }
+.po-cues-list { display: flex; flex-direction: column; gap: 3px; }
+.po-cue-item {
+  font-size: 12px; color: var(--text-2);
+  padding-left: 10px; position: relative;
+}
+.po-cue-item::before {
+  content: '·'; position: absolute; left: 0; color: var(--good);
+}
+.po-cues-empty { font-size: 11px; color: var(--text-4); font-style: italic; }
+.po-cues-textarea {
+  width: 100%; box-sizing: border-box;
+  background: rgba(255,255,255,0.04); border: 1px solid var(--border);
+  border-radius: 8px; color: var(--text-1); font-family: inherit;
+  font-size: 12px; padding: 8px; resize: vertical; min-height: 60px;
+  margin-top: 4px;
+}
+.po-cues-save-btn {
+  font-size: 11px; padding: 4px 12px; border-radius: 999px;
+  background: rgba(110,231,183,0.15); color: var(--good);
+  border: 1px solid var(--good); cursor: pointer; margin-top: 4px;
+  font-family: inherit;
+}
+
+/* ----- Coach ----- */
+.po-coach-section { padding: 8px 0; }
+.po-coach-btn {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 12px; font-weight: 700; padding: 7px 14px;
+  border-radius: 999px; border: 1px solid rgba(110,231,183,0.3);
+  background: rgba(110,231,183,0.08); color: var(--good);
+  cursor: pointer; font-family: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+.po-coach-btn:active { background: rgba(110,231,183,0.18); }
+.po-coach-btn.loading { opacity: 0.6; pointer-events: none; }
+.po-coach-response {
+  display: none; margin-top: 10px;
+  background: rgba(110,231,183,0.06); border: 1px solid rgba(110,231,183,0.15);
+  border-radius: 10px; padding: 10px 12px;
+  font-size: 13px; color: var(--text-1); line-height: 1.5;
+}
+.po-coach-response.show { display: block; }
+.po-coach-response-label {
+  font-size: 9px; font-weight: 800; letter-spacing: 0.1em;
+  color: var(--good); margin-bottom: 6px; text-transform: uppercase;
+}
+
+/* ----- Debrief modal ----- */
+#debriefModal {
+  display: none; position: fixed; inset: 0; z-index: 9000;
+  background: rgba(0,0,0,0.7); align-items: flex-end;
+}
+#debriefModal.show { display: flex; }
+.po-debrief-sheet {
+  width: 100%; background: var(--card-bg);
+  border-radius: 20px 20px 0 0; padding: 20px 20px 40px;
+  max-height: 70vh; overflow-y: auto;
+}
+.po-debrief-title {
+  font-size: 11px; font-weight: 800; letter-spacing: 0.08em;
+  color: var(--good); text-transform: uppercase; margin-bottom: 12px;
+}
+.po-debrief-body {
+  font-size: 14px; color: var(--text-1); line-height: 1.6;
+  white-space: pre-wrap;
+}
+.po-debrief-close {
+  display: block; width: 100%; margin-top: 16px;
+  padding: 12px; border-radius: 12px; border: none;
+  background: rgba(255,255,255,0.06); color: var(--text-2);
+  font-size: 14px; cursor: pointer; font-family: inherit;
+}
+
 /* ----- Modals ----- */
 .po-modal-bg {
   display: none; position: fixed; inset: 0;
@@ -2027,6 +2119,15 @@ img, video, canvas, svg { max-width: 100%; }
   </div>
   <div class="po-quick-feedback ql-hidden" id="quickLogFeedback"></div>
 
+  <!-- Debrief Modal -->
+  <div id="debriefModal">
+    <div class="po-debrief-sheet">
+      <div class="po-debrief-title">⚡ Session Debrief — Jarvis</div>
+      <div class="po-debrief-body" id="debriefBody">Analyzing your session…</div>
+      <button class="po-debrief-close" id="debriefClose" type="button">Close</button>
+    </div>
+  </div>
+
   <!-- Import Modal -->
   <div class="import-overlay" id="importOverlay">
     <div class="import-sheet" id="importSheet">
@@ -2250,6 +2351,28 @@ img, video, canvas, svg { max-width: 100%; }
           <input type="date" id="logDateInput">
         </button>
       </div>
+      <!-- Cues -->
+      <div class="po-cues-section" id="cuesSection">
+        <div class="po-cues-header">
+          <span class="po-cues-label">Cues</span>
+          <button class="po-cues-edit-btn" id="cuesEditBtn" type="button">edit</button>
+        </div>
+        <div class="po-cues-list" id="cuesList"></div>
+        <div id="cuesEditArea" style="display:none">
+          <textarea class="po-cues-textarea" id="cuesTextarea" placeholder="One cue per line — e.g. scapular depression before pulling"></textarea>
+          <button class="po-cues-save-btn" id="cuesSaveBtn" type="button">Save</button>
+        </div>
+      </div>
+
+      <!-- Coach -->
+      <div class="po-coach-section">
+        <button class="po-coach-btn" id="coachBtn" type="button">⚡ Ask Coach</button>
+        <div class="po-coach-response" id="coachResponse">
+          <div class="po-coach-response-label">Jarvis</div>
+          <div id="coachResponseText"></div>
+        </div>
+      </div>
+
       <div class="po-bw-banner" id="bwBanner">Bodyweight — log reps only</div>
       <div class="po-last-set" id="lastSet">
         <span class="po-last-label">Last time</span>
@@ -2989,6 +3112,10 @@ img, video, canvas, svg { max-width: 100%; }
   }
   function renderForm() {
     const ex = getCurrentEx();
+    renderCues(ex);
+    // Reset coach panel when switching exercises
+    $('coachResponse').classList.remove('show');
+    $('coachResponseText').textContent = '';
     const banner = $('bwBanner');
     const wField = $('weightField');
     const oneRmLbl = $('oneRmLabel');
@@ -3608,6 +3735,7 @@ img, video, canvas, svg { max-width: 100%; }
 
   $('poTwDoneBtn').addEventListener('click', () => {
     const todayKey = wtDateKey(new Date());
+    const wasUndone = !doneDays[todayKey];
     if (doneDays[todayKey]) {
       delete doneDays[todayKey];
     } else {
@@ -3616,6 +3744,7 @@ img, video, canvas, svg { max-width: 100%; }
     saveDoneDays(doneDays);
     renderTodaysWorkout();
     renderPastWorkouts();
+    if (wasUndone) fireDebrief();
   });
   $('poTwPastToggle').addEventListener('click', () => {
     const body = $('poTwPastBody');
@@ -3697,6 +3826,155 @@ img, video, canvas, svg { max-width: 100%; }
     if (e.key === 'Enter') saveAdhocExercise();
     if (e.key === 'Escape') closeAdhocForm();
   });
+  // ── Cues ──────────────────────────────────────────────────────
+  const JARVIS_URL = 'https://claude-workspace-production-8460.up.railway.app';
+
+  function getCues(exId) {
+    return (state.cues && state.cues[exId]) || [];
+  }
+  function saveCues(exId, lines) {
+    if (!state.cues) state.cues = {};
+    state.cues[exId] = lines;
+    saveState();
+  }
+
+  function renderCues(ex) {
+    const list = $('cuesList');
+    const textarea = $('cuesTextarea');
+    const editArea = $('cuesEditArea');
+    const editBtn = $('cuesEditBtn');
+    if (!ex) { $('cuesSection').style.display = 'none'; return; }
+    $('cuesSection').style.display = '';
+    editArea.style.display = 'none';
+    editBtn.textContent = 'edit';
+    const cues = getCues(ex.id);
+    if (cues.length) {
+      list.innerHTML = cues.map(c => '<div class="po-cue-item">' + escape(c) + '</div>').join('');
+    } else {
+      list.innerHTML = '<div class="po-cues-empty">No cues yet — tap edit to add</div>';
+    }
+    textarea.value = cues.join('\n');
+  }
+
+  $('cuesEditBtn').addEventListener('click', function() {
+    const editArea = $('cuesEditArea');
+    const open = editArea.style.display !== 'none';
+    editArea.style.display = open ? 'none' : 'block';
+    $('cuesEditBtn').textContent = open ? 'edit' : 'cancel';
+  });
+
+  $('cuesSaveBtn').addEventListener('click', function() {
+    const ex = getCurrentEx();
+    if (!ex) return;
+    const lines = $('cuesTextarea').value.split('\n').map(s => s.trim()).filter(Boolean);
+    saveCues(ex.id, lines);
+    renderCues(ex);
+  });
+
+  // ── Ask Coach ─────────────────────────────────────────────────
+  const coachCache = {}; // exId → response text
+
+  $('coachBtn').addEventListener('click', async function() {
+    const ex = getCurrentEx();
+    if (!ex) return;
+    const btn = $('coachBtn');
+    const responseEl = $('coachResponse');
+    const responseText = $('coachResponseText');
+
+    if (coachCache[ex.id]) {
+      responseText.textContent = coachCache[ex.id];
+      responseEl.classList.add('show');
+      return;
+    }
+
+    btn.classList.add('loading');
+    btn.textContent = '⚡ Thinking…';
+
+    const logs = (state.logs[ex.id] || []).slice(-10);
+    const u = state.units || 'lb';
+    const setsText = logs.map(function(l) {
+      const w = l.plateConfig
+        ? Object.entries(l.plateConfig).map(function(kv) { return kv[1] + '×' + kv[0]; }).join('+')
+        : (l.plates != null ? l.plates + ' plates' : l.weight + u);
+      return l.date.slice(0,10) + ': ' + w + ' × ' + l.reps + ' reps';
+    }).join('\n');
+
+    const cues = getCues(ex.id);
+    const cueText = cues.length ? '\nCurrent cues: ' + cues.join('; ') : '';
+
+    const message = 'Give me a 2-3 sentence specific coaching insight for ' + ex.name + '. My last 10 sets:\n' + setsText + cueText + '\nFocus on: should I add weight, volume, deload, or anything else notable in my trend?';
+
+    try {
+      const res = await fetch(JARVIS_URL + '/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: 'default-user', message }),
+      });
+      const data = await res.json();
+      const text = data.response || data.message || 'No response from Jarvis.';
+      coachCache[ex.id] = text;
+      responseText.textContent = text;
+      responseEl.classList.add('show');
+    } catch (e) {
+      responseText.textContent = 'Could not reach Jarvis. Check connection.';
+      responseEl.classList.add('show');
+    }
+
+    btn.classList.remove('loading');
+    btn.textContent = '⚡ Ask Coach';
+  });
+
+  // ── Post-workout debrief ──────────────────────────────────────
+  async function fireDebrief() {
+    const modal = $('debriefModal');
+    const body = $('debriefBody');
+    modal.classList.add('show');
+    body.textContent = 'Analyzing your session…';
+
+    const today = getActiveDate();
+    const u = state.units || 'lb';
+    const allLogs = state.logs || {};
+    const exercises = state.exercises || [];
+
+    const sessionLines = [];
+    exercises.forEach(function(ex) {
+      const sets = (allLogs[ex.id] || []).filter(function(l) { return l.date.slice(0,10) === today; });
+      if (!sets.length) return;
+      const setsStr = sets.map(function(l) {
+        if (l.plates != null) return l.plates + 'pl×' + l.reps;
+        if (l.plateConfig) return Object.entries(l.plateConfig).map(function(kv) { return kv[1] + '×' + kv[0]; }).join('+') + '×' + l.reps;
+        return l.weight + u + '×' + l.reps;
+      }).join(', ');
+      sessionLines.push(ex.name + ': ' + setsStr);
+    });
+
+    if (!sessionLines.length) {
+      body.textContent = 'No sets logged today.';
+      return;
+    }
+
+    const message = 'Give me a 3-4 sentence post-workout debrief for today\'s session. Be specific about what I hit, what to push next time, and any flags:\n\n' + sessionLines.join('\n');
+
+    try {
+      const res = await fetch(JARVIS_URL + '/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: 'default-user', message }),
+      });
+      const data = await res.json();
+      body.textContent = data.response || data.message || 'No response.';
+    } catch (e) {
+      body.textContent = 'Could not reach Jarvis.';
+    }
+  }
+
+  $('debriefClose').addEventListener('click', function() {
+    $('debriefModal').classList.remove('show');
+  });
+  $('debriefModal').addEventListener('click', function(e) {
+    if (e.target === $('debriefModal')) $('debriefModal').classList.remove('show');
+  });
+
   initDateChip('logDateChip', 'logDateInput');
 
   // ── Plate picker ──────────────────────────────────────────────
