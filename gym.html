@@ -654,16 +654,16 @@ img, video, canvas, svg { max-width: 100%; }
   font-style: italic;
 }
 .po-hist-row {
-  display: grid; grid-template-columns: 60px 1fr auto auto; gap: 12px;
-  padding: 10px 4px; align-items: center;
-  border-bottom: 1px solid var(--border);
+  display: grid; grid-template-columns: 48px 1fr auto auto; gap: 8px;
+  padding: 4px 2px; align-items: center;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
 }
 .po-hist-row:last-child { border-bottom: none; }
-.po-hist-date { font-size: 11px; color: var(--text-3); font-family: var(--font-mono); }
-.po-hist-set { font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.po-hist-date { font-size: 10px; color: var(--text-3); font-family: var(--font-mono); }
+.po-hist-set { font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .po-hist-del, .po-hist-edit {
   background: transparent; border: none; color: var(--text-4);
-  font-size: 16px; cursor: pointer; padding: 4px 8px;
+  font-size: 13px; cursor: pointer; padding: 2px 5px;
   -webkit-tap-highlight-color: transparent;
 }
 .po-hist-del:hover { color: var(--bad); }
