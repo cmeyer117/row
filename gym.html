@@ -924,10 +924,35 @@ img, video, canvas, svg { max-width: 100%; }
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 10px 12px;
+  cursor: pointer;
+  transition: background 0.15s;
 }
+.po-tw-past-day:hover { background: rgba(255,255,255,0.04); }
 .po-tw-past-day-h {
   display: flex; align-items: center; justify-content: space-between;
   gap: 10px;
+}
+.po-tw-past-detail {
+  display: none;
+  margin-top: 10px;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+  display: none;
+  flex-direction: column;
+  gap: 8px;
+}
+.po-tw-past-day.expanded .po-tw-past-detail { display: flex; }
+.po-tw-past-ex-name {
+  font-size: 11px; font-weight: 700; color: var(--text-2);
+  letter-spacing: 0.04em; margin-bottom: 3px;
+}
+.po-tw-past-sets {
+  display: flex; flex-wrap: wrap; gap: 5px;
+}
+.po-tw-past-set-chip {
+  font-size: 11px; font-family: var(--font-mono);
+  background: rgba(255,255,255,0.06); border-radius: 6px;
+  padding: 2px 7px; color: var(--text-2);
 }
 .po-tw-past-day-date {
   font-size: 11px; color: var(--text-3);
@@ -3506,7 +3531,22 @@ img, video, canvas, svg { max-width: 100%; }
       const isDone = !!doneDays[dk];
       const exNames = sum.perEx.map(e => e.ex.name).slice(0, 3).join(', ')
         + (sum.perEx.length > 3 ? '…' : '');
-      return '<div class="po-tw-past-day">'
+      const detail = sum.perEx.map(e => {
+        const chips = e.sets.map(l => {
+          if (e.ex.bw) return l.reps + ' reps';
+          if (l.plates != null) {
+            var p = l.plates + (l.plates === 1 ? 'pl' : 'pl');
+            if (l.extraLbs) p += '+' + l.extraLbs;
+            return p + '×' + l.reps;
+          }
+          return l.weight + u + '×' + l.reps;
+        }).map(c => '<span class="po-tw-past-set-chip">' + escape(c) + '</span>').join('');
+        return '<div>'
+          + '<div class="po-tw-past-ex-name">' + escape(e.ex.name) + '</div>'
+          + '<div class="po-tw-past-sets">' + chips + '</div>'
+          + '</div>';
+      }).join('');
+      return '<div class="po-tw-past-day" data-dk="' + dk + '">'
         + '<div class="po-tw-past-day-h">'
         +   '<span class="po-tw-past-day-date">' + fmtPastDate(dk) + '</span>'
         +   '<span class="po-tw-past-day-summary">'
@@ -3517,8 +3557,12 @@ img, video, canvas, svg { max-width: 100%; }
         + '<div class="po-tw-past-day-summary" style="margin-top:6px; font-size:11px; color:var(--text-3);">'
         +   escape(exNames)
         + '</div>'
+        + '<div class="po-tw-past-detail">' + detail + '</div>'
         + '</div>';
     }).join('');
+    body.querySelectorAll('.po-tw-past-day').forEach(function(row) {
+      row.addEventListener('click', function() { row.classList.toggle('expanded'); });
+    });
   }
 
   $('poTwDoneBtn').addEventListener('click', () => {
