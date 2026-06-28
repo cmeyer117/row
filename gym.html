@@ -465,6 +465,52 @@ img, video, canvas, svg { max-width: 100%; }
 }
 .po-w-btn:hover { background: rgba(255,255,255,0.10); }
 .po-w-btn:active { transform: scale(0.94); }
+.po-plate-toggle {
+  display: flex; gap: 4px; margin-bottom: 2px;
+}
+.po-plate-toggle-btn {
+  font-size: 10px; font-weight: 700; letter-spacing: 0.07em;
+  padding: 3px 10px; border-radius: 999px; border: 1px solid var(--border);
+  background: transparent; color: var(--text-3); cursor: pointer;
+  font-family: var(--font-mono);
+}
+.po-plate-toggle-btn.active {
+  background: rgba(110,231,183,0.15); color: var(--good); border-color: var(--good);
+}
+.po-plate-picker {
+  display: none; flex-direction: column; gap: 8px;
+}
+.po-plate-picker.visible { display: flex; }
+.po-plate-picker-summary {
+  font-family: var(--font-mono); font-size: 13px; font-weight: 700;
+  color: var(--text-1); min-height: 20px;
+}
+.po-plate-denom-row {
+  display: flex; flex-wrap: wrap; gap: 6px;
+}
+.po-plate-denom {
+  display: flex; align-items: center; gap: 0;
+  border: 1px solid var(--border); border-radius: 10px;
+  overflow: hidden;
+}
+.po-plate-denom-label {
+  font-size: 11px; font-family: var(--font-mono); font-weight: 700;
+  color: var(--text-2); padding: 0 8px; min-width: 36px; text-align: center;
+}
+.po-plate-denom-count {
+  font-size: 13px; font-weight: 700; font-family: var(--font-mono);
+  color: var(--text-1); padding: 0 6px; min-width: 22px; text-align: center;
+}
+.po-plate-btn {
+  background: rgba(255,255,255,0.05); border: none; color: var(--text-1);
+  font-size: 16px; font-weight: 700; cursor: pointer;
+  padding: 6px 10px; line-height: 1;
+}
+.po-plate-btn:active { background: rgba(110,231,183,0.15); }
+.po-plate-clear {
+  font-size: 11px; color: var(--text-3); background: none; border: none;
+  cursor: pointer; text-decoration: underline; font-family: inherit; padding: 0;
+}
 .po-reps-row {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(48px, 1fr));
@@ -2215,11 +2261,22 @@ img, video, canvas, svg { max-width: 100%; }
       </div>
       <div class="po-log-grid" id="logGrid">
         <div class="po-field" id="weightField">
-          <label id="weightLabel">Weight (kg)</label>
-          <div class="po-weight-row">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+            <label id="weightLabel">Weight (lb)</label>
+            <div class="po-plate-toggle">
+              <button class="po-plate-toggle-btn active" id="modeToggleLb" type="button">LB</button>
+              <button class="po-plate-toggle-btn" id="modeTogglePlates" type="button">PLATES</button>
+            </div>
+          </div>
+          <div class="po-weight-row" id="lbWeightRow">
             <button class="po-w-btn" id="weightDownBtn" type="button">−</button>
             <input type="number" id="weightInput" step="0.5" inputmode="decimal" placeholder="0">
             <button class="po-w-btn" id="weightUpBtn" type="button">+</button>
+          </div>
+          <div class="po-plate-picker" id="platePicker">
+            <div class="po-plate-picker-summary" id="platePickerSummary">No plates selected</div>
+            <div class="po-plate-denom-row" id="plateDenomRow"></div>
+            <button class="po-plate-clear" id="plateClearBtn" type="button">clear</button>
           </div>
         </div>
         <div class="po-field">
@@ -3658,19 +3715,103 @@ img, video, canvas, svg { max-width: 100%; }
   });
   initDateChip('logDateChip', 'logDateInput');
 
+  // ── Plate picker ──────────────────────────────────────────────
+  const PLATE_DENOMS = [45, 35, 25, 10, 5, 2.5];
+  let plateCounts = {}; // { 45: 2, 25: 1, ... }
+  let plateMode = false;
+
+  function buildPlateDenomRow() {
+    const row = $('plateDenomRow');
+    row.innerHTML = PLATE_DENOMS.map(d => {
+      const key = String(d);
+      return '<div class="po-plate-denom">'
+        + '<button class="po-plate-btn" data-d="' + key + '" data-dir="-">−</button>'
+        + '<span class="po-plate-denom-label">' + d + '</span>'
+        + '<span class="po-plate-denom-count" id="pc_' + key.replace('.','_') + '">0</span>'
+        + '<button class="po-plate-btn" data-d="' + key + '" data-dir="+">+</button>'
+        + '</div>';
+    }).join('');
+    row.addEventListener('click', function(e) {
+      const btn = e.target.closest('.po-plate-btn');
+      if (!btn) return;
+      const d = parseFloat(btn.dataset.d);
+      const key = String(d);
+      plateCounts[key] = Math.max(0, (plateCounts[key] || 0) + (btn.dataset.dir === '+' ? 1 : -1));
+      updatePlateUI();
+    });
+  }
+
+  function updatePlateUI() {
+    let parts = [];
+    let total = 0;
+    PLATE_DENOMS.forEach(function(d) {
+      const key = String(d);
+      const count = plateCounts[key] || 0;
+      const el = document.getElementById('pc_' + key.replace('.','_'));
+      if (el) el.textContent = count;
+      if (count > 0) { parts.push(count + '×' + d); total += count * d; }
+    });
+    const summary = $('platePickerSummary');
+    summary.textContent = parts.length ? parts.join(' + ') + ' (' + total + ' lb/side)' : 'No plates selected';
+  }
+
+  function getPlateWeight() {
+    return PLATE_DENOMS.reduce(function(sum, d) {
+      return sum + (plateCounts[String(d)] || 0) * d;
+    }, 0);
+  }
+
+  function getPlateConfig() {
+    var cfg = {};
+    PLATE_DENOMS.forEach(function(d) {
+      var count = plateCounts[String(d)] || 0;
+      if (count > 0) cfg[String(d)] = count;
+    });
+    return cfg;
+  }
+
+  function setPlateMode(on) {
+    plateMode = on;
+    $('modeToggleLb').classList.toggle('active', !on);
+    $('modeTogglePlates').classList.toggle('active', on);
+    $('lbWeightRow').style.display = on ? 'none' : '';
+    $('platePicker').classList.toggle('visible', on);
+  }
+
+  buildPlateDenomRow();
+
+  $('modeToggleLb').addEventListener('click', function() { setPlateMode(false); });
+  $('modeTogglePlates').addEventListener('click', function() { setPlateMode(true); });
+  $('plateClearBtn').addEventListener('click', function() {
+    plateCounts = {}; updatePlateUI();
+  });
+  // ─────────────────────────────────────────────────────────────
+
   $('logBtn').addEventListener('click', () => {
     const ex = getCurrentEx();
     if (!ex) return;
     const reps = parseInt($('repsRow').dataset.value, 10) || 0;
     if (reps <= 0) { alert('Pick a rep count.'); return; }
-    const w = ex.bw ? 0 : (parseFloat($('weightInput').value) || 0);
-    if (!ex.bw && w <= 0) { alert('Enter a weight.'); return; }
+    let w = 0, entry = {};
+    if (ex.bw) {
+      w = 0;
+    } else if (plateMode) {
+      w = getPlateWeight();
+      if (w <= 0) { alert('Add at least one plate.'); return; }
+      const cfg = getPlateConfig();
+      entry.plates = null; // not the old single-plate format
+      entry.plateConfig = cfg;
+    } else {
+      w = parseFloat($('weightInput').value) || 0;
+      if (w <= 0) { alert('Enter a weight.'); return; }
+    }
     const dateKey = getChipDate('logDateInput');
     const isoDate = new Date(dateKey + 'T12:00:00').toISOString();
     const arr = state.logs[ex.id] || [];
-    arr.push({ weight: w, reps: reps, date: isoDate });
+    arr.push(Object.assign({ weight: w, reps: reps, date: isoDate }, entry));
     arr.sort((a, b) => a.date.localeCompare(b.date));
     state.logs[ex.id] = arr;
+    if (plateMode) { plateCounts = {}; updatePlateUI(); }
     resetChipToToday('logDateChip', 'logDateInput');
     saveState(); renderAll();
     // Strength changed → composition estimate may shift
@@ -3725,6 +3866,10 @@ img, video, canvas, svg { max-width: 100%; }
   // l = log entry {weight, reps, plates?, extraLbs?}  ex = exercise object
   function formatSet(l, ex) {
     if (ex && ex.bw) return l.reps + ' reps';
+    if (l.plateConfig) {
+      var parts = Object.entries(l.plateConfig).map(function(kv) { return kv[1] + '×' + kv[0]; });
+      return parts.join(' + ') + ' × ' + l.reps;
+    }
     if (l.plates != null) {
       var pStr = l.plates + (l.plates === 1 ? ' plate' : ' plates');
       if (l.extraLbs) pStr += '+' + l.extraLbs;
