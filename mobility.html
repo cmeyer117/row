@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0a0b">
+<link rel="manifest" href="/manifest.json" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Row" />
+<title>Mobility — Row</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,700;1,6..72,400&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="topbar.js" defer></script>
+<style>
+:root {
+  --bg: #0a0a0b;
+  --bg-card: #111113;
+  --text-1: #ffffff;
+  --text-2: rgba(255,255,255,0.6);
+  --text-3: rgba(255,255,255,0.4);
+  --text-4: rgba(255,255,255,0.25);
+  --border: rgba(255,255,255,0.06);
+  --border-strong: rgba(255,255,255,0.14);
+  --accent: #6ee7b7;
+  --good: #6ee7b7;
+  --warn: #fbbf24;
+  --bad: #ff8a8a;
+  --font: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SF Mono, Menlo, Consolas, monospace;
+}
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; padding: 0;
+  background: radial-gradient(ellipse 80% 60% at 75% 0%, rgba(110,231,183,0.06) 0%, #0a0a0b 60%);
+  color: var(--text-1);
+  font-family: var(--font);
+  -webkit-font-smoothing: antialiased;
+  -webkit-text-size-adjust: 100%;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+.mob-shell {
+  width: 100%; max-width: min(720px, 100vw);
+  margin: 0 auto;
+  padding: 24px 16px calc(120px + env(safe-area-inset-bottom));
+  box-sizing: border-box;
+}
+.mob-shell * { min-width: 0; }
+
+/* ── Page header ── */
+.mob-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 20px;
+}
+.mob-title {
+  font-size: 22px; font-weight: 700; letter-spacing: -0.015em; margin: 0;
+}
+.mob-subtitle {
+  font-size: 12px; color: var(--text-3); margin: 2px 0 0;
+}
+
+/* ── Section tabs (top of page) ── */
+.mob-tabs {
+  display: flex; gap: 6px; margin-bottom: 20px;
+  overflow-x: auto; scrollbar-width: none;
+}
+.mob-tabs::-webkit-scrollbar { display: none; }
+.mob-tab-btn {
+  flex-shrink: 0; padding: 8px 16px; border-radius: 999px;
+  font-size: 13px; font-weight: 600; letter-spacing: 0.01em;
+  color: var(--text-3); background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08); cursor: pointer;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
+  -webkit-tap-highlight-color: transparent; font-family: inherit;
+}
+.mob-tab-btn:hover { color: var(--text-1); }
+.mob-tab-btn.active {
+  color: var(--text-1); background: rgba(110,231,183,0.10);
+  border-color: rgba(110,231,183,0.30);
+}
+
+/* ── Section visibility ── */
+.mob-section { display: none; }
+.mob-section.active { display: block; }
+
+/* ── Section heading ── */
+.mob-section-label {
+  font-family: var(--font-mono); font-size: 10px; font-weight: 700;
+  letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-3);
+  margin: 0 0 14px;
+}
+
+/* ── Day picker ── */
+.mob-day-picker {
+  display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px;
+}
+.mob-day-btn {
+  padding: 6px 14px; border-radius: 999px; font-size: 12px; font-weight: 600;
+  letter-spacing: 0.04em; color: var(--text-3);
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+  cursor: pointer; transition: background 0.15s, border-color 0.15s, color 0.15s;
+  -webkit-tap-highlight-color: transparent; font-family: inherit;
+}
+.mob-day-btn:hover { color: var(--text-1); background: rgba(255,255,255,0.07); }
+.mob-day-btn.active {
+  color: var(--text-1); background: rgba(110,231,183,0.10);
+  border-color: rgba(110,231,183,0.30);
+}
+
+/* ── Cards ── */
+.mob-card {
+  background: rgba(255,255,255,0.025); border: 1px solid var(--border);
+  border-radius: 16px; padding: 16px 18px; margin-bottom: 10px;
+}
+.mob-card-title {
+  font-size: 15px; font-weight: 700; color: var(--text-1);
+  margin: 0 0 4px; line-height: 1.3;
+}
+.mob-card-meta {
+  font-family: var(--font-mono); font-size: 10px; font-weight: 700;
+  letter-spacing: 0.10em; text-transform: uppercase;
+  color: var(--accent); margin-bottom: 8px;
+}
+.mob-card-body {
+  font-size: 13px; color: var(--text-2); line-height: 1.55;
+}
+.mob-card-body strong { color: var(--text-1); font-weight: 600; }
+.mob-card-note {
+  font-size: 11px; color: var(--text-3); font-style: italic;
+  margin-top: 6px; line-height: 1.45;
+}
+
+/* ── Block headings inside sections ── */
+.mob-block-title {
+  font-family: var(--font-mono); font-size: 10px; font-weight: 800;
+  letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--accent); margin: 18px 0 8px;
+}
+.mob-block-title:first-child { margin-top: 0; }
+
+/* ── Exercise row (compact) ── */
+.mob-exercise-list { display: flex; flex-direction: column; gap: 6px; }
+.mob-ex-row {
+  padding: 10px 14px; background: rgba(255,255,255,0.025);
+  border: 1px solid var(--border); border-radius: 10px;
+}
+.mob-ex-name { font-size: 13px; font-weight: 600; color: var(--text-1); margin-bottom: 2px; }
+.mob-ex-detail { font-size: 12px; color: var(--text-2); line-height: 1.4; }
+.mob-ex-note { font-size: 11px; color: var(--text-3); font-style: italic; margin-top: 3px; line-height: 1.4; }
+
+/* ── Rule banner ── */
+.mob-rule {
+  background: rgba(110,231,183,0.06); border: 1px solid rgba(110,231,183,0.18);
+  border-radius: 12px; padding: 12px 14px;
+  font-size: 13px; color: var(--text-2); line-height: 1.5;
+  margin-bottom: 16px;
+}
+.mob-rule strong { color: var(--accent); }
+
+/* ── Warning banner ── */
+.mob-warn {
+  background: rgba(251,191,36,0.06); border: 1px solid rgba(251,191,36,0.2);
+  border-radius: 12px; padding: 10px 14px;
+  font-size: 12px; color: var(--warn); line-height: 1.5;
+  margin-bottom: 14px;
+}
+
+/* ── Supplement table ── */
+.mob-supp-table { width: 100%; border-collapse: collapse; margin-top: 4px; }
+.mob-supp-table th {
+  font-family: var(--font-mono); font-size: 9px; font-weight: 700;
+  letter-spacing: 0.10em; text-transform: uppercase; color: var(--text-4);
+  text-align: left; padding: 6px 8px 4px; border-bottom: 1px solid var(--border);
+}
+.mob-supp-table td {
+  font-size: 12px; color: var(--text-2); padding: 8px 8px;
+  border-bottom: 1px solid var(--border); vertical-align: top;
+}
+.mob-supp-table tr:last-child td { border-bottom: none; }
+.mob-supp-table .rank { font-weight: 700; color: var(--accent); }
+.mob-supp-dose { font-family: var(--font-mono); font-size: 11px; color: var(--text-1); }
+
+/* ── Flare table ── */
+.mob-flare-row {
+  display: flex; gap: 10px; align-items: flex-start;
+  padding: 10px 0; border-bottom: 1px solid var(--border);
+}
+.mob-flare-row:last-child { border-bottom: none; }
+.mob-flare-joint {
+  font-family: var(--font-mono); font-size: 10px; font-weight: 700;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--warn); flex-shrink: 0; min-width: 64px; padding-top: 1px;
+}
+.mob-flare-action { font-size: 12px; color: var(--text-2); line-height: 1.45; }
+
+/* ── Divider ── */
+.mob-divider {
+  height: 1px; background: var(--border); margin: 20px 0;
+}
+
+/* ── Gym tab bar (same as gym.html) ── */
+.gym-tabbar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 60;
+  display: flex; justify-content: center;
+  padding: 10px max(16px, env(safe-area-inset-right)) calc(10px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  background: linear-gradient(180deg, rgba(5,5,6,0) 0%, rgba(5,5,6,0.82) 40%, rgba(5,5,6,0.96) 100%);
+  backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+  pointer-events: none;
+}
+.gym-tabbar-inner {
+  pointer-events: auto;
+  display: flex; width: 100%; max-width: 400px; gap: 6px;
+  padding: 6px; background: rgba(20,20,22,0.72);
+  border: 1px solid rgba(255,255,255,0.08); border-radius: 18px;
+  box-shadow: 0 12px 36px rgba(0,0,0,0.55);
+}
+.gym-tab {
+  flex: 1 1 0; display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  padding: 11px 14px; border-radius: 13px; font-size: 14px; font-weight: 600;
+  letter-spacing: 0.01em; color: var(--text-3); background: transparent;
+  border: 1px solid transparent; cursor: pointer; text-decoration: none;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
+  -webkit-tap-highlight-color: transparent; font-family: var(--font);
+}
+.gym-tab:hover { color: var(--text-1); }
+.gym-tab.active {
+  color: var(--text-1); background: rgba(255,255,255,0.07);
+  border-color: rgba(255,255,255,0.10);
+}
+
+@media (max-width: 400px) {
+  .gym-tab { padding: 11px 10px; font-size: 13px; }
+}
+</style>
+</head>
+<body>
+<div class="mob-shell">
+  <div class="mob-header">
+    <div>
+      <h1 class="mob-title">Mobility</h1>
+      <div class="mob-subtitle">Joint care · warm-up · daily protocol</div>
+    </div>
+  </div>
+
+  <!-- Top section tabs -->
+  <div class="mob-tabs">
+    <button class="mob-tab-btn active" data-section="daily" type="button">Daily</button>
+    <button class="mob-tab-btn" data-section="preppost" type="button">Pre / Post</button>
+    <button class="mob-tab-btn" data-section="joints" type="button">Joint Care</button>
+  </div>
+
+  <!-- ═══════════════════════════════════════════
+       SECTION 1 — DAILY MOBILITY
+       ═══════════════════════════════════════════ -->
+  <div class="mob-section active" id="section-daily">
+    <div class="mob-rule">
+      <strong>When:</strong> Morning, or any time you have 10 min. Best right after waking up — joints are stiff from sleep and this resets everything fast.<br>
+      <strong>Goal:</strong> Undo bodybuilder postural damage. Open chest, hip flexors, T-spine, hips, hamstrings.
+    </div>
+
+    <div class="mob-block-title">The Big 5 — Do These Daily (8–10 min)</div>
+    <div class="mob-exercise-list">
+      <div class="mob-ex-row">
+        <div class="mob-ex-name">1. World's Greatest Stretch</div>
+        <div class="mob-ex-detail"><strong>5 reps/side · 2 min</strong> — Step into deep lunge, drop back knee, same-side hand inside front foot, rotate opposite arm to ceiling, hold 2–3 sec at top, repeat.</div>
+        <div class="mob-ex-note">Hits hip flexors, thoracic rotation, hamstrings, adductors, and shoulders in one movement. Best all-in-one drill.</div>
+      </div>
+      <div class="mob-ex-row">
+        <div class="mob-ex-name">2. Couch Stretch</div>
+        <div class="mob-ex-detail"><strong>90 sec/side · 3 min</strong> — Back knee on ground, back foot elevated on couch/chair. Front foot flat, shin vertical. Drive hips forward and hold.</div>
+        <div class="mob-ex-note">Most important stretch for bodybuilders. Hip flexors shorten from every squat, leg press, and hour of sitting. Short hip flexors = anterior pelvic tilt = forward lean = lower back stress = affected posing stance.</div>
+      </div>
+      <div class="mob-ex-row">
+        <div class="mob-ex-name">3. T-Spine Extension on Foam Roller</div>
+        <div class="mob-ex-detail"><strong>2 min</strong> — Roller at mid-back (T4–T10), arms crossed or hands behind head. Drop back slowly and breathe. Move roller 1–2 inches up, pause, then 1–2 inches down.</div>
+        <div class="mob-ex-note">Root cause of your limited right-side rotation — not just the labrum. T-spine kyphosis from pressing compresses the spine and forces the shoulder into impingement position.</div>
+      </div>
+      <div class="mob-ex-row">
+        <div class="mob-ex-name">4. 90/90 Hip Stretch</div>
+        <div class="mob-ex-detail"><strong>60 sec/side · 2 min</strong> — Sit on floor, front leg at 90° perpendicular to torso, back leg at 90° behind. Sit tall, push hips down. Lean forward over front shin (external rotator), then rotate over back shin (internal rotator).</div>
+        <div class="mob-ex-note">Fixes piriformis tightness causing hip and sciatic pain. Most stretches only hit one direction — this covers both.</div>
+      </div>
+      <div class="mob-ex-row">
+        <div class="mob-ex-name">5. Doorway Chest + Overhead Lat (superset)</div>
+        <div class="mob-ex-detail"><strong>60 sec each side · 2 min</strong> — Chest: forearm on frame, step through and rotate. Two positions: 90° and 120°. Lat: same-side arm overhead on doorframe, drop hip away.</div>
+        <div class="mob-ex-note">Alternate: chest one side, lat same side, switch. Both tight areas in one doorframe visit.</div>
+      </div>
+    </div>
+
+    <div class="mob-divider"></div>
+    <div class="mob-block-title">Add-Ons (If You Have More Time)</div>
+    <div class="mob-exercise-list">
+      <div class="mob-ex-row">
+        <div class="mob-ex-name">Dead hang</div>
+        <div class="mob-ex-detail">30 sec × 2 — Decompress spine and shoulders. Best after roller work.</div>
+      </div>
+      <div class="mob-ex-row">
+        <div class="mob-ex-name">Cat-cow</div>
+        <div class="mob-ex-detail">10 slow reps — Arch fully, then round fully. Lubricates the spine cervical to lumbar.</div>
+      </div>
+      <div class="mob-ex-row">
+        <div class="mob-ex-name">Figure-4 piriformis stretch</div>
+        <div class="mob-ex-detail">60 sec/side — Lying on back, cross ankle over opposite knee, pull that knee toward chest.</div>
+      </div>
+      <div class="mob-ex-row">
+        <div class="mob-ex-name">Standing hamstring stretch</div>
+        <div class="mob-ex-detail">60 sec/side — Foot elevated, hinge forward at hip with flat back. Not a rounded-back reach.</div>
+      </div>
+      <div class="mob-ex-row">
+        <div class="mob-ex-name">Child's pose with rotation</div>
+        <div class="mob-ex-detail">60 sec — Thread one arm under body, reach to opposite side. Opens thoracic rotators and lat simultaneously.</div>
+      </div>
+      <div class="mob-ex-row">
+        <div class="mob-ex-name">Wrist flexor + extensor stretch</div>
+        <div class="mob-ex-detail">30 sec each — Arm extended, palm up/down, pull fingers back. Especially important if elbows ache.</div>
+      </div>
+    </div>
+
+    <div class="mob-divider"></div>
+    <div class="mob-block-title">Minimum Viable (3 Min)</div>
+    <div class="mob-rule" style="margin-bottom:0">
+      1. T-spine roller — 60 sec<br>
+      2. World's greatest stretch — 3 reps/side<br>
+      3. Couch stretch — 45 sec/side<br>
+      <span style="color:var(--text-3);font-size:11px">Better than nothing by a significant margin.</span>
+    </div>
+
+    <div class="mob-divider"></div>
+    <div class="mob-block-title">Posing Tip</div>
+    <div class="mob-card">
+      <div class="mob-card-body">Do your mobility session first, then practice posing immediately after. ROM is at its maximum within 30 min of active stretching. For the right lat spread: practice after overhead lat stretch and T-spine work while the tissue is open. Film it weekly — you will notice a difference.</div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════
+       SECTION 2 — PRE / POST WORKOUT
+       ═══════════════════════════════════════════ -->
+  <div class="mob-section" id="section-preppost">
+    <div class="mob-rule">
+      <strong>Before:</strong> Dynamic only. Static &gt;60 sec pre-lift measurably reduces force output — move through ranges, don't hold.<br>
+      <strong>After:</strong> Static holds only. Tissue is warm — hold 45–60 sec minimum. Anything less doesn't create lasting change.
+    </div>
+
+    <!-- Day picker -->
+    <div class="mob-day-picker" id="ppDayPicker">
+      <button class="mob-day-btn active" data-day="push" type="button">Push</button>
+      <button class="mob-day-btn" data-day="pull" type="button">Pull</button>
+      <button class="mob-day-btn" data-day="legsA" type="button">Legs A</button>
+      <button class="mob-day-btn" data-day="legsB" type="button">Legs B</button>
+      <button class="mob-day-btn" data-day="upper" type="button">Upper</button>
+    </div>
+
+    <div id="ppContent"></div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════
+       SECTION 3 — JOINT CARE
+       ═══════════════════════════════════════════ -->
+  <div class="mob-section" id="section-joints">
+    <div class="mob-warn">
+      Right shoulder — torn posterior labrum. Right-side rotation significantly limited. Knees and elbows chronically aching. Posing (lat spread) affected by right-side restriction.
+    </div>
+
+    <div class="mob-block-title">Every Day — 5–8 Min (Training or Not)</div>
+    <div class="mob-exercise-list">
+      <div class="mob-ex-row">
+        <div class="mob-ex-name">1. Cross-body shoulder stretch</div>
+        <div class="mob-ex-detail"><strong>3 × 30 sec, RIGHT side emphasis</strong> — Pull arm across chest with opposite hand, shoulder blade pinned against wall. Hold longer on the right.</div>
+        <div class="mob-ex-note">Targets the posterior capsule — the main restriction causing your limited rotation. Do not skip this one.</div>
+      </div>
+      <div class="mob-ex-row">
+        <div class="mob-ex-name">2. Banded external rotation isometric</div>
+        <div class="mob-ex-detail"><strong>3 × 20–30 sec/arm</strong> — Light-moderate band, elbow tucked at side. Activates rotator cuff and scapular stabilizers — the muscles compensating for the torn labrum.</div>
+      </div>
+      <div class="mob-ex-row">
+        <div class="mob-ex-name">3. T-spine extension over foam roller</div>
+        <div class="mob-ex-detail"><strong>2–3 × 10 slow reps</strong> — Roller at T5–T8. Arms crossed or hands behind head. Drop head back and breathe into the extension. Work up and down the thoracic spine.</div>
+        <div class="mob-ex-note">Critical. You cannot fix the shoulder in isolation if the T-spine is frozen. This is what unlocks rotation.</div>
+      </div>
+      <div class="mob-ex-row">
+        <div class="mob-ex-name">4. Dead hang</div>
+        <div class="mob-ex-detail"><strong>2 × 20–30 sec</strong> — Hang from a bar, fully relaxed, feet off ground. Decompresses the GH joint, gently stretches the posterior capsule.</div>
+        <div class="mob-ex-note">If shoulder is flaring: supported hang with feet lightly touching the ground.</div>
+      </div>
+    </div>
+
+    <div class="mob-divider"></div>
+    <div class="mob-block-title">Right Shoulder — Posterior Labrum Recovery</div>
+    <div class="mob-exercise-list">
+      <div class="mob-ex-row">
+        <div class="mob-ex-name">Side-lying ER with light DB</div>
+        <div class="mob-ex-detail"><strong>3 × 15 · 2–5 lbs</strong> — Directly loads infraspinatus and teres minor — the muscles stabilizing the GH joint when the labrum is compromised.</div>
+      </div>
+      <div class="mob-ex-row">
+        <div class="mob-ex-name">Wall slides with upward rotation</div>
+        <div class="mob-ex-detail"><strong>2 × 10</strong> — Retrains serratus anterior and lower trap. Without these firing, every arm elevation creates grinding and impingement.</div>
+      </div>
+      <div class="mob-ex-row">
+        <div class="mob-ex-name">90/90 shoulder rotation drill</div>
+        <div class="mob-ex-detail"><strong>2 × 10 reps</strong> — Arm at 90° abduction, rotate palm down then up slowly. Lubricates the GH joint through its actual range.</div>
+      </div>
+    </div>
+    <div class="mob-card" style="margin-top:10px">
+      <div class="mob-card-body" style="font-size:12px;color:var(--text-3)">
+        <strong style="color:var(--bad)">Avoid:</strong> Upright rows · Behind-neck press · Behind-neck pulldown · Sleeping on the right shoulder · Arm behind body in internal rotation (stretches posterior labrum directly).<br><br>
+        Meaningful change takes <strong style="color:var(--text-1)">8–12 weeks</strong> of daily consistency. No shortcuts.
+      </div>
+    </div>
+
+    <div class="mob-divider"></div>
+    <div class="mob-block-title">Elbow Care — Tendinopathy Protocol</div>
+    <div class="mob-exercise-list">
+      <div class="mob-ex-row">
+        <div class="mob-ex-name">Wrist isometrics (flexor + extensor)</div>
+        <div class="mob-ex-detail"><strong>5 × 15 sec each</strong> — Flexor: palm up, push into resistance. Extensor: palm down, push back of hand up. Do before working sets that bother you.</div>
+        <div class="mob-ex-note">Isometrics reduce tendon pain for 45+ min acutely (Cook & Purdam, 2009).</div>
+      </div>
+      <div class="mob-ex-row">
+        <div class="mob-ex-name">Tyler Twist (Theraband Flexbar)</div>
+        <div class="mob-ex-detail"><strong>3 × 15 daily</strong> — Grip bar at both ends, one hand pronated one supinated. Flex both wrists, then slowly let the painful side extend against resistance.</div>
+        <div class="mob-ex-note">Gold standard for lateral epicondylitis. Takes 6–8 weeks for full effect. Bisset et al. (2006) — superior to corticosteroid injections at 1 year.</div>
+      </div>
+      <div class="mob-ex-row">
+        <div class="mob-ex-name">Reverse wrist curls (eccentric)</div>
+        <div class="mob-ex-detail"><strong>3 × 15 · 3× per week on arm days</strong> — Light DB (5–10 lbs), palm down. Lower wrist slowly 3–4 sec down, 1 sec up.</div>
+      </div>
+    </div>
+
+    <div class="mob-divider"></div>
+    <div class="mob-block-title">Knee Care — Patellar Tendinopathy Protocol</div>
+    <div class="mob-exercise-list">
+      <div class="mob-ex-row">
+        <div class="mob-ex-name">Spanish squat isometric</div>
+        <div class="mob-ex-detail"><strong>5 × 45 sec before leg sessions</strong> — Knee bent 60–90°. Isometrics reduce patellar tendon pain acutely — do them, then train.</div>
+      </div>
+      <div class="mob-ex-row">
+        <div class="mob-ex-name">Reverse Nordic curl</div>
+        <div class="mob-ex-detail"><strong>3 × 5, build to 3 × 15 over 6–8 weeks</strong> — Kneel on pad, feet anchored under rack. Lower torso backward slowly (3–4 sec) as far as pain allows, pull back up.</div>
+        <div class="mob-ex-note">Gold standard eccentric for patellar tendinopathy. Actually remodels the tendon (Purdam et al. 2004, Visnes & Bahr 2007).</div>
+      </div>
+      <div class="mob-ex-row">
+        <div class="mob-ex-name">TKE with band</div>
+        <div class="mob-ex-detail"><strong>3 × 15/leg</strong> — Band looped behind knee, slight knee bend, extend fully. Fixes patellar tracking by strengthening VMO.</div>
+      </div>
+      <div class="mob-ex-row">
+        <div class="mob-ex-name">Foam roller — outer quad + IT band</div>
+        <div class="mob-ex-detail"><strong>60 sec/leg</strong> — Find tight spots and hold 10–15 sec. Also roll quad muscle belly and calves (tight calves pull on posterior knee chain).</div>
+      </div>
+    </div>
+    <div class="mob-card" style="margin-top:10px">
+      <div class="mob-card-body" style="font-size:12px;color:var(--text-3)">
+        <strong style="color:var(--text-1)">After leg day:</strong> Elevate legs 10–15 min · Ice directly on patellar tendon 10 min if acutely painful.
+      </div>
+    </div>
+
+    <div class="mob-divider"></div>
+    <div class="mob-block-title">Flare-Up Rules</div>
+    <div class="mob-card">
+      <div class="mob-card-body" style="font-size:12px">
+        Do not go to zero. Total rest causes regression — connective tissue needs load signals to maintain integrity.
+      </div>
+      <div style="margin-top:10px">
+        <div class="mob-flare-row">
+          <div class="mob-flare-joint">Shoulder</div>
+          <div class="mob-flare-action">Drop to cables/machines. Keep banded ER isometrics. Skip heavy pressing for the session.</div>
+        </div>
+        <div class="mob-flare-row">
+          <div class="mob-flare-joint">Elbow</div>
+          <div class="mob-flare-action">Drop to bodyweight curls or isometrics. Use straps for back. Keep the Tyler Twist — it helps during flares.</div>
+        </div>
+        <div class="mob-flare-row">
+          <div class="mob-flare-joint">Knee</div>
+          <div class="mob-flare-action">Spanish squat holds + TKE only. No loaded squatting until 2–3 days clear.</div>
+        </div>
+      </div>
+      <div class="mob-card-note">Stop immediately if: catching, popping, or a feeling of joint shifting/giving way. That is instability — not soreness. Back off the movement for the full week.</div>
+    </div>
+
+    <div class="mob-divider"></div>
+    <div class="mob-block-title">Supplement Stack — Evidence-Based</div>
+    <div class="mob-card" style="padding:12px 14px">
+      <table class="mob-supp-table">
+        <thead>
+          <tr>
+            <th>Rank</th>
+            <th>Supplement</th>
+            <th>Dose</th>
+            <th>When</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="rank">🥇</td>
+            <td>Fish Oil</td>
+            <td class="mob-supp-dose">3–5g EPA+DHA</td>
+            <td>With any fat-containing meal</td>
+          </tr>
+          <tr>
+            <td class="rank">🥇</td>
+            <td>Collagen + Vit C</td>
+            <td class="mob-supp-dose">15g + 50mg</td>
+            <td>30–60 min BEFORE training</td>
+          </tr>
+          <tr>
+            <td class="rank">🥈</td>
+            <td>D3 + K2</td>
+            <td class="mob-supp-dose">5,000 IU + 100mcg</td>
+            <td>Breakfast (needs fat)</td>
+          </tr>
+          <tr>
+            <td class="rank">🥈</td>
+            <td>Magnesium glycinate</td>
+            <td class="mob-supp-dose">300–400mg</td>
+            <td>30 min before bed</td>
+          </tr>
+          <tr>
+            <td class="rank">🥉</td>
+            <td>Creatine</td>
+            <td class="mob-supp-dose">5g</td>
+            <td>Any time, daily</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="mob-card-note">Fish oil + collagen timing critical. Takes 6–8 weeks to saturate tissue. Skip: glucosamine/chondroitin (GAIT Trial, 2006: no benefit vs placebo), turmeric alone (bioavailability near zero without piperine), joint complex blends (underdosed).</div>
+    </div>
+  </div>
+</div>
+
+<!-- Gym tab bar — Mobility active -->
+<nav class="gym-tabbar">
+  <div class="gym-tabbar-inner">
+    <a class="gym-tab" href="gym.html">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="3" width="12" height="2" rx="1" fill="currentColor"/><rect x="2" y="7" width="8" height="2" rx="1" fill="currentColor"/><rect x="2" y="11" width="10" height="2" rx="1" fill="currentColor"/></svg>
+      Log
+    </a>
+    <a class="gym-tab" href="gym.html#progress">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><polyline points="2,12 6,7 9,9 14,3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
+      Progress
+    </a>
+    <a class="gym-tab active" href="mobility.html">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="8" cy="3.5" r="1.5" fill="currentColor"/><path d="M5 7c0-1.1.9-2 2-2h2c1.1 0 2 .9 2 2v2.5l1.5 3.5h-1.5L10 11H6l-1 2H3.5L5 9.5V7z" fill="currentColor"/></svg>
+      Mobility
+    </a>
+  </div>
+</nav>
+
+<script>
+(function() {
+  // ── Section tab switching ──
+  var tabs = document.querySelectorAll('.mob-tab-btn');
+  tabs.forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      tabs.forEach(function(b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      document.querySelectorAll('.mob-section').forEach(function(s) { s.classList.remove('active'); });
+      document.getElementById('section-' + btn.dataset.section).classList.add('active');
+    });
+  });
+
+  // ── Pre/Post content ──
+  var PP = {
+    push: {
+      pre: [
+        { name: 'T-spine roller', detail: '10 slow reps — Always do first, every session.' },
+        { name: 'Arm circles', detail: '20 forward + 20 backward — Always do first.' },
+        { name: 'Band pull-aparts', detail: '3 × 20 — straight arms, shoulder height. Activates rear delts and scapular retractors.' },
+        { name: 'Doorway pec stretch (dynamic)', detail: '10 reps/side — move in and out, do NOT hold.' },
+        { name: 'Scapular retraction holds', detail: '3 × 15 sec — shoulders back and down.' },
+        { name: 'Banded ER isometric', detail: '3 × 20 sec — elbow tucked, activates rotator cuff.' },
+        { name: 'Wall slides', detail: '2 × 10 — arms on wall, slide up maintaining contact.' },
+        { name: 'Wrist circles', detail: '10 each direction — non-negotiable if elbows ache.' },
+      ],
+      post: [
+        { name: 'Doorway chest stretch', detail: '60 sec/side — Two positions: arm at 90° (lower pec) and 120° (upper pec/anterior delt).' },
+        { name: 'Cross-body rear delt stretch (RIGHT emphasis)', detail: '60 sec/side — Double up post-push since you just loaded the shoulder.' },
+        { name: 'Overhead tricep stretch', detail: '45 sec/side — Arm overhead, elbow bent, hand behind head. Push elbow back with opposite hand.' },
+        { name: 'Wrist flexor stretch', detail: '30 sec/side — Arm extended, palm up, pull fingers back.' },
+      ],
+      cue: 'Bench cue: elbows tucked 45°, NOT flared to 90°. Single biggest change to reduce shear on the posterior labrum.'
+    },
+    pull: {
+      pre: [
+        { name: 'T-spine roller', detail: '10 slow reps — Always do first, every session.' },
+        { name: 'Arm circles', detail: '20 forward + 20 backward — Always do first.' },
+        { name: 'Cross-body stretch (RIGHT emphasis)', detail: '3 × 30 sec — hold longer on right. Targets posterior capsule.' },
+        { name: 'Banded scap retraction + posterior reach', detail: '5 × 20–30 sec — rear delt, rhomboids, mid-trap.' },
+        { name: 'Overhead lat stretch (dynamic)', detail: '10 reps/side — move through lat/teres/shoulder range before loading.' },
+        { name: 'Dead hang', detail: '1 × 30 sec — full GH joint decompression.' },
+        { name: 'Hip hinge with pause', detail: '10 reps — flat back, pause 2 sec at bottom. Sets pattern for rows/RDLs.' },
+      ],
+      post: [
+        { name: 'Overhead lat stretch', detail: '60 sec/side — One arm overhead, grab a rack, drop hip away. Most important post-pull stretch.' },
+        { name: "Child's pose with arm reach", detail: '60 sec — Reach right arm longer. Opens right lat and posterior shoulder simultaneously.' },
+        { name: 'Bicep wall stretch', detail: '45 sec/side — Arm extended, palm flat on wall, rotate body away.' },
+        { name: 'Doorway chest stretch', detail: '60 sec — Lats and pecs both pull the shoulder into internal rotation. Stretch the pec after pull day too.' },
+      ],
+      cue: 'Lat pulldown cue: "elbows to hips" — not "pull the bar down." Keeps scapula depressed and loaded correctly.'
+    },
+    legsA: {
+      pre: [
+        { name: 'T-spine roller', detail: '10 slow reps — Always do first, every session.' },
+        { name: 'Arm circles', detail: '20 forward + 20 backward — Always do first.' },
+        { name: 'Foam roller — outer quad/IT band', detail: '60 sec/leg — find tight spots, hold 10–15 sec.' },
+        { name: 'TKE with band', detail: '3 × 15/leg — band behind knee, extend against resistance. Retrains VMO, fixes patellar tracking.' },
+        { name: 'Spanish squat isometric', detail: '3–5 × 30–45 sec at 60–90° knee bend — reduces patellar tendon pain acutely.' },
+        { name: 'Hip circles', detail: '10 each direction, each leg.' },
+        { name: 'Leg swings', detail: '10 front-to-back + 10 side-to-side, each leg.' },
+        { name: 'Glute bridges', detail: '2 × 15 — squeeze hard at top, 1 sec hold. Activates glutes, prevents knee cave.' },
+        { name: 'Squat to stand', detail: '5 reps — grab toes, drop to squat, stand tall. Shows your mobility for the day.' },
+        { name: 'Ankle circles', detail: '10 each direction, each ankle — tight ankles = limited depth = knee stress.' },
+      ],
+      post: [
+        { name: 'Couch stretch (hip flexors)', detail: '90 sec/side — Most important stretch after legs. If you only do one, this is it.' },
+        { name: 'Standing hamstring stretch', detail: '60 sec/side — Foot on bench, hinge at hip (flat back, not rounded).' },
+        { name: 'Figure-4 / Piriformis stretch', detail: '60 sec/side — Lying on back, cross ankle over opposite knee, pull knee toward chest.' },
+        { name: 'Standing quad stretch', detail: '30 sec/side — Stand on one leg, pull heel to glute. Keep hips level.' },
+      ],
+      cue: null
+    },
+    legsB: {
+      pre: [
+        { name: 'T-spine roller', detail: '10 slow reps — Always do first, every session.' },
+        { name: 'Arm circles', detail: '20 forward + 20 backward — Always do first.' },
+        { name: 'Foam roller — outer quad/IT band', detail: '60 sec/leg — find tight spots, hold 10–15 sec.' },
+        { name: 'TKE with band', detail: '3 × 15/leg — retrains VMO, fixes patellar tracking.' },
+        { name: 'Reverse Nordic curl', detail: '3 × 5 — knees on pad, lower slowly 3–4 sec. Best evidence for tendon remodeling.' },
+        { name: 'Spanish squat isometric', detail: '3–5 × 30–45 sec — acute pain reduction, then train.' },
+        { name: 'Hip circles', detail: '10 each direction, each leg.' },
+        { name: 'Leg swings', detail: '10 front-to-back + 10 side-to-side, each leg.' },
+        { name: 'Glute bridges', detail: '2 × 15 — 1 sec hold at top.' },
+        { name: 'Ankle circles', detail: '10 each direction, each ankle.' },
+      ],
+      post: [
+        { name: 'Couch stretch (hip flexors)', detail: '90 sec/side — Most important stretch after legs.' },
+        { name: 'Standing hamstring stretch', detail: '60 sec/side — Foot elevated, hinge at hip with flat back.' },
+        { name: 'Figure-4 / Piriformis stretch', detail: '60 sec/side — Deep glute and piriformis — tight from heavy squats and leg press.' },
+        { name: 'Standing quad stretch', detail: '30 sec/side.' },
+      ],
+      cue: null
+    },
+    upper: {
+      pre: [
+        { name: 'T-spine roller', detail: '10 slow reps — Always do first.' },
+        { name: 'Arm circles', detail: '20 forward + 20 backward — Always do first.' },
+        { name: 'Band pull-aparts', detail: '3 × 20 — from Push block.' },
+        { name: 'Doorway pec stretch (dynamic)', detail: '10 reps/side — from Push block, do NOT hold.' },
+        { name: 'Scapular retraction holds', detail: '3 × 15 sec — from Push block.' },
+        { name: 'Banded ER isometric', detail: '3 × 20 sec — from Push block.' },
+        { name: 'Wall slides', detail: '2 × 10 — from Push block.' },
+        { name: 'Dead hang', detail: '1 × 30 sec — from Pull block: decompresses GH joint.' },
+        { name: 'Wrist circles', detail: '10 each direction.' },
+      ],
+      post: [
+        { name: 'Doorway chest stretch', detail: '60 sec/side — Two positions: 90° and 120°.' },
+        { name: 'Overhead lat stretch', detail: '60 sec/side — From Pull Day post block.' },
+        { name: 'Cross-body rear delt stretch (RIGHT)', detail: '60 sec/side.' },
+        { name: 'Overhead tricep stretch', detail: '45 sec/side.' },
+        { name: 'Wrist flexor stretch', detail: '30 sec/side.' },
+      ],
+      cue: 'Upper = Push Day block + Dead hang. Six minutes total.'
+    }
+  };
+
+  var currentDay = 'push';
+
+  function renderPP(day) {
+    var d = PP[day];
+    if (!d) return;
+    var html = '';
+
+    if (d.cue) {
+      html += '<div class="mob-warn" style="margin-bottom:14px">' + d.cue + '</div>';
+    }
+
+    html += '<div class="mob-block-title">Pre-Workout Warm-Up</div><div class="mob-exercise-list">';
+    d.pre.forEach(function(item) {
+      html += '<div class="mob-ex-row"><div class="mob-ex-name">' + item.name + '</div>';
+      if (item.detail) html += '<div class="mob-ex-detail">' + item.detail + '</div>';
+      html += '</div>';
+    });
+    html += '</div>';
+
+    html += '<div class="mob-divider"></div>';
+    html += '<div class="mob-block-title">Post-Workout Stretching</div><div class="mob-exercise-list">';
+    d.post.forEach(function(item) {
+      html += '<div class="mob-ex-row"><div class="mob-ex-name">' + item.name + '</div>';
+      if (item.detail) html += '<div class="mob-ex-detail">' + item.detail + '</div>';
+      html += '</div>';
+    });
+    html += '</div>';
+
+    document.getElementById('ppContent').innerHTML = html;
+  }
+
+  renderPP('push');
+
+  document.getElementById('ppDayPicker').addEventListener('click', function(e) {
+    var btn = e.target.closest('.mob-day-btn');
+    if (!btn) return;
+    document.querySelectorAll('#ppDayPicker .mob-day-btn').forEach(function(b) { b.classList.remove('active'); });
+    btn.classList.add('active');
+    currentDay = btn.dataset.day;
+    renderPP(currentDay);
+  });
+})();
+</script>
+</body>
+</html>

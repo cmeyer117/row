@@ -711,6 +711,41 @@ img, video, canvas, svg { max-width: 100%; }
   font-family: inherit;
 }
 
+/* ----- Warm-Up ----- */
+.po-warmup-section {
+  padding: 8px 0 4px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  margin-bottom: 8px;
+}
+.po-warmup-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 0;
+}
+.po-warmup-label {
+  font-size: 10px; font-weight: 800; letter-spacing: 0.08em;
+  color: var(--text-3); text-transform: uppercase;
+}
+.po-warmup-toggle {
+  font-size: 11px; background: none; border: none; color: var(--text-4);
+  cursor: pointer; padding: 0 4px; font-family: inherit;
+}
+.po-warmup-toggle:hover { color: var(--text-2); }
+.po-warmup-list { display: flex; flex-direction: column; gap: 5px; margin-top: 8px; }
+.po-warmup-block-title {
+  font-size: 9px; font-weight: 800; letter-spacing: 0.10em; text-transform: uppercase;
+  color: var(--accent); margin: 4px 0 2px;
+}
+.po-warmup-item {
+  padding: 6px 10px; background: rgba(255,255,255,0.025);
+  border: 1px solid rgba(255,255,255,0.06); border-radius: 8px;
+}
+.po-warmup-item-name {
+  font-size: 12px; font-weight: 600; color: var(--text-1); margin-bottom: 1px;
+}
+.po-warmup-item-detail {
+  font-size: 11px; color: var(--text-3); line-height: 1.4;
+}
+
 /* ----- Coach ----- */
 .po-coach-section { padding: 8px 0; }
 .po-coach-btn {
@@ -2351,6 +2386,15 @@ img, video, canvas, svg { max-width: 100%; }
           <input type="date" id="logDateInput">
         </button>
       </div>
+      <!-- Warm-Up -->
+      <div class="po-warmup-section" id="warmupSection">
+        <div class="po-warmup-header">
+          <span class="po-warmup-label">Warm-Up</span>
+          <button class="po-warmup-toggle" id="warmupToggle" type="button">show ▾</button>
+        </div>
+        <div class="po-warmup-list" id="warmupList" style="display:none"></div>
+      </div>
+
       <!-- Cues -->
       <div class="po-cues-section" id="cuesSection">
         <div class="po-cues-header">
@@ -2519,6 +2563,10 @@ img, video, canvas, svg { max-width: 100%; }
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><polyline points="2,12 6,7 9,9 14,3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
         Progress
       </button>
+      <a class="gym-tab" href="mobility.html">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="8" cy="3.5" r="1.5" fill="currentColor"/><path d="M5 7c0-1.1.9-2 2-2h2c1.1 0 2 .9 2 2v2.5l1.5 3.5h-1.5L10 11H6l-1 2H3.5L5 9.5V7z" fill="currentColor"/></svg>
+        Mobility
+      </a>
     </div>
   </nav>
 </div>
@@ -2875,6 +2923,123 @@ img, video, canvas, svg { max-width: 100%; }
   }
 
   // ============================================================
+  // ============================================================
+  // WARMUP DATA (sourced from vault: Pre-Workout Warm-Up + Joint Care Protocol)
+  // ============================================================
+  const WARMUPS = {
+    always: [
+      { label: 'T-spine roller', detail: '10 slow reps — drop back over roller at T5–T8, breathe into extension. Unlocks shoulder rotation.' },
+      { label: 'Arm circles', detail: '20 forward + 20 backward — slow and deliberate. Feel where the restriction is (right side for you).' },
+    ],
+    push: [
+      { label: 'Band pull-aparts', detail: '3 × 20 — straight arms, shoulder height. Activates rear delts and scapular retractors.' },
+      { label: 'Doorway pec stretch (dynamic)', detail: '10 reps/side — move in and out, do NOT hold. Pre-static kills force output.' },
+      { label: 'Scapular retraction holds', detail: '3 × 15 sec — shoulders back and down. Sets shoulder position for the whole session.' },
+      { label: 'Banded ER isometric', detail: '3 × 20 sec — elbow tucked at side, activates rotator cuff and scapular stabilizers.' },
+      { label: 'Wall slides', detail: '2 × 10 — arms on wall, slide up while maintaining contact. Retrains scapular upward rotation.' },
+      { label: 'Wrist circles', detail: '10 each direction — non-negotiable if elbows ache.' },
+    ],
+    pull: [
+      { label: 'Cross-body stretch (RIGHT emphasis)', detail: '3 × 30 sec — hold longer on right. Targets posterior capsule — your main rotation restriction.' },
+      { label: 'Banded scap retraction + posterior reach', detail: '5 × 20–30 sec — activates rear delt, rhomboids, mid-trap.' },
+      { label: 'Overhead lat stretch (dynamic)', detail: '10 reps/side — one arm overhead, lean in and out. Moves through lat/teres/shoulder range before loading.' },
+      { label: 'Dead hang', detail: '1 × 30 sec — fully relaxed, feet off ground. Decompresses GH joint before loading.' },
+      { label: 'Hip hinge with pause', detail: '10 reps — flat back, pause 2 sec at bottom. Sets the pattern for deadlifts/RDLs.' },
+    ],
+    legsA: [
+      { label: 'Foam roller — outer quad/IT band', detail: '60 sec/leg — find tight spots, hold 10–15 sec each.' },
+      { label: 'TKE with band', detail: '3 × 15/leg — band behind knee, extend fully against resistance. Retrains VMO, fixes patellar tracking.' },
+      { label: 'Spanish squat isometric', detail: '3–5 × 30–45 sec at 60–90° knee bend. Reduces patellar tendon pain acutely — do these first.' },
+      { label: 'Hip circles', detail: '10 each direction, each leg — opens hip joint through full ROM before loading.' },
+      { label: 'Leg swings', detail: '10 front-to-back + 10 side-to-side, each leg — hold rack for balance.' },
+      { label: 'Glute bridges', detail: '2 × 15 — squeeze hard at top, 1 sec hold. Activates glutes before squats — prevents knee cave.' },
+      { label: 'Squat to stand', detail: '5 reps — grab toes, drop to squat, stand tall. Shows your mobility for the day.' },
+      { label: 'Ankle circles', detail: '10 each direction, each ankle — tight ankles = limited depth = forward lean = knee stress.' },
+    ],
+    legsB: [
+      { label: 'Foam roller — outer quad/IT band', detail: '60 sec/leg — find tight spots, hold 10–15 sec each.' },
+      { label: 'TKE with band', detail: '3 × 15/leg — band behind knee. Retrains VMO and patellar tracking.' },
+      { label: 'Reverse Nordic curl', detail: '3 × 5 — knees on pad, feet anchored, lower torso slowly 3–4 sec. Best evidence for patellar tendon remodeling.' },
+      { label: 'Spanish squat isometric', detail: '3–5 × 30–45 sec — acute pain reduction, then train.' },
+      { label: 'Hip circles', detail: '10 each direction, each leg.' },
+      { label: 'Leg swings', detail: '10 front-to-back + 10 side-to-side, each leg.' },
+      { label: 'Glute bridges', detail: '2 × 15 — 1 sec hold at top.' },
+      { label: 'Ankle circles', detail: '10 each direction, each ankle.' },
+    ],
+    upper: [
+      { label: 'Band pull-aparts', detail: '3 × 20 — straight arms, shoulder height.' },
+      { label: 'Doorway pec stretch (dynamic)', detail: '10 reps/side — move in and out, do NOT hold.' },
+      { label: 'Scapular retraction holds', detail: '3 × 15 sec — shoulders back and down.' },
+      { label: 'Banded ER isometric', detail: '3 × 20 sec — elbow tucked, activates rotator cuff.' },
+      { label: 'Wall slides', detail: '2 × 10 — retrains scapular upward rotation.' },
+      { label: 'Dead hang', detail: '1 × 30 sec — from pull protocol: decompresses GH joint.' },
+      { label: 'Wrist circles', detail: '10 each direction.' },
+    ],
+    rest: [],
+  };
+
+  var warmupOpen = false;
+
+  function renderWarmup() {
+    const section = $('warmupSection');
+    const list = $('warmupList');
+    const toggle = $('warmupToggle');
+    if (!section || !list) return;
+
+    const ex = getCurrentEx();
+    const dayId = ex ? ex.day : state.filterDay;
+    const dayItems = WARMUPS[dayId] || [];
+
+    list.innerHTML = '';
+
+    if (!warmupOpen) {
+      list.style.display = 'none';
+      toggle.textContent = 'show ▾';
+      return;
+    }
+
+    list.style.display = '';
+    toggle.textContent = 'hide ▴';
+
+    const alwaysTitle = document.createElement('div');
+    alwaysTitle.className = 'po-warmup-block-title';
+    alwaysTitle.textContent = 'Every Session';
+    list.appendChild(alwaysTitle);
+    WARMUPS.always.forEach(item => list.appendChild(buildWarmupItem(item)));
+
+    if (dayItems.length) {
+      const dayNames = { push: 'Push Day', pull: 'Pull Day', legsA: 'Legs A', legsB: 'Legs B', upper: 'Upper Day' };
+      const dayTitle = document.createElement('div');
+      dayTitle.className = 'po-warmup-block-title';
+      dayTitle.textContent = (dayNames[dayId] || dayId.toUpperCase()) + ' — Add These';
+      list.appendChild(dayTitle);
+      dayItems.forEach(item => list.appendChild(buildWarmupItem(item)));
+    } else if (dayId === 'rest') {
+      const restEl = document.createElement('div');
+      restEl.className = 'po-warmup-item-detail';
+      restEl.style.fontStyle = 'italic';
+      restEl.style.paddingTop = '2px';
+      restEl.textContent = 'Rest day — open Mobility page for daily protocol.';
+      list.appendChild(restEl);
+    }
+  }
+
+  function buildWarmupItem(item) {
+    const div = document.createElement('div');
+    div.className = 'po-warmup-item';
+    const name = document.createElement('div');
+    name.className = 'po-warmup-item-name';
+    name.textContent = item.label;
+    div.appendChild(name);
+    if (item.detail) {
+      const detail = document.createElement('div');
+      detail.className = 'po-warmup-item-detail';
+      detail.textContent = item.detail;
+      div.appendChild(detail);
+    }
+    return div;
+  }
+
   // RENDER
   // ============================================================
   function renderFilters() {
@@ -3112,6 +3277,7 @@ img, video, canvas, svg { max-width: 100%; }
   }
   function renderForm() {
     const ex = getCurrentEx();
+    renderWarmup();
     renderCues(ex);
     // Reset coach panel when switching exercises
     $('coachResponse').classList.remove('show');
@@ -3895,6 +4061,11 @@ img, video, canvas, svg { max-width: 100%; }
     }
     textarea.value = cues.join('\n');
   }
+
+  $('warmupToggle').addEventListener('click', function() {
+    warmupOpen = !warmupOpen;
+    renderWarmup();
+  });
 
   $('cuesEditBtn').addEventListener('click', function() {
     const editArea = $('cuesEditArea');

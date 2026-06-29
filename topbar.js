@@ -265,9 +265,9 @@ body.topbar-modal-open { overflow: hidden; touch-action: none; }
   }
   function currentPageKey() {
     const p = (window.location.pathname || '').toLowerCase();
-    if (p.endsWith('health.html')) return 'health';
-    if (p.endsWith('gym.html')) return 'fitness';
-    if (p.endsWith('main.html')) return 'main';
+    if (p.endsWith('health.html') || p.endsWith('/health')) return 'health';
+    if (p.endsWith('gym.html') || p.endsWith('/gym') || p.endsWith('mobility.html') || p.endsWith('/mobility')) return 'fitness';
+    if (p.endsWith('main.html') || p.endsWith('/main')) return 'main';
     if (p.endsWith('finance.html')) return '';
     if (p.endsWith('index.html') || p === '/' || p.endsWith('/row/')) return '';
     return 'main';
