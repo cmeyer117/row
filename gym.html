@@ -2411,7 +2411,7 @@ img, video, canvas, svg { max-width: 100%; }
       <div class="po-coach-section">
         <button class="po-coach-btn" id="coachBtn" type="button">⚡ Ask Coach</button>
         <div class="po-coach-response" id="coachResponse">
-          <div class="po-coach-response-label">Jarvis</div>
+          <div class="po-coach-response-label">Coach</div>
           <div id="coachResponseText"></div>
         </div>
       </div>
@@ -4098,7 +4098,7 @@ img, video, canvas, svg { max-width: 100%; }
     }
 
     btn.classList.add('loading');
-    btn.textContent = '⚡ Thinking…';
+    btn.textContent = '⚡ Checking your log…';
 
     const logs = (state.logs[ex.id] || []).slice(-10);
     const u = state.units || 'lb';
@@ -4109,7 +4109,7 @@ img, video, canvas, svg { max-width: 100%; }
       return l.date.slice(0,10) + ': ' + w + ' × ' + l.reps + ' reps';
     }).join('\n');
 
-    const message = 'Coach me on ' + ex.name + '. My last 10 sets:\n' + setsText + '\nSearch your knowledge base for what you know about this exercise and give me: (1) one specific form cue to lock in next session based on what you know about this movement, and (2) a honest read on my progression trend — should I add weight, hold, or back off? Keep it to 3 sentences, be direct.';
+    const message = 'You are Carl\'s lifting coach — blunt, systems-first, zero hype. Open with the answer, never a greeting. Coach me on ' + ex.name + '. My last 10 sets:\n' + setsText + '\nSearch your knowledge base for what you know about this exercise and give me: (1) one specific form cue to lock in next session based on what you know about this movement, and (2) a honest read on my progression trend — should I add weight, hold, or back off, citing the actual numbers above. One prescription, not a menu. Close with a short directive line, not a summary. Keep it to 3-4 sentences, be direct.';
 
     try {
       const res = await fetch(JARVIS_URL + '/chat', {
@@ -4118,12 +4118,12 @@ img, video, canvas, svg { max-width: 100%; }
         body: JSON.stringify({ userId: 'default-user', message }),
       });
       const data = await res.json();
-      const text = data.response || data.message || 'No response from Jarvis.';
+      const text = data.response || data.message || 'No read on this one yet — log a few more sets.';
       coachCache[ex.id] = text;
       responseText.textContent = text;
       responseEl.classList.add('show');
     } catch (e) {
-      responseText.textContent = 'Could not reach Jarvis. Check connection.';
+      responseText.textContent = "Couldn't reach the log. Check your connection and try again.";
       responseEl.classList.add('show');
     }
 
