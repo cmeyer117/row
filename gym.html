@@ -5150,11 +5150,28 @@ img, video, canvas, svg { max-width: 100%; }
     }
   }
 
+  // Tripwire, not a block: deleting an entry via the UI legitimately
+  // shrinks the array, so we can't refuse a smaller push outright — but
+  // an *unexpected* shrink (a sync race, not a user action) should be
+  // visible instead of silently vanishing into the cloud.
+  function pcWarnIfShrinking(nextState) {
+    if (!pcLastSyncedJson) return;
+    try {
+      const prev = JSON.parse(pcLastSyncedJson);
+      const prevLen = Array.isArray(prev.po_coach_weights) ? prev.po_coach_weights.length : 0;
+      const nextLen = Array.isArray(nextState.po_coach_weights) ? nextState.po_coach_weights.length : 0;
+      if (nextLen < prevLen) {
+        console.warn('[sync] pushing a shorter po_coach_weights (' + nextLen + ' vs ' + prevLen + ' synced) — expected only if you just deleted an entry.');
+      }
+    } catch (_) {}
+  }
+
   async function pcPushNow() {
     if (!pcSupa) return;
     const state = pcCollectState();
     const json = JSON.stringify(state);
     if (json === pcLastSyncedJson) return;
+    pcWarnIfShrinking(state);
     try {
       const { error } = await pcSupa
         .from('app_state')
