@@ -382,7 +382,7 @@ img, video, canvas, svg { max-width: 100%; }
 .po-btn-icon:hover { background: rgba(255,255,255,0.10); color: var(--text-1); }
 .po-btn-icon:disabled { opacity: 0.4; cursor: not-allowed; }
 .po-no-ex {
-  background: rgba(255,255,255,0.025);
+  background: linear-gradient(165deg, rgba(16,26,22,.55) 0%, rgba(7,12,10,.40) 100%);
   border: 1px dashed var(--border);
   border-radius: 12px; padding: 16px; text-align: center;
   font-size: 13px; color: var(--text-3); margin-top: 10px;
@@ -403,7 +403,7 @@ img, video, canvas, svg { max-width: 100%; }
 .po-last-set {
   display: none; align-items: center; gap: 12px;
   padding: 11px 14px;
-  background: rgba(255,255,255,0.025);
+  background: linear-gradient(165deg, rgba(16,26,22,.55) 0%, rgba(7,12,10,.40) 100%);
   border: 1px solid var(--border);
   border-radius: 10px;
   margin-bottom: 12px; font-size: 12px;
@@ -586,8 +586,9 @@ img, video, canvas, svg { max-width: 100%; }
 /* ----- Prescription card ----- */
 .po-rx-card {
   padding: 18px 20px; border-radius: 14px;
-  background: rgba(255,255,255,0.025);
-  border: 1px solid var(--border);
+  background: linear-gradient(165deg, rgba(16,26,22,.55) 0%, rgba(7,12,10,.40) 100%);
+  border: 1px solid rgba(167, 243, 208, 0.10);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.05), 0 22px 50px -30px rgba(0,0,0,.75);
   position: relative;
 }
 .po-rx-card.po-rx-up   { background: linear-gradient(180deg, rgba(110,231,183,0.08), rgba(255,255,255,0.025)); border-color: rgba(110,231,183,0.18); }
@@ -624,8 +625,8 @@ img, video, canvas, svg { max-width: 100%; }
 }
 .po-stat-box {
   padding: 14px 12px;
-  background: rgba(255,255,255,0.025);
-  border: 1px solid var(--border);
+  background: linear-gradient(165deg, rgba(16,26,22,.55) 0%, rgba(7,12,10,.40) 100%);
+  border: 1px solid rgba(167, 243, 208, 0.10);
   border-radius: 12px; text-align: center;
 }
 .po-stat-label {
@@ -736,7 +737,7 @@ img, video, canvas, svg { max-width: 100%; }
   color: var(--accent); margin: 4px 0 2px;
 }
 .po-warmup-item {
-  padding: 6px 10px; background: rgba(255,255,255,0.025);
+  padding: 6px 10px; background: linear-gradient(165deg, rgba(16,26,22,.55) 0%, rgba(7,12,10,.40) 100%);
   border: 1px solid rgba(255,255,255,0.06); border-radius: 8px;
 }
 .po-warmup-item-name {
@@ -857,7 +858,7 @@ img, video, canvas, svg { max-width: 100%; }
 .po-set-row {
   display: flex; align-items: center; gap: 8px;
   padding: 8px 10px;
-  background: rgba(255,255,255,0.025);
+  background: linear-gradient(165deg, rgba(16,26,22,.55) 0%, rgba(7,12,10,.40) 100%);
   border: 1px solid var(--border);
   border-radius: 8px;
 }
@@ -875,7 +876,7 @@ img, video, canvas, svg { max-width: 100%; }
 .po-set-row .po-mini-btn:hover { color: var(--bad); }
 .po-add-row-btn {
   width: 100%; margin-top: 6px;
-  padding: 10px; background: rgba(255,255,255,0.025);
+  padding: 10px; background: linear-gradient(165deg, rgba(16,26,22,.55) 0%, rgba(7,12,10,.40) 100%);
   border: 1px dashed var(--border);
   color: var(--text-2);
   border-radius: 8px; cursor: pointer;
@@ -891,7 +892,7 @@ img, video, canvas, svg { max-width: 100%; }
   grid-template-columns: auto 1fr auto auto auto auto;
   gap: 6px; align-items: center;
   padding: 8px 10px;
-  background: rgba(255,255,255,0.025);
+  background: linear-gradient(165deg, rgba(16,26,22,.55) 0%, rgba(7,12,10,.40) 100%);
   border: 1px solid var(--border);
   border-radius: 8px;
   transition: border-color 0.15s, background 0.15s;
@@ -996,13 +997,82 @@ img, video, canvas, svg { max-width: 100%; }
   .po-reps-row { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 
-/* Today's Workout + Past Workouts */
+/* Today's Workout + Past Workouts — glass card matching the hub's tile language */
 .po-tw {
-  background: rgba(255,255,255,0.025);
-  border: 1px solid var(--border);
-  border-radius: 14px;
+  position: relative;
+  background: linear-gradient(165deg, rgba(16,26,22,.55) 0%, rgba(7,12,10,.40) 100%);
+  border: 1px solid rgba(167, 243, 208, 0.10);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.05), 0 22px 50px -30px rgba(0,0,0,.75);
+  border-radius: 18px;
   padding: 16px;
+  overflow: hidden;
+  isolation: isolate;
 }
+.po-tw::before {
+  content: '';
+  position: absolute; inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse 85% 75% at 58% 38%, rgba(110,231,183,.06), transparent 64%);
+}
+.po-tw > * { position: relative; z-index: 1; }
+
+.week-strip {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+  margin: 14px 0 18px;
+}
+.week-card {
+  position: relative;
+  padding: 10px 8px;
+  border-radius: 12px;
+  background: linear-gradient(165deg, rgba(16,26,22,.55) 0%, rgba(7,12,10,.40) 100%);
+  border: 1px solid rgba(167, 243, 208, 0.10);
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.week-card:hover { border-color: rgba(110, 231, 183, 0.28); }
+.week-card.is-today {
+  border-color: rgba(110, 231, 183, 0.4);
+  box-shadow: 0 0 24px rgba(110,231,183,0.14);
+}
+.week-card-name {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 13px;
+  color: var(--text-1);
+  margin-bottom: 4px;
+}
+.week-card-status {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 8.5px; font-weight: 700;
+  letter-spacing: 0.10em;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.08);
+  color: var(--text-3);
+}
+.week-card.is-today .week-card-status { background: rgba(110,231,183,0.14); color: var(--good); }
+.week-card.is-done .week-card-status { background: rgba(110,231,183,0.10); color: var(--good); }
+.week-card.is-rest .week-card-status { background: rgba(255,255,255,0.05); color: var(--text-4); }
+.week-card-bar {
+  height: 4px; border-radius: 999px;
+  background: rgba(255,255,255,0.08);
+  margin-top: 8px; overflow: hidden;
+}
+.week-card-bar-fill {
+  height: 100%; border-radius: 999px;
+  background: var(--good);
+}
+@media (max-width: 480px) {
+  .week-strip { grid-template-columns: repeat(5, minmax(0,1fr)); gap: 5px; }
+  .week-card { padding: 8px 4px; }
+  .week-card-name { font-size: 11px; }
+}
+
 .po-tw-head {
   display: flex; align-items: center; justify-content: space-between;
   gap: 10px; margin-bottom: 12px;
@@ -1047,7 +1117,7 @@ img, video, canvas, svg { max-width: 100%; }
 .po-tw-row {
   display: flex; align-items: center; justify-content: space-between;
   padding: 10px 12px;
-  background: rgba(255,255,255,0.025);
+  background: linear-gradient(165deg, rgba(16,26,22,.55) 0%, rgba(7,12,10,.40) 100%);
   border: 1px solid var(--border);
   border-radius: 10px;
   font-size: 13px;
@@ -1093,14 +1163,15 @@ img, video, canvas, svg { max-width: 100%; }
   display: flex; flex-direction: column; gap: 6px;
 }
 .po-tw-past-day {
-  background: rgba(255,255,255,0.025);
-  border: 1px solid var(--border);
+  background: linear-gradient(165deg, rgba(16,26,22,.55) 0%, rgba(7,12,10,.40) 100%);
+  border: 1px solid rgba(167, 243, 208, 0.10);
   border-radius: 10px;
   padding: 10px 12px;
   cursor: pointer;
+  transition: border-color 0.2s;
   transition: background 0.15s;
 }
-.po-tw-past-day:hover { background: rgba(255,255,255,0.04); }
+.po-tw-past-day:hover { background: rgba(255,255,255,0.04); border-color: rgba(110, 231, 183, 0.28); }
 .po-tw-past-day-h {
   display: flex; align-items: center; justify-content: space-between;
   gap: 10px;
@@ -1234,8 +1305,8 @@ img, video, canvas, svg { max-width: 100%; }
 /* Composition estimate */
 .wt-comp {
   margin-top: 18px; padding: 14px 16px;
-  background: rgba(255,255,255,0.025);
-  border: 1px solid var(--border);
+  background: linear-gradient(165deg, rgba(16,26,22,.55) 0%, rgba(7,12,10,.40) 100%);
+  border: 1px solid rgba(167, 243, 208, 0.10);
   border-radius: 12px;
 }
 .wt-comp-h {
@@ -1532,7 +1603,7 @@ img, video, canvas, svg { max-width: 100%; }
   display: grid; grid-template-columns: 76px 1fr auto auto;
   align-items: center; gap: 10px;
   padding: 9px 10px;
-  background: rgba(255,255,255,0.025);
+  background: linear-gradient(165deg, rgba(16,26,22,.55) 0%, rgba(7,12,10,.40) 100%);
   border: 1px solid var(--border);
   border-radius: 8px;
   font-size: 13px;
@@ -1548,7 +1619,7 @@ img, video, canvas, svg { max-width: 100%; }
 .wt-hist-btn.del:hover { color: var(--bad); }
 .wt-hist-toggle {
   width: 100%; margin-top: 10px; padding: 10px;
-  background: rgba(255,255,255,0.025);
+  background: linear-gradient(165deg, rgba(16,26,22,.55) 0%, rgba(7,12,10,.40) 100%);
   border: 1px dashed var(--border);
   border-radius: 8px; cursor: pointer;
   font-family: inherit; font-size: 12px; color: var(--text-3);
@@ -1713,7 +1784,7 @@ img, video, canvas, svg { max-width: 100%; }
   gap: 8px; align-items: center;
   margin-top: 8px;
   padding: 12px 14px;
-  background: rgba(255,255,255,0.025);
+  background: linear-gradient(165deg, rgba(16,26,22,.55) 0%, rgba(7,12,10,.40) 100%);
   border: 1px solid var(--border);
   border-radius: 12px;
 }
@@ -1787,7 +1858,7 @@ img, video, canvas, svg { max-width: 100%; }
   padding: 13px 14px;
   border-radius: 10px;
   border: 1px solid transparent;
-  background: rgba(255,255,255,0.025);
+  background: linear-gradient(165deg, rgba(16,26,22,.55) 0%, rgba(7,12,10,.40) 100%);
   margin-bottom: 6px;
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s;
@@ -2141,6 +2212,13 @@ img, video, canvas, svg { max-width: 100%; }
     <span class="po-day-sep">·</span>
     <span class="po-day-split" id="dayPillSplit">—</span>
   </button>
+
+  <!-- Week strip — read-only status/progress per rotation day, last 5 days
+       including today. Tapping today scrolls to Today's Workout; tapping a
+       past day expands it in the existing past-workouts list. No manual
+       day-switching — the rotation is date-anchored (see todaySplit()) and
+       letting a user tap ahead would desync it. -->
+  <div class="week-strip" id="weekStrip"></div>
 
   <!-- Quick Log Bar -->
   <div class="po-quick-log">
@@ -3477,7 +3555,34 @@ img, video, canvas, svg { max-width: 100%; }
     const mons = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
     return dows[d.getDay()] + ', ' + mons[d.getMonth()] + ' ' + d.getDate();
   }
+  // Same rotation math as todaySplit(), parametrized by how many days ago.
+  // daysAgo=0 is today. Used by the week strip to show the last 5 days.
+  function splitForOffset(daysAgo) {
+    try {
+      const rot = state.splitRotation;
+      if (!rot || !rot.length) return null;
+      const [ay, am, ad] = state.splitAnchor.date.split('-').map(Number);
+      const a = new Date(ay, am - 1, ad);
+      const t = new Date();
+      t.setHours(0, 0, 0, 0);
+      t.setDate(t.getDate() - daysAgo);
+      const diffDays = Math.round((t - a) / 86400000);
+      const idx = ((state.splitAnchor.index + diffDays) % rot.length + rot.length) % rot.length;
+      return { name: rot[idx], index: idx, dateKey: wtDateKey(t) };
+    } catch (e) {
+      return null;
+    }
+  }
   function isRestName(name) { return /^rest\b/i.test(name || ''); }
+  // state.splitRotation already holds display names ("Push", "Legs A", ...)
+  // sourced from CONFIG.days[].name — state.exercises[].day uses the
+  // lowercase ids ("push", "legsA") instead, so look the id up via
+  // state.days (or CONFIG.days as a fallback) before filtering exercises.
+  function dayIdForSplitName(name) {
+    const list = (state.days && state.days.length) ? state.days : CONFIG.days;
+    const found = list.find(d => d.name === name);
+    return found ? found.id : null;
+  }
   function splitLabel(name) {
     if (!name) return '—';
     return (isRestName(name) ? 'REST DAY — pick a day below ↓' : (name + ' DAY')).toUpperCase();
@@ -3534,6 +3639,7 @@ img, video, canvas, svg { max-width: 100%; }
       undoBtn.style.display = (ex && getTodaySets(ex.id).length > 0) ? 'block' : 'none';
     }
     renderDayPill();
+    renderWeekStrip();
     renderFilters(); renderSelect(); renderForm(); renderLastSet();
     renderRepsRow();
     renderRx(); renderStats(); renderSparkline(); renderHistory();
@@ -3846,6 +3952,38 @@ img, video, canvas, svg { max-width: 100%; }
     btn.style.opacity = btn.disabled ? '0.4' : '';
   }
 
+  // Read-only week strip: last 5 rotation days (today + 4 prior), each a
+  // small card with day name, status, and a per-exercise completion bar.
+  // No day-switching — see the comment on #weekStrip in the markup.
+  function renderWeekStrip() {
+    const strip = $('weekStrip');
+    if (!strip) return;
+    const all = logsByDay();
+    const cards = [];
+    for (let i = 4; i >= 0; i--) {
+      const s = splitForOffset(i);
+      if (!s) continue;
+      const isToday = i === 0;
+      const isRest = isRestName(s.name);
+      const daySets = all[s.dateKey] || [];
+      const loggedIds = new Set(daySets.map(x => x.ex.id));
+      const dayId = dayIdForSplitName(s.name);
+      const totalForDay = dayId ? state.exercises.filter(e => e.day === dayId).length : 0;
+      const pct = totalForDay ? Math.min(100, Math.round((loggedIds.size / totalForDay) * 100)) : 0;
+      const done = !!doneDays[s.dateKey];
+      const statusText = isToday ? 'TODAY' : (isRest ? 'REST' : (done ? 'DONE' : ''));
+      const statusCls = isToday ? 'is-today' : (isRest ? 'is-rest' : (done ? 'is-done' : ''));
+      cards.push(
+        '<div class="week-card ' + statusCls + '" data-dk="' + s.dateKey + '" data-today="' + isToday + '">'
+        + '<div class="week-card-name">' + escape(s.name) + '</div>'
+        + (statusText ? '<span class="week-card-status">' + statusText + '</span>' : '')
+        + (!isRest ? '<div class="week-card-bar"><div class="week-card-bar-fill" style="width:' + pct + '%"></div></div>' : '')
+        + '</div>'
+      );
+    }
+    strip.innerHTML = cards.join('');
+  }
+
   function renderPastWorkouts() {
     const todayKey = wtDateKey(new Date());
     const all = logsByDay();
@@ -3897,6 +4035,29 @@ img, video, canvas, svg { max-width: 100%; }
       row.addEventListener('click', function() { row.classList.toggle('expanded'); });
     });
   }
+
+  // Today's card scrolls to the existing Today's Workout section. A past
+  // day's card opens the past-workouts list (if closed) and expands that
+  // specific day's row, reusing the existing expand behavior verbatim.
+  $('weekStrip').addEventListener('click', (e) => {
+    const card = e.target.closest('.week-card');
+    if (!card || card.classList.contains('is-rest')) return;
+    if (card.dataset.today === 'true') {
+      $('poTw').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
+    const dk = card.dataset.dk;
+    const pastBody = $('poTwPastBody');
+    const toggle = $('poTwPastToggle');
+    if (pastBody.style.display === 'none') toggle.click();
+    requestAnimationFrame(() => {
+      const row = pastBody.querySelector('.po-tw-past-day[data-dk="' + dk + '"]');
+      if (row) {
+        row.classList.add('expanded');
+        row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    });
+  });
 
   $('poTwDoneBtn').addEventListener('click', () => {
     const todayKey = wtDateKey(new Date());
