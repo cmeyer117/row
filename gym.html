@@ -587,7 +587,8 @@ img, video, canvas, svg { max-width: 100%; }
 .po-rx-card {
   padding: 18px 20px; border-radius: 14px;
   background: linear-gradient(165deg, rgba(16,26,22,.55) 0%, rgba(7,12,10,.40) 100%);
-  border: 1px solid var(--border);
+  border: 1px solid rgba(167, 243, 208, 0.10);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.05), 0 22px 50px -30px rgba(0,0,0,.75);
   position: relative;
 }
 .po-rx-card.po-rx-up   { background: linear-gradient(180deg, rgba(110,231,183,0.08), rgba(255,255,255,0.025)); border-color: rgba(110,231,183,0.18); }
@@ -625,7 +626,7 @@ img, video, canvas, svg { max-width: 100%; }
 .po-stat-box {
   padding: 14px 12px;
   background: linear-gradient(165deg, rgba(16,26,22,.55) 0%, rgba(7,12,10,.40) 100%);
-  border: 1px solid var(--border);
+  border: 1px solid rgba(167, 243, 208, 0.10);
   border-radius: 12px; text-align: center;
 }
 .po-stat-label {
@@ -1106,13 +1107,14 @@ img, video, canvas, svg { max-width: 100%; }
 }
 .po-tw-past-day {
   background: linear-gradient(165deg, rgba(16,26,22,.55) 0%, rgba(7,12,10,.40) 100%);
-  border: 1px solid var(--border);
+  border: 1px solid rgba(167, 243, 208, 0.10);
   border-radius: 10px;
   padding: 10px 12px;
   cursor: pointer;
+  transition: border-color 0.2s;
   transition: background 0.15s;
 }
-.po-tw-past-day:hover { background: rgba(255,255,255,0.04); }
+.po-tw-past-day:hover { background: rgba(255,255,255,0.04); border-color: rgba(110, 231, 183, 0.28); }
 .po-tw-past-day-h {
   display: flex; align-items: center; justify-content: space-between;
   gap: 10px;
@@ -1247,7 +1249,7 @@ img, video, canvas, svg { max-width: 100%; }
 .wt-comp {
   margin-top: 18px; padding: 14px 16px;
   background: linear-gradient(165deg, rgba(16,26,22,.55) 0%, rgba(7,12,10,.40) 100%);
-  border: 1px solid var(--border);
+  border: 1px solid rgba(167, 243, 208, 0.10);
   border-radius: 12px;
 }
 .wt-comp-h {
