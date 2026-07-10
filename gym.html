@@ -5018,6 +5018,11 @@ img, video, canvas, svg { max-width: 100%; }
   let pcPushTimer = null;
   let pcSuppressSync = false;
   let pcPendingRemote = null;
+  // A write that happens before the initial remote pull resolves must
+  // never push — the local snapshot at that point hasn't been merged
+  // with remote yet, so pushing it would overwrite remote history that
+  // only exists in the cloud (this is what caused real data loss).
+  let pcInitialPullDone = false;
   // JSON of the last state we sent or received — used to ignore
   // realtime echoes of our own pushes so we don't infinite-loop.
   let pcLastSyncedJson = null;
@@ -5162,7 +5167,7 @@ img, video, canvas, svg { max-width: 100%; }
   }
 
   function pcSchedulePush() {
-    if (pcSuppressSync) return;
+    if (pcSuppressSync || !pcInitialPullDone) return;
     clearTimeout(pcPushTimer);
     pcPushTimer = setTimeout(pcPushNow, 250);
   }
@@ -5170,7 +5175,7 @@ img, video, canvas, svg { max-width: 100%; }
   // Backup push on unload via fetch keepalive so a fast refresh
   // doesn't lose the latest change before the debounced push fires.
   function pcFlushPushOnUnload() {
-    if (!pcSupa) return;
+    if (!pcSupa || !pcInitialPullDone) return;
     const state = pcCollectState();
     const json = JSON.stringify(state);
     if (json === pcLastSyncedJson) return;
@@ -5203,10 +5208,12 @@ img, video, canvas, svg { max-width: 100%; }
       if (!error && data && data.data && Object.keys(data.data).length > 0) {
         pcLastSyncedJson = JSON.stringify(data.data);
         pcMaybeApplyRemote(data.data);
-      } else if (Object.keys(pcCollectState()).length > 0) {
-        pcSchedulePush();
+        pcInitialPullDone = true;
+      } else {
+        pcInitialPullDone = true;
+        if (Object.keys(pcCollectState()).length > 0) pcSchedulePush();
       }
-    } catch (_) {}
+    } catch (_) { pcInitialPullDone = true; }
     pcSupa.channel('app_state_' + APP_KEY)
       .on('postgres_changes', {
         event: '*',
