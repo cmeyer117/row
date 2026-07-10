@@ -5100,6 +5100,23 @@ img, video, canvas, svg { max-width: 100%; }
           }
           continue;
         }
+        if (k === 'po_coach_weights') {
+          // Union by dateKey instead of overwriting — a device that pulls
+          // before pushing its own newer entries must never let the
+          // remote's (possibly stale) copy destroy local-only history.
+          let localArr = [];
+          try { localArr = JSON.parse(localStorage.getItem(k) || '[]'); } catch {}
+          const remoteArr = Array.isArray(remote[k]) ? remote[k] : [];
+          const byDateKey = new Map();
+          for (const e of remoteArr) if (e && e.dateKey) byDateKey.set(e.dateKey, e);
+          for (const e of localArr) if (e && e.dateKey && !byDateKey.has(e.dateKey)) byDateKey.set(e.dateKey, e);
+          const merged = Array.from(byDateKey.values()).sort((a, b) => a.dateKey.localeCompare(b.dateKey));
+          const incoming = JSON.stringify(merged);
+          if (localStorage.getItem(k) !== incoming) {
+            try { _pcOrigSet(k, incoming); changed = true; } catch {}
+          }
+          continue;
+        }
         if (k in remote) {
           const incoming = JSON.stringify(remote[k]);
           const local = localStorage.getItem(k);
