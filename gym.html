@@ -1908,6 +1908,28 @@ img, video, canvas, svg { max-width: 100%; }
   -webkit-tap-highlight-color: transparent;
 }
 
+#progModalChart {
+  margin-bottom: 16px;
+}
+#progModalChart svg {
+  width: 100%; height: 120px; display: block;
+}
+#progModalSessions {
+  display: flex; flex-direction: column; gap: 8px;
+  max-height: 40vh; overflow-y: auto;
+}
+.prog-modal-session {
+  background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 10px; padding: 10px 12px;
+}
+.prog-modal-session-date {
+  font-family: var(--font-mono); font-size: 11px; color: var(--text-3);
+  margin-bottom: 6px;
+}
+.prog-modal-session-chips {
+  display: flex; flex-wrap: wrap; gap: 6px;
+}
+
 /* ===== Today's Extras divider + ad-hoc rows ===== */
 .wl-extras-divider {
   font-family: var(--font-mono);
@@ -2615,6 +2637,18 @@ img, video, canvas, svg { max-width: 100%; }
       <div class="sub-modal-actions">
         <button class="sub-set-default" id="subSetDefault">Set as default</button>
         <button class="sub-cancel" id="subCancel">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PROGRESS CARD EXPANDED-GRAPH MODAL -->
+  <div class="sub-modal-bg" id="progModalBg">
+    <div class="sub-modal">
+      <div class="sub-modal-title" id="progModalTitle">Exercise</div>
+      <div id="progModalChart"></div>
+      <div id="progModalSessions"></div>
+      <div class="sub-modal-actions">
+        <button class="sub-cancel" id="progModalClose">Close</button>
       </div>
     </div>
   </div>
