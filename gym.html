@@ -670,6 +670,31 @@ img, video, canvas, svg { max-width: 100%; }
 .po-hist-del:hover { color: var(--bad); }
 .po-hist-edit:hover { color: var(--text-1); }
 
+/* ----- Rest Timer ----- */
+.po-rest-timer {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  background: linear-gradient(165deg, rgba(16,26,22,.55) 0%, rgba(7,12,10,.40) 100%);
+  border: 1px solid rgba(110, 231, 183, 0.30);
+  border-radius: 14px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+}
+.po-rest-timer-count {
+  font-family: var(--font-mono); font-size: 20px; font-weight: 700;
+  color: var(--good); font-variant-numeric: tabular-nums;
+}
+.po-rest-timer-msg {
+  font-size: 13px; color: var(--text-2); flex: 1; min-width: 140px;
+}
+.po-rest-timer-actions { display: flex; gap: 6px; }
+.po-rest-timer-adj, .po-rest-timer-dismiss {
+  font-family: var(--font-mono); font-size: 11px; font-weight: 700;
+  padding: 6px 10px; border-radius: 8px; cursor: pointer;
+  background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.10);
+  color: var(--text-2);
+}
+.po-rest-timer-adj:hover, .po-rest-timer-dismiss:hover { background: rgba(255,255,255,0.10); }
+
 /* ----- Cues ----- */
 .po-cues-section {
   padding: 8px 0 4px;
@@ -2474,6 +2499,17 @@ img, video, canvas, svg { max-width: 100%; }
         <button class="wl-adhoc-cancel" id="wlAdhocCancel">✕</button>
       </div>
       <button class="wl-add-btn" id="wlAddBtn">+ Add exercise</button>
+    </div>
+
+    <!-- Rest Timer — auto-starts after logging a set -->
+    <div class="po-rest-timer" id="restTimerBar" style="display:none">
+      <span class="po-rest-timer-count" id="restTimerCount">0:00</span>
+      <span class="po-rest-timer-msg" id="restTimerMsg"></span>
+      <div class="po-rest-timer-actions">
+        <button type="button" class="po-rest-timer-adj" data-delta="-15">-15s</button>
+        <button type="button" class="po-rest-timer-adj" data-delta="15">+15s</button>
+        <button type="button" class="po-rest-timer-dismiss" id="restTimerDismiss">Skip</button>
+      </div>
     </div>
 
     <!-- Log a set -->
