@@ -4973,6 +4973,9 @@ img, video, canvas, svg { max-width: 100%; }
     get state() { return state; },
     $, CONFIG, getChipDate, getActiveDate, fmtDateChipLabel, resetChipToToday, initDateChip
   };
+  // renderAll is called from the BOOT script below, which is now a
+  // separate <script> tag (module split) and can't see this IIFE's scope.
+  window.renderAll = renderAll;
 })();
 </script>
 <script src="gym-weight-photos.js"></script>
