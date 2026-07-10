@@ -3555,6 +3555,31 @@ img, video, canvas, svg { max-width: 100%; }
     const mons = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
     return dows[d.getDay()] + ', ' + mons[d.getMonth()] + ' ' + d.getDate();
   }
+  // Same rotation math as todaySplit(), parametrized by how many days ago.
+  // daysAgo=0 is today. Used by the week strip to show the last 5 days.
+  function splitForOffset(daysAgo) {
+    try {
+      const rot = state.splitRotation;
+      if (!rot || !rot.length) return null;
+      const [ay, am, ad] = state.splitAnchor.date.split('-').map(Number);
+      const a = new Date(ay, am - 1, ad);
+      const t = new Date();
+      t.setHours(0, 0, 0, 0);
+      t.setDate(t.getDate() - daysAgo);
+      const diffDays = Math.round((t - a) / 86400000);
+      const idx = ((state.splitAnchor.index + diffDays) % rot.length + rot.length) % rot.length;
+      return { name: rot[idx], index: idx, dateKey: wtDateKey(t) };
+    } catch (e) {
+      return null;
+    }
+  }
+  // "legsA" -> "Legs A", "push" -> "Push", etc. Matches the lowercase ids
+  // used in state.splitRotation / state.exercises[].day.
+  function splitDisplayName(name) {
+    if (!name) return '—';
+    if (/^legs/i.test(name)) return 'Legs ' + name.slice(4).toUpperCase();
+    return name.charAt(0).toUpperCase() + name.slice(1);
+  }
   function isRestName(name) { return /^rest\b/i.test(name || ''); }
   function splitLabel(name) {
     if (!name) return '—';
@@ -3612,6 +3637,7 @@ img, video, canvas, svg { max-width: 100%; }
       undoBtn.style.display = (ex && getTodaySets(ex.id).length > 0) ? 'block' : 'none';
     }
     renderDayPill();
+    renderWeekStrip();
     renderFilters(); renderSelect(); renderForm(); renderLastSet();
     renderRepsRow();
     renderRx(); renderStats(); renderSparkline(); renderHistory();
@@ -3924,6 +3950,37 @@ img, video, canvas, svg { max-width: 100%; }
     btn.style.opacity = btn.disabled ? '0.4' : '';
   }
 
+  // Read-only week strip: last 5 rotation days (today + 4 prior), each a
+  // small card with day name, status, and a per-exercise completion bar.
+  // No day-switching — see the comment on #weekStrip in the markup.
+  function renderWeekStrip() {
+    const strip = $('weekStrip');
+    if (!strip) return;
+    const all = logsByDay();
+    const cards = [];
+    for (let i = 4; i >= 0; i--) {
+      const s = splitForOffset(i);
+      if (!s) continue;
+      const isToday = i === 0;
+      const isRest = isRestName(s.name);
+      const daySets = all[s.dateKey] || [];
+      const loggedIds = new Set(daySets.map(x => x.ex.id));
+      const totalForDay = state.exercises.filter(e => e.day === s.name).length;
+      const pct = totalForDay ? Math.min(100, Math.round((loggedIds.size / totalForDay) * 100)) : 0;
+      const done = !!doneDays[s.dateKey];
+      const statusText = isToday ? 'TODAY' : (isRest ? 'REST' : (done ? 'DONE' : ''));
+      const statusCls = isToday ? 'is-today' : (isRest ? 'is-rest' : (done ? 'is-done' : ''));
+      cards.push(
+        '<div class="week-card ' + statusCls + '" data-dk="' + s.dateKey + '" data-today="' + isToday + '">'
+        + '<div class="week-card-name">' + escape(splitDisplayName(s.name)) + '</div>'
+        + (statusText ? '<span class="week-card-status">' + statusText + '</span>' : '')
+        + (!isRest ? '<div class="week-card-bar"><div class="week-card-bar-fill" style="width:' + pct + '%"></div></div>' : '')
+        + '</div>'
+      );
+    }
+    strip.innerHTML = cards.join('');
+  }
+
   function renderPastWorkouts() {
     const todayKey = wtDateKey(new Date());
     const all = logsByDay();
@@ -3975,6 +4032,29 @@ img, video, canvas, svg { max-width: 100%; }
       row.addEventListener('click', function() { row.classList.toggle('expanded'); });
     });
   }
+
+  // Today's card scrolls to the existing Today's Workout section. A past
+  // day's card opens the past-workouts list (if closed) and expands that
+  // specific day's row, reusing the existing expand behavior verbatim.
+  $('weekStrip').addEventListener('click', (e) => {
+    const card = e.target.closest('.week-card');
+    if (!card || card.classList.contains('is-rest')) return;
+    if (card.dataset.today === 'true') {
+      $('poTw').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
+    const dk = card.dataset.dk;
+    const pastBody = $('poTwPastBody');
+    const toggle = $('poTwPastToggle');
+    if (pastBody.style.display === 'none') toggle.click();
+    requestAnimationFrame(() => {
+      const row = pastBody.querySelector('.po-tw-past-day[data-dk="' + dk + '"]');
+      if (row) {
+        row.classList.add('expanded');
+        row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    });
+  });
 
   $('poTwDoneBtn').addEventListener('click', () => {
     const todayKey = wtDateKey(new Date());
