@@ -332,7 +332,7 @@
       if (strengthDelta >= 0) {
         // Strength preserved or up → all fat lost, slight muscle gain
         estMuscle = Math.min(maxMusclePerWeek * weeks * 0.3, 0.5);
-        estFat = wDown + estMuscle;
+        estFat = -(wDown + estMuscle);
         headlineCls = 'good';
         headline = '−' + wDown.toFixed(1) + ' ' + window.__gym.state.units + ' — strength holding, fat dropping.';
       } else {

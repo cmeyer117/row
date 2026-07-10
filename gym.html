@@ -2646,7 +2646,7 @@ img, video, canvas, svg { max-width: 100%; }
             <div class="po-tw-eyebrow" id="poTwDateLabel">TODAY</div>
             <div class="po-tw-summary">
               <span class="po-tw-summary-num" id="poTwSetCount">0</span>
-              <span class="po-tw-summary-label">sets</span>
+              <span class="po-tw-summary-label" id="poTwSetLabel">sets</span>
               <span class="po-tw-summary-sep">·</span>
               <span class="po-tw-summary-vol" id="poTwTotalVol">0 kg lifted</span>
             </div>
@@ -4057,6 +4057,7 @@ img, video, canvas, svg { max-width: 100%; }
     eyebrow.textContent = 'TODAY · ' + dows[d.getDay()] + ', ' + mons[d.getMonth()] + ' ' + d.getDate();
 
     $('poTwSetCount').textContent = sum.totalSets;
+    $('poTwSetLabel').textContent = sum.totalSets === 1 ? 'set' : 'sets';
     $('poTwTotalVol').textContent = Math.round(sum.totalVol).toLocaleString() + ' ' + u + ' lifted';
 
     const list = $('poTwList');

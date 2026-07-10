@@ -302,14 +302,18 @@ body.topbar-modal-open { overflow: hidden; touch-action: none; }
   function getWaterProgress() {
     let state = null;
     try { state = JSON.parse(localStorage.getItem('po_water_v1')); } catch (e) {}
-    if (!state) return { done: 0, total: 0 };
+    // No saved settings yet — mirror po-water.html's own default profile
+    // instead of reporting 0/0 (the two widgets must agree pre-setup).
+    if (!state) state = {};
     const todayKey = calendarDateKey();
     const done = (state.logs || {})[todayKey] || 0;
-    const p = state.profile || { weightKg: 75 };
+    // Same defaults as po-water.html's CONFIG.profile / CONFIG.caffeineMgPerDay.
+    const p = state.profile || { weightKg: 75, age: 25, sex: 'm', activityHrsPerWeek: 5 };
     const wKg = state.weightUnit === 'lb' ? (p.weightKg || 0) / 2.20462 : (p.weightKg || 0);
     const base = wKg * 35;
     const exercise = (p.activityHrsPerWeek || 0) / 7 * 500;
-    const caffeine = Math.max(0, (state.caffeineMgPerDay || 0) - 200) * 1.5;
+    const caffeineMgPerDay = state.caffeineMgPerDay != null ? state.caffeineMgPerDay : 200;
+    const caffeine = Math.max(0, caffeineMgPerDay - 200) * 1.5;
     const subs = (state.substances || []).reduce((s, x) => {
       const dose = (x && x.dose != null ? x.dose : (x && x.defaultDose)) || 0;
       return s + Math.max(0, dose * ((x && x.mlPerUnit) || 0));
