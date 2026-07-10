@@ -73,18 +73,37 @@ body::after {
   margin: 0 auto;
 }
 
-.dash-title {
-  margin: 0 0 22px;
+.hero {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin: 0 0 28px;
+}
+
+.hero-mark {
+  flex: none;
+  width: 46px;
+  height: 46px;
+  filter: drop-shadow(0 0 14px rgba(110,231,183,0.35));
+}
+
+.hero-greeting {
+  margin: 0;
   font-family: var(--font-serif);
   font-size: 32px;
-  font-weight: 700;
+  font-weight: 400;
   font-style: italic;
-  letter-spacing: -0.02em;
-  background: linear-gradient(135deg, #FFFFFF 0%, var(--accent) 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  color: transparent;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+}
+
+.hero-date {
+  margin: 4px 0 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
 }
 
 /* ===== Bento Grid ===== */
@@ -160,7 +179,7 @@ body::after {
 .tile-jarvis:hover    .tile-arrow { color: #A78BFA; }
 .tile-jarvis          .tile-badge { background: rgba(167,139,250,0.10); color: #A78BFA; }
 .tile-jarvis .tile-name { font-size: 30px; }
-.tile-jarvis .tile-icon { font-size: 42px; }
+.tile-jarvis .tile-icon { width: 38px; height: 38px; }
 
 .tile-vessel  { grid-column: span 2; border-color: rgba(201, 168, 76, 0.14); }
 .tile-vessel::before  { background: radial-gradient(circle at 60% 50%, rgba(201,168,76,0.08), transparent 60%); }
@@ -168,7 +187,7 @@ body::after {
 .tile-vessel:hover    .tile-arrow { color: #C9A84C; }
 .tile-vessel          .tile-badge { background: rgba(201,168,76,0.12); color: #C9A84C; }
 .tile-vessel .tile-name { font-size: 30px; }
-.tile-vessel .tile-icon { font-size: 42px; }
+.tile-vessel .tile-icon { width: 38px; height: 38px; }
 
 /* tile content */
 .tile-num {
@@ -180,12 +199,12 @@ body::after {
 }
 
 .tile-icon {
-  font-size: 32px;
-  line-height: 1;
+  width: 30px;
+  height: 30px;
   margin-bottom: 10px;
   display: block;
 }
-.tile-goals .tile-icon { font-size: 42px; }
+.tile-goals .tile-icon { width: 38px; height: 38px; }
 
 .tile-name {
   font-family: var(--font-serif);
@@ -267,7 +286,22 @@ body::after {
 </head>
 <body>
 <div class="page">
-  <h1 class="dash-title">Carl's Dashboard</h1>
+  <div class="hero">
+    <svg class="hero-mark" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="markGrad" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stop-color="#FFFFFF"/>
+          <stop offset="100%" stop-color="#6EE7B7"/>
+        </linearGradient>
+      </defs>
+      <path d="M24 2 L44 24 L24 46 L4 24 Z" stroke="url(#markGrad)" stroke-width="1.6" fill="rgba(110,231,183,0.06)"/>
+      <path d="M17 20 L24 30 L31 18" stroke="url(#markGrad)" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <div>
+      <h1 class="hero-greeting" id="greeting">Good day</h1>
+      <p class="hero-date" id="today-date"></p>
+    </div>
+  </div>
 
   <div class="bento">
 
@@ -275,7 +309,7 @@ body::after {
     <a href="main.html" class="tile tile-goals">
       <div>
         <div class="tile-num">·01</div>
-        <span class="tile-icon">🎯</span>
+        <svg class="tile-icon" viewBox="0 0 24 24" fill="none" stroke="#6EE7B7" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.2" fill="#6EE7B7"/></svg>
         <div class="tile-name">Goals</div>
         <div class="tile-sub">Daily to-dos, streaks,<br>and tomorrow's plan.</div>
       </div>
@@ -289,7 +323,7 @@ body::after {
     <a href="gym.html" class="tile tile-fitness">
       <div>
         <div class="tile-num">·02</div>
-        <span class="tile-icon">💪</span>
+        <svg class="tile-icon" viewBox="0 0 24 24" fill="none" stroke="#7DD3FC" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="2 17 8 11 12 14 22 5"/><polyline points="16 5 22 5 22 11"/></svg>
         <div class="tile-name">Fitness</div>
         <div class="tile-sub">Progressive overload, weight tracking, and progress photos.</div>
       </div>
@@ -303,7 +337,7 @@ body::after {
     <a href="health.html" class="tile tile-health">
       <div>
         <div class="tile-num">·03</div>
-        <span class="tile-icon">💊</span>
+        <svg class="tile-icon" viewBox="0 0 24 24" fill="none" stroke="#A7F3D0" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12 h6 l2 -7 l4 14 l2 -7 h6"/></svg>
         <div class="tile-name">Health</div>
         <div class="tile-sub">Supplement stack and water intake.</div>
       </div>
@@ -317,7 +351,7 @@ body::after {
     <a href="finance.html" class="tile tile-finance">
       <div>
         <div class="tile-num">·04</div>
-        <span class="tile-icon">📊</span>
+        <svg class="tile-icon" viewBox="0 0 24 24" fill="none" stroke="#F2C063" stroke-width="1.6" stroke-linecap="round"><line x1="5" y1="20" x2="5" y2="12"/><line x1="12" y1="20" x2="12" y2="6"/><line x1="19" y1="20" x2="19" y2="15"/></svg>
         <div class="tile-name">Finance</div>
         <div class="tile-sub">Net worth, subscriptions, and cashflow.</div>
       </div>
@@ -331,7 +365,7 @@ body::after {
     <a href="https://jarvis-pi-liart.vercel.app?from=row" target="_blank" rel="noopener" class="tile tile-jarvis">
       <div>
         <div class="tile-num">·05</div>
-        <span class="tile-icon">🤖</span>
+        <svg class="tile-icon" viewBox="0 0 24 24" fill="none" stroke="#A78BFA" stroke-width="1.6"><rect x="4" y="4" width="16" height="16" rx="4"/><circle cx="9" cy="10" r="1.3" fill="#A78BFA" stroke="none"/><circle cx="15" cy="10" r="1.3" fill="#A78BFA" stroke="none"/><path d="M8 15 h8" stroke-linecap="round"/></svg>
         <div class="tile-name">Jarvis</div>
         <div class="tile-sub">Voice + text AI. Full memory, web search, and project context. Sir.</div>
       </div>
@@ -345,7 +379,7 @@ body::after {
     <a href="https://vessel-carl-meyer-s-projects.vercel.app" target="_blank" rel="noopener" class="tile tile-vessel">
       <div>
         <div class="tile-num">·06</div>
-        <span class="tile-icon">✦</span>
+        <svg class="tile-icon" viewBox="0 0 24 24" fill="none" stroke="#C9A84C" stroke-width="1.6" stroke-linejoin="round"><path d="M12 2 L14.5 9.5 L22 12 L14.5 14.5 L12 22 L9.5 14.5 L2 12 L9.5 9.5 Z"/></svg>
         <div class="tile-name">Vessel</div>
         <div class="tile-sub">Faith · Manifest · Journal · Prayer.</div>
       </div>
@@ -357,5 +391,15 @@ body::after {
 
   </div>
 </div>
+<script>
+(function () {
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+  document.getElementById('greeting').textContent = greeting;
+  document.getElementById('today-date').textContent = new Date().toLocaleDateString('en-US', {
+    weekday: 'long', month: 'long', day: 'numeric'
+  });
+})();
+</script>
 </body>
 </html>
