@@ -1016,6 +1016,63 @@ img, video, canvas, svg { max-width: 100%; }
   background: radial-gradient(ellipse 85% 75% at 58% 38%, rgba(110,231,183,.06), transparent 64%);
 }
 .po-tw > * { position: relative; z-index: 1; }
+
+.week-strip {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+  margin: 14px 0 18px;
+}
+.week-card {
+  position: relative;
+  padding: 10px 8px;
+  border-radius: 12px;
+  background: linear-gradient(165deg, rgba(16,26,22,.55) 0%, rgba(7,12,10,.40) 100%);
+  border: 1px solid rgba(167, 243, 208, 0.10);
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.week-card:hover { border-color: rgba(110, 231, 183, 0.28); }
+.week-card.is-today {
+  border-color: rgba(110, 231, 183, 0.4);
+  box-shadow: 0 0 24px rgba(110,231,183,0.14);
+}
+.week-card-name {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 13px;
+  color: var(--text-1);
+  margin-bottom: 4px;
+}
+.week-card-status {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 8.5px; font-weight: 700;
+  letter-spacing: 0.10em;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.08);
+  color: var(--text-3);
+}
+.week-card.is-today .week-card-status { background: rgba(110,231,183,0.14); color: var(--good); }
+.week-card.is-done .week-card-status { background: rgba(110,231,183,0.10); color: var(--good); }
+.week-card.is-rest .week-card-status { background: rgba(255,255,255,0.05); color: var(--text-4); }
+.week-card-bar {
+  height: 4px; border-radius: 999px;
+  background: rgba(255,255,255,0.08);
+  margin-top: 8px; overflow: hidden;
+}
+.week-card-bar-fill {
+  height: 100%; border-radius: 999px;
+  background: var(--good);
+}
+@media (max-width: 480px) {
+  .week-strip { grid-template-columns: repeat(5, minmax(0,1fr)); gap: 5px; }
+  .week-card { padding: 8px 4px; }
+  .week-card-name { font-size: 11px; }
+}
+
 .po-tw-head {
   display: flex; align-items: center; justify-content: space-between;
   gap: 10px; margin-bottom: 12px;
@@ -2155,6 +2212,13 @@ img, video, canvas, svg { max-width: 100%; }
     <span class="po-day-sep">·</span>
     <span class="po-day-split" id="dayPillSplit">—</span>
   </button>
+
+  <!-- Week strip — read-only status/progress per rotation day, last 5 days
+       including today. Tapping today scrolls to Today's Workout; tapping a
+       past day expands it in the existing past-workouts list. No manual
+       day-switching — the rotation is date-anchored (see todaySplit()) and
+       letting a user tap ahead would desync it. -->
+  <div class="week-strip" id="weekStrip"></div>
 
   <!-- Quick Log Bar -->
   <div class="po-quick-log">
