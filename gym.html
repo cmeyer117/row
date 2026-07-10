@@ -3573,14 +3573,16 @@ img, video, canvas, svg { max-width: 100%; }
       return null;
     }
   }
-  // "legsA" -> "Legs A", "push" -> "Push", etc. Matches the lowercase ids
-  // used in state.splitRotation / state.exercises[].day.
-  function splitDisplayName(name) {
-    if (!name) return '—';
-    if (/^legs/i.test(name)) return 'Legs ' + name.slice(4).toUpperCase();
-    return name.charAt(0).toUpperCase() + name.slice(1);
-  }
   function isRestName(name) { return /^rest\b/i.test(name || ''); }
+  // state.splitRotation already holds display names ("Push", "Legs A", ...)
+  // sourced from CONFIG.days[].name — state.exercises[].day uses the
+  // lowercase ids ("push", "legsA") instead, so look the id up via
+  // state.days (or CONFIG.days as a fallback) before filtering exercises.
+  function dayIdForSplitName(name) {
+    const list = (state.days && state.days.length) ? state.days : CONFIG.days;
+    const found = list.find(d => d.name === name);
+    return found ? found.id : null;
+  }
   function splitLabel(name) {
     if (!name) return '—';
     return (isRestName(name) ? 'REST DAY — pick a day below ↓' : (name + ' DAY')).toUpperCase();
@@ -3965,14 +3967,15 @@ img, video, canvas, svg { max-width: 100%; }
       const isRest = isRestName(s.name);
       const daySets = all[s.dateKey] || [];
       const loggedIds = new Set(daySets.map(x => x.ex.id));
-      const totalForDay = state.exercises.filter(e => e.day === s.name).length;
+      const dayId = dayIdForSplitName(s.name);
+      const totalForDay = dayId ? state.exercises.filter(e => e.day === dayId).length : 0;
       const pct = totalForDay ? Math.min(100, Math.round((loggedIds.size / totalForDay) * 100)) : 0;
       const done = !!doneDays[s.dateKey];
       const statusText = isToday ? 'TODAY' : (isRest ? 'REST' : (done ? 'DONE' : ''));
       const statusCls = isToday ? 'is-today' : (isRest ? 'is-rest' : (done ? 'is-done' : ''));
       cards.push(
         '<div class="week-card ' + statusCls + '" data-dk="' + s.dateKey + '" data-today="' + isToday + '">'
-        + '<div class="week-card-name">' + escape(splitDisplayName(s.name)) + '</div>'
+        + '<div class="week-card-name">' + escape(s.name) + '</div>'
         + (statusText ? '<span class="week-card-status">' + statusText + '</span>' : '')
         + (!isRest ? '<div class="week-card-bar"><div class="week-card-bar-fill" style="width:' + pct + '%"></div></div>' : '')
         + '</div>'
