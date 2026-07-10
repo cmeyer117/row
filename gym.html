@@ -4387,6 +4387,39 @@ img, video, canvas, svg { max-width: 100%; }
     saveState();
   }
 
+  let restTimerInterval = null;
+  let restTimerRemaining = 0;
+
+  function restTimerMessage(ex) {
+    const muscle = MUSCLE_PRIMARY[ex.name] || 'the target muscle';
+    return 'Squeeze your ' + muscle + ' — hold the peak contraction.';
+  }
+
+  function updateRestTimerDisplay() {
+    const mins = Math.floor(restTimerRemaining / 60);
+    const secs = restTimerRemaining % 60;
+    $('restTimerCount').textContent = mins + ':' + String(secs).padStart(2, '0');
+  }
+
+  function stopRestTimer() {
+    if (restTimerInterval) { clearInterval(restTimerInterval); restTimerInterval = null; }
+    $('restTimerBar').style.display = 'none';
+  }
+
+  function startRestTimer(ex) {
+    stopRestTimer();
+    const repMin = parseInt(ex.repMin, 10) || 8;
+    restTimerRemaining = repMin <= 6 ? 150 : 75; // heavy (repMin 4-8) = 2:30, isolation (8-16) = 1:15
+    $('restTimerMsg').textContent = restTimerMessage(ex);
+    $('restTimerBar').style.display = 'flex';
+    updateRestTimerDisplay();
+    restTimerInterval = setInterval(function() {
+      restTimerRemaining--;
+      if (restTimerRemaining <= 0) { stopRestTimer(); return; }
+      updateRestTimerDisplay();
+    }, 1000);
+  }
+
   function renderCues(ex) {
     const list = $('cuesList');
     const textarea = $('cuesTextarea');
@@ -4626,6 +4659,7 @@ img, video, canvas, svg { max-width: 100%; }
     state.logs[ex.id] = arr;
     if (plateMode) { plateCounts = {}; updatePlateUI(); }
     resetChipToToday('logDateChip', 'logDateInput');
+    startRestTimer(ex);
     saveState(); renderAll();
     // Strength changed → composition estimate may shift
     if (typeof wtRender === 'function') wtRender();
@@ -4637,6 +4671,15 @@ img, video, canvas, svg { max-width: 100%; }
     btn.style.transform = 'scale(0.96)';
     setTimeout(() => { btn.style.transform = ''; }, 160);
   });
+
+  document.querySelectorAll('.po-rest-timer-adj').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      if (!restTimerInterval && restTimerRemaining <= 0) return;
+      restTimerRemaining = Math.max(0, restTimerRemaining + parseInt(btn.dataset.delta, 10));
+      updateRestTimerDisplay();
+    });
+  });
+  $('restTimerDismiss').addEventListener('click', stopRestTimer);
 
   $('undoBtn').addEventListener('click', () => {
     const ex = getCurrentEx();
