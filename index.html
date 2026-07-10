@@ -121,8 +121,8 @@ body::after {
   justify-content: space-between;
   padding: 22px;
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.012);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.14);
   text-decoration: none;
   overflow: hidden;
   transition: border-color 0.25s, background 0.25s;
@@ -215,8 +215,8 @@ body::after {
   letter-spacing: 0.10em;
   padding: 3px 9px;
   border-radius: 999px;
-  background: rgba(255,255,255,0.05);
-  color: var(--text-tertiary);
+  background: rgba(255,255,255,0.10);
+  color: var(--text-secondary);
 }
 .tile-goals .tile-badge { background: rgba(110,231,183,0.10); color: #6EE7B7; }
 
@@ -386,7 +386,7 @@ body::after {
         const y = 24 - ((v - min) / range) * 20;
         return x + ',' + y;
       }).join(' ');
-      svg.innerHTML = '<polyline points="' + pts + '" fill="none" stroke="var(--text-tertiary)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>';
+      svg.innerHTML = '<polyline points="' + pts + '" fill="none" stroke="#6EE7B7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>';
     }
   } catch (e) {}
 })();
