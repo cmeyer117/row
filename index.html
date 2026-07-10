@@ -120,74 +120,30 @@ body::after {
   flex-direction: column;
   justify-content: space-between;
   padding: 22px;
-  border-radius: 20px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  backdrop-filter: blur(24px) saturate(1.2);
-  -webkit-backdrop-filter: blur(24px) saturate(1.2);
-  box-shadow: 0 12px 40px rgba(0,0,0,0.45), 0 1px 0 rgba(255,255,255,0.06) inset;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.012);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   text-decoration: none;
   overflow: hidden;
-  transition: transform 0.18s cubic-bezier(0.22, 1, 0.36, 1),
-              box-shadow 0.18s,
-              border-color 0.18s;
+  transition: border-color 0.25s, background 0.25s;
   cursor: pointer;
 }
 
 .tile:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 24px 56px rgba(0,0,0,0.55), 0 1px 0 rgba(255,255,255,0.10) inset;
+  border-color: rgba(110, 231, 183, 0.28);
+  background: rgba(110, 231, 183, 0.03);
 }
-
-.tile::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  opacity: 0;
-  transition: opacity 0.18s;
-  pointer-events: none;
-}
-.tile:hover::before { opacity: 1; }
 
 /* tile positions */
 .tile-goals    { grid-column: span 2; grid-row: span 2; }
 .tile-fitness  { grid-column: span 2; grid-row: span 1; }
 .tile-health   { grid-column: span 1; grid-row: span 1; }
 .tile-finance  { grid-column: span 1; grid-row: span 1; }
+.tile-jarvis   { grid-column: span 2; }
+.tile-vessel   { grid-column: span 2; }
 
-/* tile accent colours */
-.tile-goals   { border-color: rgba(110, 231, 183, 0.14); }
-.tile-goals::before   { background: radial-gradient(circle at 80% 20%, rgba(110,231,183,0.08), transparent 60%); }
-.tile-goals:hover     { border-color: rgba(110, 231, 183, 0.28); }
-
-.tile-fitness { border-color: rgba(125, 211, 252, 0.12); }
-.tile-fitness::before { background: radial-gradient(circle at 80% 20%, rgba(125,211,252,0.07), transparent 60%); }
-.tile-fitness:hover   { border-color: rgba(125, 211, 252, 0.26); }
-
-.tile-health  { border-color: rgba(167, 243, 208, 0.12); }
-.tile-health::before  { background: radial-gradient(circle at 80% 20%, rgba(167,243,208,0.07), transparent 60%); }
-.tile-health:hover    { border-color: rgba(167, 243, 208, 0.26); }
-
-.tile-finance { border-color: rgba(242, 192, 99, 0.12); }
-.tile-finance::before { background: radial-gradient(circle at 80% 20%, rgba(242,192,99,0.07), transparent 60%); }
-.tile-finance:hover   { border-color: rgba(242, 192, 99, 0.26); }
-
-.tile-jarvis  { grid-column: span 2; border-color: rgba(167, 139, 250, 0.12); }
-.tile-jarvis::before  { background: radial-gradient(circle at 60% 50%, rgba(167,139,250,0.08), transparent 60%); }
-.tile-jarvis:hover    { border-color: rgba(167, 139, 250, 0.28); }
-.tile-jarvis:hover    .tile-arrow { color: #A78BFA; }
-.tile-jarvis          .tile-badge { background: rgba(167,139,250,0.10); color: #A78BFA; }
-.tile-jarvis .tile-name { font-size: 30px; }
-.tile-jarvis .tile-icon { width: 38px; height: 38px; }
-
-.tile-vessel  { grid-column: span 2; border-color: rgba(201, 168, 76, 0.14); }
-.tile-vessel::before  { background: radial-gradient(circle at 60% 50%, rgba(201,168,76,0.08), transparent 60%); }
-.tile-vessel:hover    { border-color: rgba(201, 168, 76, 0.30); }
-.tile-vessel:hover    .tile-arrow { color: #C9A84C; }
-.tile-vessel          .tile-badge { background: rgba(201,168,76,0.12); color: #C9A84C; }
-.tile-vessel .tile-name { font-size: 30px; }
-.tile-vessel .tile-icon { width: 38px; height: 38px; }
+.tile-jarvis .tile-name, .tile-vessel .tile-name { font-size: 30px; }
+.tile-jarvis .tile-icon, .tile-vessel .tile-icon { width: 38px; height: 38px; }
 
 /* tile content */
 .tile-num {
@@ -240,10 +196,7 @@ body::after {
 }
 .tile:hover .tile-arrow { transform: translateX(4px); }
 
-.tile-goals:hover   .tile-arrow { color: #6EE7B7; }
-.tile-fitness:hover .tile-arrow { color: #7DD3FC; }
-.tile-health:hover  .tile-arrow { color: #A7F3D0; }
-.tile-finance:hover .tile-arrow { color: #F2C063; }
+.tile:hover .tile-arrow { color: #6EE7B7; }
 
 .tile-badge {
   font-family: var(--font-mono);
@@ -254,10 +207,7 @@ body::after {
   background: rgba(255,255,255,0.05);
   color: var(--text-tertiary);
 }
-.tile-goals   .tile-badge { background: rgba(110,231,183,0.10); color: #6EE7B7; }
-.tile-fitness .tile-badge { background: rgba(125,211,252,0.10); color: #7DD3FC; }
-.tile-health  .tile-badge { background: rgba(167,243,208,0.10); color: #A7F3D0; }
-.tile-finance .tile-badge { background: rgba(242,192,99,0.10);  color: #F2C063; }
+.tile-goals .tile-badge { background: rgba(110,231,183,0.10); color: #6EE7B7; }
 
 /* ===== Responsive ===== */
 @media (max-width: 720px) {
@@ -323,7 +273,7 @@ body::after {
     <a href="gym.html" class="tile tile-fitness">
       <div>
         <div class="tile-num">·02</div>
-        <svg class="tile-icon" viewBox="0 0 24 24" fill="none" stroke="#7DD3FC" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="2 17 8 11 12 14 22 5"/><polyline points="16 5 22 5 22 11"/></svg>
+        <svg class="tile-icon" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="2 17 8 11 12 14 22 5"/><polyline points="16 5 22 5 22 11"/></svg>
         <div class="tile-name">Fitness</div>
         <div class="tile-sub">Progressive overload, weight tracking, and progress photos.</div>
       </div>
@@ -337,7 +287,7 @@ body::after {
     <a href="health.html" class="tile tile-health">
       <div>
         <div class="tile-num">·03</div>
-        <svg class="tile-icon" viewBox="0 0 24 24" fill="none" stroke="#A7F3D0" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12 h6 l2 -7 l4 14 l2 -7 h6"/></svg>
+        <svg class="tile-icon" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12 h6 l2 -7 l4 14 l2 -7 h6"/></svg>
         <div class="tile-name">Health</div>
         <div class="tile-sub">Supplement stack and water intake.</div>
       </div>
@@ -351,7 +301,7 @@ body::after {
     <a href="finance.html" class="tile tile-finance">
       <div>
         <div class="tile-num">·04</div>
-        <svg class="tile-icon" viewBox="0 0 24 24" fill="none" stroke="#F2C063" stroke-width="1.6" stroke-linecap="round"><line x1="5" y1="20" x2="5" y2="12"/><line x1="12" y1="20" x2="12" y2="6"/><line x1="19" y1="20" x2="19" y2="15"/></svg>
+        <svg class="tile-icon" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" stroke-width="1.6" stroke-linecap="round"><line x1="5" y1="20" x2="5" y2="12"/><line x1="12" y1="20" x2="12" y2="6"/><line x1="19" y1="20" x2="19" y2="15"/></svg>
         <div class="tile-name">Finance</div>
         <div class="tile-sub">Net worth, subscriptions, and cashflow.</div>
       </div>
@@ -365,7 +315,7 @@ body::after {
     <a href="https://jarvis-pi-liart.vercel.app?from=row" target="_blank" rel="noopener" class="tile tile-jarvis">
       <div>
         <div class="tile-num">·05</div>
-        <svg class="tile-icon" viewBox="0 0 24 24" fill="none" stroke="#A78BFA" stroke-width="1.6"><rect x="4" y="4" width="16" height="16" rx="4"/><circle cx="9" cy="10" r="1.3" fill="#A78BFA" stroke="none"/><circle cx="15" cy="10" r="1.3" fill="#A78BFA" stroke="none"/><path d="M8 15 h8" stroke-linecap="round"/></svg>
+        <svg class="tile-icon" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" stroke-width="1.6"><rect x="4" y="4" width="16" height="16" rx="4"/><circle cx="9" cy="10" r="1.3" fill="var(--text-tertiary)" stroke="none"/><circle cx="15" cy="10" r="1.3" fill="var(--text-tertiary)" stroke="none"/><path d="M8 15 h8" stroke-linecap="round"/></svg>
         <div class="tile-name">Jarvis</div>
         <div class="tile-sub">Voice + text AI. Full memory, web search, and project context. Sir.</div>
       </div>
@@ -379,7 +329,7 @@ body::after {
     <a href="https://vessel-carl-meyer-s-projects.vercel.app" target="_blank" rel="noopener" class="tile tile-vessel">
       <div>
         <div class="tile-num">·06</div>
-        <svg class="tile-icon" viewBox="0 0 24 24" fill="none" stroke="#C9A84C" stroke-width="1.6" stroke-linejoin="round"><path d="M12 2 L14.5 9.5 L22 12 L14.5 14.5 L12 22 L9.5 14.5 L2 12 L9.5 9.5 Z"/></svg>
+        <svg class="tile-icon" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" stroke-width="1.6" stroke-linejoin="round"><path d="M12 2 L14.5 9.5 L22 12 L14.5 14.5 L12 22 L9.5 14.5 L2 12 L9.5 9.5 Z"/></svg>
         <div class="tile-name">Vessel</div>
         <div class="tile-sub">Faith · Manifest · Journal · Prayer.</div>
       </div>
