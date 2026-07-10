@@ -996,13 +996,25 @@ img, video, canvas, svg { max-width: 100%; }
   .po-reps-row { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 
-/* Today's Workout + Past Workouts */
+/* Today's Workout + Past Workouts — glass card matching the hub's tile language */
 .po-tw {
-  background: rgba(255,255,255,0.025);
-  border: 1px solid var(--border);
-  border-radius: 14px;
+  position: relative;
+  background: linear-gradient(165deg, rgba(16,26,22,.55) 0%, rgba(7,12,10,.40) 100%);
+  border: 1px solid rgba(167, 243, 208, 0.10);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.05), 0 22px 50px -30px rgba(0,0,0,.75);
+  border-radius: 18px;
   padding: 16px;
+  overflow: hidden;
+  isolation: isolate;
 }
+.po-tw::before {
+  content: '';
+  position: absolute; inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse 85% 75% at 58% 38%, rgba(110,231,183,.06), transparent 64%);
+}
+.po-tw > * { position: relative; z-index: 1; }
 .po-tw-head {
   display: flex; align-items: center; justify-content: space-between;
   gap: 10px; margin-bottom: 12px;
