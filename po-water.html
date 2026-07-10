@@ -39,6 +39,8 @@ const CONFIG = {
   glassMl: 250,
 
   // Default user profile (gets overwritten by what you save in Settings).
+  // topbar.js's getWaterProgress() hardcodes a matching copy of these
+  // defaults for its pre-first-visit fallback — keep both in sync.
   profile: {
     weightKg: 75,
     age: 25,
@@ -47,6 +49,7 @@ const CONFIG = {
   },
 
   // Default daily caffeine in mg (200 mg ≈ two cups of coffee).
+  // topbar.js's getWaterProgress() hardcodes a matching fallback — keep in sync.
   caffeineMgPerDay: 200,
 
   // Pre-loaded substances. The Settings → Stimulants & meds search uses
