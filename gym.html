@@ -3830,7 +3830,12 @@ img, video, canvas, svg { max-width: 100%; }
       return '<div class="prog-card" data-exid="' + ex.id + '">'
         + '<div class="prog-card-top">'
         +   '<div class="prog-card-name">' + escape(ex.name) + '</div>'
-        +   (dayName ? '<div class="prog-card-badge">' + escape(dayName) + '</div>' : '')
+        +   '<div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">'
+        +     (dayName ? '<div class="prog-card-badge">' + escape(dayName) + '</div>' : '')
+        +     '<button type="button" class="prog-card-log-btn" data-exid="' + ex.id + '" aria-label="Log a set" title="Log a set" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.10);border-radius:8px;width:26px;height:26px;display:flex;align-items:center;justify-content:center;color:var(--text-2);cursor:pointer;">'
+        +       '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>'
+        +     '</button>'
+        +   '</div>'
         + '</div>'
         + '<div class="prog-card-stats">'
         +   '<div class="prog-stat"><div class="prog-stat-label">PR</div><div class="prog-stat-val">' + prStr + '</div></div>'
@@ -3844,21 +3849,83 @@ img, video, canvas, svg { max-width: 100%; }
         + '</div>';
     }).join('');
 
-    // Tap card → switch to log tab and select that exercise
-    listEl.querySelectorAll('.prog-card').forEach(function(card) {
-      card.addEventListener('click', function() {
-        var exId = card.dataset.exid;
+    // Log button → switch to log tab and select that exercise (old card-tap behavior)
+    listEl.querySelectorAll('.prog-card-log-btn').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        var exId = btn.dataset.exid;
         state.currentEx = exId;
-        // Switch to log tab
         switchTab('log');
         saveState(); renderAll();
-        // Scroll to top of form
         setTimeout(function() {
           var el = $('logFormWrap');
           if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }, 80);
       });
     });
+    // Tap anywhere else on the card → open the expanded graph modal
+    listEl.querySelectorAll('.prog-card').forEach(function(card) {
+      card.addEventListener('click', function() {
+        renderProgressModal(card.dataset.exid);
+      });
+    });
+  }
+
+  function renderProgressModal(exId) {
+    var ex = (state.exercises || []).find(function(e) { return e.id === exId; });
+    if (!ex) return;
+    var logs = (state.logs[exId] || []).slice().sort(function(a, b) { return a.date.localeCompare(b.date); });
+    if (!logs.length) return;
+
+    var sessions = {};
+    logs.forEach(function(l) {
+      var dk = l.date.slice(0, 10);
+      if (!sessions[dk]) sessions[dk] = [];
+      sessions[dk].push(l);
+    });
+    var sessionKeys = Object.keys(sessions).sort();
+
+    var prLog = logs.reduce(function(best, l) {
+      return (l.weight || 0) > (best.weight || 0) ? l : best;
+    }, logs[0]);
+    var prStr = ex.bw
+      ? (Math.max.apply(null, logs.map(function(l) { return l.reps; }))) + ' reps'
+      : (prLog.plates != null
+          ? prLog.plates + 'p' + (prLog.extraLbs ? '+' + prLog.extraLbs : '') + ' × ' + prLog.reps
+          : (prLog.weight || 0) + unit() + ' × ' + prLog.reps);
+
+    $('progModalTitle').textContent = ex.name + ' — PR ' + prStr;
+
+    var sessionTops = sessionKeys.map(function(dk) {
+      return Math.max.apply(null, sessions[dk].map(function(l) { return l.weight || 0; }));
+    });
+    var chartEl = $('progModalChart');
+    if (sessionTops.length >= 2) {
+      var path = buildSparkPath(sessionTops, 600, 120);
+      chartEl.innerHTML = '<svg viewBox="0 0 600 120" preserveAspectRatio="none">'
+        + '<path d="' + path + '" stroke="#6ee7b7" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>'
+        + '</svg>';
+    } else {
+      chartEl.innerHTML = '<div style="font-family:var(--font-mono);font-size:11px;color:var(--text-4);">Need 2+ sessions for a trend line.</div>';
+    }
+
+    var u = unit();
+    var rows = sessionKeys.slice().reverse().map(function(dk) {
+      var chips = sessions[dk].map(function(l) {
+        var label;
+        if (ex.bw) label = l.reps + ' reps';
+        else if (l.plates != null) label = l.plates + 'p' + (l.extraLbs ? '+' + l.extraLbs : '') + '×' + l.reps;
+        else label = l.weight + u + '×' + l.reps;
+        return '<span class="po-tw-past-set-chip">' + escape(label) + '</span>';
+      }).join('');
+      return '<div class="prog-modal-session">'
+        + '<div class="prog-modal-session-date">' + fmtPastDate(dk) + '</div>'
+        + '<div class="prog-modal-session-chips">' + chips + '</div>'
+        + '</div>';
+    }).join('');
+    $('progModalSessions').innerHTML = rows;
+
+    $('progModalBg').classList.add('show');
   }
 
   // ============================================================
@@ -4176,6 +4243,15 @@ img, video, canvas, svg { max-width: 100%; }
   document.getElementById('subCancel').addEventListener('click', closeSubPicker);
   document.getElementById('subModalBg').addEventListener('click', e => {
     if (e.target === document.getElementById('subModalBg')) closeSubPicker();
+  });
+
+  document.getElementById('progModalBg').addEventListener('click', e => {
+    if (e.target === document.getElementById('progModalBg')) {
+      document.getElementById('progModalBg').classList.remove('show');
+    }
+  });
+  document.getElementById('progModalClose').addEventListener('click', () => {
+    document.getElementById('progModalBg').classList.remove('show');
   });
 
   // Ad-hoc exercise buttons
