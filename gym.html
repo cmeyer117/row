@@ -2886,9 +2886,14 @@ img, video, canvas, svg { max-width: 100%; }
   // ============================================================
   const LS_KEY = 'po_coach_v1';
 
+  // Fixed epoch, NOT Date.now() — ids must be stable across regenerations
+  // (e.g. fresh device before Supabase pull lands) or they drift and orphan
+  // previously-logged sets keyed to the old suffix. Matches the suffix
+  // already live in Supabase's exercise catalog.
+  var SEED_EPOCH = 1783790050413;
   function buildDefaultExercises() {
     return CONFIG.defaultExercises.map((e, i) => Object.assign({
-      id: 'seed_' + i + '_' + Date.now()
+      id: 'seed_' + i + '_' + SEED_EPOCH
     }, e));
   }
   function loadState() {
