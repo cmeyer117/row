@@ -5617,6 +5617,29 @@ img, video, canvas, svg { max-width: 100%; }
     } catch (_) {}
   }
 
+  // Pull current state from Supabase and apply it if newer. Used both for
+  // the initial sync and to re-sync a tab that's been backgrounded/asleep —
+  // a long-open tab's realtime subscription can silently die (iOS suspends
+  // it) with no error, so without a re-pull on wake it just keeps showing
+  // whatever was true at its last real page load, forever.
+  async function pcPullRemote() {
+    if (!pcSupa) return;
+    try {
+      const { data, error } = await pcSupa
+        .from('app_state').select('data').eq('key', APP_KEY).maybeSingle();
+      if (!error && data && data.data && Object.keys(data.data).length > 0) {
+        const incoming = JSON.stringify(data.data);
+        if (incoming !== pcLastSyncedJson) {
+          pcLastSyncedJson = incoming;
+          pcMaybeApplyRemote(data.data);
+        }
+      } else if (!pcInitialPullDone && Object.keys(pcCollectState()).length > 0) {
+        pcSchedulePush();
+      }
+    } catch (_) { /* stay on current state, try again next wake */ }
+    pcInitialPullDone = true;
+  }
+
   // Initial sync: connect Supabase, pull current state, subscribe to
   // realtime updates so other devices' changes appear instantly.
   (async function pcInitCloudSync() {
@@ -5624,18 +5647,7 @@ img, video, canvas, svg { max-width: 100%; }
     // Skip if the placeholder values are still in place (local-only mode)
     if (SUPABASE_URL.indexOf('PASTE-') === 0 || SUPABASE_KEY.indexOf('PASTE-') === 0) return;
     pcSupa = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-    try {
-      const { data, error } = await pcSupa
-        .from('app_state').select('data').eq('key', APP_KEY).maybeSingle();
-      if (!error && data && data.data && Object.keys(data.data).length > 0) {
-        pcLastSyncedJson = JSON.stringify(data.data);
-        pcMaybeApplyRemote(data.data);
-        pcInitialPullDone = true;
-      } else {
-        pcInitialPullDone = true;
-        if (Object.keys(pcCollectState()).length > 0) pcSchedulePush();
-      }
-    } catch (_) { pcInitialPullDone = true; }
+    await pcPullRemote();
     pcSupa.channel('app_state_' + APP_KEY)
       .on('postgres_changes', {
         event: '*',
@@ -5659,6 +5671,10 @@ img, video, canvas, svg { max-width: 100%; }
   window.addEventListener('beforeunload', pcFlushPushOnUnload);
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) pcFlushPushOnUnload();
+    else pcPullRemote();
+  });
+  window.addEventListener('pageshow', (e) => {
+    if (e.persisted) pcPullRemote();
   });
 })();
 </script>
