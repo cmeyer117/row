@@ -3042,6 +3042,9 @@ img, video, canvas, svg { max-width: 100%; }
   function gymName(id) { const g = state.gyms.find(x => x.id === id); return g ? g.name : id; }
   function dayName(id) { const d = state.days.find(x => x.id === id); return d ? d.name : id; }
   function estimate1RM(w, r) { if (r < 2) return w; return w * (1 + r / 30); }
+  // gym-weight-photos.js is a separate script (own scope) and calls this —
+  // expose it on window, same pattern as window.__gym.pcSupa below.
+  window.estimate1RM = estimate1RM;
   function roundToStep(v, s) { return Math.round(v / s) * s; }
   function getFiltered() {
     const program = state.exercises.filter(e =>
