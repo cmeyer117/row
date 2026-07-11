@@ -5845,12 +5845,38 @@ img, video, canvas, svg { max-width: 100%; }
   }, true);
   window.addEventListener('pagehide', pcFlushPushOnUnload);
   window.addEventListener('beforeunload', pcFlushPushOnUnload);
+
+  // Self-updating check: iOS "Add to Home Screen" icons (no manifest/service
+  // worker here) can otherwise get permanently stuck on whatever code was
+  // live when the icon was created — force-quit/reopen doesn't help because
+  // iOS resumes the frozen session instead of truly reloading it. Piggyback
+  // on the same wake events already used for data re-sync: check the page's
+  // own ETag, and if the server has a newer version, force a real reload.
+  let pcPageEtag = null;
+  (async function pcCaptureEtag() {
+    try {
+      const res = await fetch(location.href, { cache: 'no-store' });
+      pcPageEtag = res.headers.get('etag');
+    } catch (_) {}
+  })();
+  async function pcCheckForUpdate() {
+    if (!pcPageEtag) return;
+    try {
+      const res = await fetch(location.href, { cache: 'no-store' });
+      const latest = res.headers.get('etag');
+      if (latest && latest !== pcPageEtag) {
+        pcDebug('stale-version-detected-reloading', { was: pcPageEtag, now: latest });
+        window.location.reload();
+      }
+    } catch (_) { /* offline — try again next wake */ }
+  }
+
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) pcFlushPushOnUnload();
-    else pcPullRemote();
+    else { pcPullRemote(); pcCheckForUpdate(); }
   });
   window.addEventListener('pageshow', (e) => {
-    if (e.persisted) pcPullRemote();
+    if (e.persisted) { pcPullRemote(); pcCheckForUpdate(); }
   });
 })();
 </script>
