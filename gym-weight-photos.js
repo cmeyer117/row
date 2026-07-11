@@ -740,3 +740,5 @@
   window.wtLoad = wtLoad;
   window.wtSetEntries = function (arr) { wtEntries = arr; };
   window.photosSetAll = function (arr) { photos = arr; };
+  window.compressPhotoDataUrl = compressPhotoDataUrl;
+  window.uploadPhotoToStorage = uploadPhotoToStorage;
