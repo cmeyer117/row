@@ -5821,6 +5821,18 @@ img, video, canvas, svg { max-width: 100%; }
     if (!window.supabase || !SUPABASE_URL || !SUPABASE_KEY) return;
     // Skip if the placeholder values are still in place (local-only mode)
     if (SUPABASE_URL.indexOf('PASTE-') === 0 || SUPABASE_KEY.indexOf('PASTE-') === 0) return;
+    // Never sync from a local/dev host — this file hardcodes prod credentials
+    // with no separate dev project, so a local test server (npx serve, etc.)
+    // talks to the SAME Supabase row as the real app. A dev session with
+    // cleared/fresh localStorage that fails its initial pull (flaky local
+    // network, sandboxed browser) falls through to pcPullRemote()'s "push
+    // local state since we couldn't pull" fallback and overwrites real
+    // production data with empty/test state. Happened for real 2026-07-11.
+    const h = location.hostname;
+    if (h === 'localhost' || h === '127.0.0.1' || h === '' || location.protocol === 'file:') {
+      pcDebug('cloud-sync-skipped-dev-host', { hostname: h });
+      return;
+    }
     const localWeightCount = (() => {
       try { return (JSON.parse(localStorage.getItem('po_coach_weights') || '[]') || []).length; } catch (_) { return -1; }
     })();
