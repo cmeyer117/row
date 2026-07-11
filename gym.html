@@ -4553,7 +4553,7 @@ img, video, canvas, svg { max-width: 100%; }
     try { return JSON.parse(localStorage.getItem('posing_checks') || '[]'); } catch { return []; }
   }
   function posingSaveChecks(arr) {
-    try { localStorage.setItem('posing_checks', JSON.stringify(arr)); } catch {}
+    try { localStorage.setItem('posing_checks', JSON.stringify(arr)); return true; } catch (e) { return false; }
   }
 
   async function posingSendPhoto(dataUrl) {
@@ -4620,7 +4620,18 @@ img, video, canvas, svg { max-width: 100%; }
     const checks = posingLoadChecks();
     const entry = { id: 'pc' + Date.now(), dataUrl: posingPendingPhoto, dateKey: getActiveDate() };
     checks.unshift(entry);
-    posingSaveChecks(checks);
+    if (!posingSaveChecks(checks)) {
+      // Storage was full even after the initial compress — try once more at
+      // lower quality before giving up, same fallback progress photos use.
+      try { entry.dataUrl = await window.compressPhotoDataUrl(posingPendingPhoto, 800, 0.6); } catch {}
+      if (!posingSaveChecks(checks)) {
+        checks.shift();
+        alert('Phone storage is full — delete some older progress photos before keeping another.');
+        posingPendingPhoto = null;
+        $('posingKeepBar').style.display = 'none';
+        return;
+      }
+    }
     window.uploadPhotoToStorage(posingPendingPhoto).then(function(url) {
       if (!url) return;
       const arr = posingLoadChecks();
