@@ -5566,6 +5566,28 @@ img, video, canvas, svg { max-width: 100%; }
     } catch (e) {}
   };
 
+  // ponytail: diagnostic-only trail so a sync failure on a device we
+  // can't physically inspect (Carl's phone) is visible via Supabase
+  // instead of guessed at. Remove once the PWA-sync bug is confirmed fixed.
+  let pcDebugLog = [];
+  function pcDebug(event, extra) {
+    pcDebugLog.push({ t: new Date().toISOString(), event, extra: extra || null });
+    if (pcDebugLog.length > 30) pcDebugLog = pcDebugLog.slice(-30);
+    try {
+      fetch(SUPABASE_URL + '/rest/v1/app_state?on_conflict=key', {
+        method: 'POST',
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': 'Bearer ' + SUPABASE_KEY,
+          'Content-Type': 'application/json',
+          'Prefer': 'resolution=merge-duplicates',
+        },
+        body: JSON.stringify({ key: 'po-coach-sync-debug', data: pcDebugLog, updated_at: new Date().toISOString() }),
+        keepalive: true,
+      }).catch(() => {});
+    } catch (_) {}
+  }
+
   function pcCollectState() {
     const out = {};
     for (const k of PC_SYNCED_KEYS) {
@@ -5693,6 +5715,7 @@ img, video, canvas, svg { max-width: 100%; }
     const json = JSON.stringify(state);
     if (json === pcLastSyncedJson) return;
     pcWarnIfShrinking(state);
+    const weightCount = Array.isArray(state.po_coach_weights) ? state.po_coach_weights.length : 0;
     try {
       const { error } = await pcSupa
         .from('app_state')
@@ -5700,8 +5723,9 @@ img, video, canvas, svg { max-width: 100%; }
           { key: APP_KEY, data: state, updated_at: new Date().toISOString() },
           { onConflict: 'key' }
         );
-      if (!error) pcLastSyncedJson = json;
-    } catch (_) {}
+      if (!error) { pcLastSyncedJson = json; pcDebug('push-success', { weightCount }); }
+      else pcDebug('push-returned-error', { msg: error.message, weightCount });
+    } catch (e) { pcDebug('push-threw', { msg: e && e.message, weightCount }); }
   }
 
   function pcSchedulePush() {
@@ -5743,17 +5767,47 @@ img, video, canvas, svg { max-width: 100%; }
     try {
       const { data, error } = await pcSupa
         .from('app_state').select('data').eq('key', APP_KEY).maybeSingle();
+      // Capture "was this the first pull" before flipping the flag —
+      // the "push local since there's nothing/an error on the remote side"
+      // fallback below is only meant to fire on the very first load, not on
+      // every wake-triggered re-pull. Flag must flip before any
+      // pcSchedulePush() call below though: pcSchedulePush() no-ops while
+      // it's still false, and the pull has already resolved by this point.
+      const wasFirstPull = !pcInitialPullDone;
+      pcInitialPullDone = true;
       if (!error && data && data.data && Object.keys(data.data).length > 0) {
+        const remoteWeightCount = Array.isArray(data.data.po_coach_weights) ? data.data.po_coach_weights.length : 0;
+        pcDebug('pull-success', { remoteWeightCount });
         const incoming = JSON.stringify(data.data);
         if (incoming !== pcLastSyncedJson) {
           pcLastSyncedJson = incoming;
-          pcMaybeApplyRemote(data.data);
+          // Bug: this merge can fold in local-only data Supabase doesn't
+          // have yet (a device that pulls before pushing its own newer
+          // entries) — the merged/richer result was written to localStorage
+          // but never scheduled for push-back, so Supabase stayed stale
+          // indefinitely no matter how many times the app reopened.
+          if (pcMaybeApplyRemote(data.data)) { pcDebug('push-scheduled-after-merge'); pcSchedulePush(); }
+        } else {
+          pcDebug('no-change-since-last-sync');
         }
-      } else if (!pcInitialPullDone && Object.keys(pcCollectState()).length > 0) {
+      } else if (error) {
+        pcDebug('pull-returned-error', { msg: error.message });
+        if (wasFirstPull && Object.keys(pcCollectState()).length > 0) { pcDebug('push-scheduled-after-pull-error'); pcSchedulePush(); }
+      } else if (wasFirstPull && Object.keys(pcCollectState()).length > 0) {
+        pcDebug('pull-empty-no-remote-row');
         pcSchedulePush();
       }
-    } catch (_) { /* stay on current state, try again next wake */ }
-    pcInitialPullDone = true;
+    } catch (e) {
+      pcDebug('pull-threw', { msg: e && e.message });
+      // Root-cause fix: a thrown fetch (flaky wifi) used to leave any
+      // unsynced local data stranded forever with no fallback push — now
+      // falls through to the same local-push attempt the clean-failure
+      // branch above already had. Must flip the flag before scheduling,
+      // same reason as the try block above.
+      const wasFirstPullBeforeThrow = !pcInitialPullDone;
+      pcInitialPullDone = true;
+      if (wasFirstPullBeforeThrow && Object.keys(pcCollectState()).length > 0) { pcDebug('push-scheduled-after-pull-exception'); pcSchedulePush(); }
+    }
   }
 
   // Initial sync: connect Supabase, pull current state, subscribe to
@@ -5762,6 +5816,10 @@ img, video, canvas, svg { max-width: 100%; }
     if (!window.supabase || !SUPABASE_URL || !SUPABASE_KEY) return;
     // Skip if the placeholder values are still in place (local-only mode)
     if (SUPABASE_URL.indexOf('PASTE-') === 0 || SUPABASE_KEY.indexOf('PASTE-') === 0) return;
+    const localWeightCount = (() => {
+      try { return (JSON.parse(localStorage.getItem('po_coach_weights') || '[]') || []).length; } catch (_) { return -1; }
+    })();
+    pcDebug('init-start', { localWeightCount, ua: navigator.userAgent, standalone: !!window.navigator.standalone, online: navigator.onLine });
     pcSupa = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
     await pcPullRemote();
     pcSupa.channel('app_state_' + APP_KEY)
@@ -5775,7 +5833,9 @@ img, video, canvas, svg { max-width: 100%; }
         const incoming = JSON.stringify(payload.new.data);
         if (incoming === pcLastSyncedJson) return; // echo of our own push
         pcLastSyncedJson = incoming;
-        pcMaybeApplyRemote(payload.new.data);
+        // Same fix as pcPullRemote() — a merge here can also fold in
+        // local-only data that needs pushing back up.
+        if (pcMaybeApplyRemote(payload.new.data)) pcSchedulePush();
       })
       .subscribe();
   })();
