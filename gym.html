@@ -2552,6 +2552,21 @@ img, video, canvas, svg { max-width: 100%; }
         </div>
       </div>
 
+      <!-- Posing Coach -->
+      <div class="po-coach-section">
+        <button class="po-coach-btn" id="posingCoachBtn" type="button">🧍 Posing Coach</button>
+        <input type="file" id="posingFileCamera" accept="image/*" capture="environment" style="display:none">
+        <input type="file" id="posingFileLibrary" accept="image/*" style="display:none">
+        <div class="po-coach-response" id="posingResponse">
+          <div class="po-coach-response-label" id="posingResponseLabel">Posing Coach</div>
+          <div id="posingResponseText"></div>
+          <div id="posingKeepBar" style="display:none;margin-top:8px;display:flex;gap:8px">
+            <button class="po-btn-secondary" id="posingKeepBtn" type="button">Keep photo</button>
+            <button class="po-btn-secondary" id="posingDiscardBtn" type="button">Discard</button>
+          </div>
+        </div>
+      </div>
+
       <div class="po-bw-banner" id="bwBanner">Bodyweight — log reps only</div>
       <div class="po-last-set" id="lastSet">
         <span class="po-last-label">Last time</span>
@@ -4529,6 +4544,96 @@ img, video, canvas, svg { max-width: 100%; }
 
     btn.classList.remove('loading');
     btn.textContent = '⚡ Ask Coach';
+  });
+
+  // ── Posing Coach ─────────────────────────────────────────────
+  let posingPendingPhoto = null; // dataUrl awaiting keep/discard decision
+
+  function posingLoadChecks() {
+    try { return JSON.parse(localStorage.getItem('posing_checks') || '[]'); } catch { return []; }
+  }
+  function posingSaveChecks(arr) {
+    try { localStorage.setItem('posing_checks', JSON.stringify(arr)); } catch {}
+  }
+
+  async function posingSendPhoto(dataUrl) {
+    const btn = $('posingCoachBtn');
+    const responseEl = $('posingResponse');
+    const responseText = $('posingResponseText');
+    const keepBar = $('posingKeepBar');
+
+    btn.classList.add('loading');
+    btn.textContent = '🧍 Checking your pose…';
+    keepBar.style.display = 'none';
+
+    let compressed = dataUrl;
+    try { compressed = await window.compressPhotoDataUrl(dataUrl); } catch {}
+    posingPendingPhoto = compressed;
+
+    const base64 = compressed.split(',')[1] || '';
+    const mediaType = (compressed.match(/^data:(image\/[a-z]+);/) || [])[1] || 'image/jpeg';
+
+    try {
+      const res = await fetch(JARVIS_URL + '/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: 'default-user',
+          message: 'Critique this pose.',
+          forcedAgentId: 'gym',
+          image: { base64, mediaType },
+        }),
+      });
+      const data = await res.json();
+      responseText.textContent = data.response || data.message || "Couldn't get a read on that photo.";
+      responseEl.classList.add('show');
+      keepBar.style.display = 'flex';
+    } catch (e) {
+      responseText.textContent = "Couldn't reach the coach. Check your connection and try again.";
+      responseEl.classList.add('show');
+    }
+
+    btn.classList.remove('loading');
+    btn.textContent = '🧍 Posing Coach';
+  }
+
+  function posingFileToPhoto(file) {
+    const r = new FileReader();
+    r.onload = (e) => posingSendPhoto(e.target.result);
+    r.readAsDataURL(file);
+  }
+
+  $('posingCoachBtn').addEventListener('click', function() { $('posingFileCamera').click(); });
+  $('posingFileCamera').addEventListener('change', function(e) {
+    const f = e.target.files && e.target.files[0];
+    if (f) posingFileToPhoto(f);
+    e.target.value = '';
+  });
+  $('posingFileLibrary').addEventListener('change', function(e) {
+    const f = e.target.files && e.target.files[0];
+    if (f) posingFileToPhoto(f);
+    e.target.value = '';
+  });
+
+  $('posingKeepBtn').addEventListener('click', async function() {
+    if (!posingPendingPhoto) return;
+    const checks = posingLoadChecks();
+    const entry = { id: 'pc' + Date.now(), dataUrl: posingPendingPhoto, dateKey: getActiveDate() };
+    checks.unshift(entry);
+    posingSaveChecks(checks);
+    window.uploadPhotoToStorage(posingPendingPhoto).then(function(url) {
+      if (!url) return;
+      const arr = posingLoadChecks();
+      const match = arr.find(function(c) { return c.id === entry.id; });
+      if (match) { match.url = url; delete match.dataUrl; posingSaveChecks(arr); }
+    });
+    posingPendingPhoto = null;
+    $('posingKeepBar').style.display = 'none';
+  });
+
+  $('posingDiscardBtn').addEventListener('click', function() {
+    posingPendingPhoto = null;
+    $('posingKeepBar').style.display = 'none';
   });
 
   // ── Post-workout debrief ──────────────────────────────────────
