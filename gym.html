@@ -2647,8 +2647,6 @@ img, video, canvas, svg { max-width: 100%; }
             <div class="po-tw-summary">
               <span class="po-tw-summary-num" id="poTwSetCount">0</span>
               <span class="po-tw-summary-label" id="poTwSetLabel">sets</span>
-              <span class="po-tw-summary-sep">·</span>
-              <span class="po-tw-summary-vol" id="poTwTotalVol">0 kg lifted</span>
             </div>
           </div>
           <button class="po-tw-done-btn" id="poTwDoneBtn" type="button">Mark workout done</button>
@@ -3038,7 +3036,18 @@ img, video, canvas, svg { max-width: 100%; }
     if (!ex) { ex = f[0]; state.currentEx = ex.id; saveState(); }
     return ex;
   }
-  function getLogs() { return (state.logs[state.currentEx] || []).slice(); }
+  // Logs are filtered to a single variant (e.g. cable vs machine) so
+  // prescriptions/trend don't average across different equipment. Uses
+  // today's explicit pick if made; otherwise falls back to whatever variant
+  // was most recently logged, since the daily session pick resets each day
+  // and shouldn't make yesterday's variant history disappear until re-picked.
+  // Legacy untagged entries count as their own "no variant" bucket.
+  function getLogs() {
+    const all = (state.logs[state.currentEx] || []).slice();
+    const sessionPick = getSession(state.currentEx).activeVariant;
+    const activeVariant = sessionPick != null ? sessionPick : (all.length ? (all[all.length - 1].variant || null) : null);
+    return all.filter(l => (l.variant || null) === activeVariant);
+  }
 
   // Prescription engine — "what should I do next session?"
   // Upgrade trigger: hits CONFIG.upgradeAtReps (default 8) OR the
@@ -4058,7 +4067,6 @@ img, video, canvas, svg { max-width: 100%; }
 
     $('poTwSetCount').textContent = sum.totalSets;
     $('poTwSetLabel').textContent = sum.totalSets === 1 ? 'set' : 'sets';
-    $('poTwTotalVol').textContent = Math.round(sum.totalVol).toLocaleString() + ' ' + u + ' lifted';
 
     const list = $('poTwList');
     const empty = $('poTwEmpty');
@@ -4071,9 +4079,7 @@ img, video, canvas, svg { max-width: 100%; }
         const top = e.ex.bw
           ? 'top ' + Math.max.apply(null, e.sets.map(s => s.reps)) + ' reps'
           : 'top ' + Math.max.apply(null, e.sets.map(s => s.weight)) + u;
-        const meta = e.ex.bw
-          ? (e.sets.length + ' set' + (e.sets.length === 1 ? '' : 's') + ' · ' + top)
-          : (e.sets.length + ' set' + (e.sets.length === 1 ? '' : 's') + ' · ' + top + ' · ' + Math.round(e.vol) + u + ' total');
+        const meta = e.sets.length + ' set' + (e.sets.length === 1 ? '' : 's') + ' · ' + top;
         return '<li class="po-tw-row">'
           + '<span class="po-tw-row-name">' + escape(e.ex.name) + '</span>'
           + '<span class="po-tw-row-meta">' + meta + '</span>'
@@ -4459,6 +4465,28 @@ img, video, canvas, svg { max-width: 100%; }
     renderCues(ex);
   });
 
+  // ── Jarvis fetch helper (one retry, 12s timeout — Railway cold starts) ──
+  async function askJarvis(message) {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const controller = new AbortController();
+      const timer = setTimeout(function() { controller.abort(); }, 12000);
+      try {
+        const res = await fetch(JARVIS_URL + '/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: 'default-user', message }),
+          signal: controller.signal,
+        });
+        clearTimeout(timer);
+        const data = await res.json();
+        return data.response || data.message || null;
+      } catch (e) {
+        clearTimeout(timer);
+        if (attempt === 1) throw e;
+      }
+    }
+  }
+
   // ── Ask Coach ─────────────────────────────────────────────────
   const coachCache = {}; // exId → response text
 
@@ -4490,13 +4518,7 @@ img, video, canvas, svg { max-width: 100%; }
     const message = 'You are Carl\'s lifting coach — blunt, systems-first, zero hype. Open with the answer, never a greeting. Coach me on ' + ex.name + '. My last 10 sets:\n' + setsText + '\nSearch your knowledge base for what you know about this exercise and give me: (1) one specific form cue to lock in next session based on what you know about this movement, and (2) a honest read on my progression trend — should I add weight, hold, or back off, citing the actual numbers above. One prescription, not a menu. Close with a short directive line, not a summary. Keep it to 3-4 sentences, be direct.';
 
     try {
-      const res = await fetch(JARVIS_URL + '/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: 'default-user', message }),
-      });
-      const data = await res.json();
-      const text = data.response || data.message || 'No read on this one yet — log a few more sets.';
+      const text = (await askJarvis(message)) || 'No read on this one yet — log a few more sets.';
       coachCache[ex.id] = text;
       responseText.textContent = text;
       responseEl.classList.add('show');
@@ -4541,15 +4563,9 @@ img, video, canvas, svg { max-width: 100%; }
     const message = 'Give me a 3-4 sentence post-workout debrief for today\'s session. Be specific about what I hit, what to push next time, and any flags:\n\n' + sessionLines.join('\n');
 
     try {
-      const res = await fetch(JARVIS_URL + '/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: 'default-user', message }),
-      });
-      const data = await res.json();
-      body.textContent = data.response || data.message || 'No response.';
+      body.textContent = (await askJarvis(message)) || 'No response.';
     } catch (e) {
-      body.textContent = 'Could not reach Jarvis.';
+      body.textContent = 'Could not reach Jarvis. Signal may be weak — try again.';
     }
   }
 
@@ -4655,7 +4671,8 @@ img, video, canvas, svg { max-width: 100%; }
     const dateKey = getChipDate('logDateInput');
     const isoDate = new Date(dateKey + 'T12:00:00').toISOString();
     const arr = state.logs[ex.id] || [];
-    arr.push(Object.assign({ weight: w, reps: reps, date: isoDate }, entry));
+    const activeVariant = getSession(ex.id).activeVariant || null;
+    arr.push(Object.assign({ weight: w, reps: reps, date: isoDate, variant: activeVariant }, entry));
     arr.sort((a, b) => a.date.localeCompare(b.date));
     state.logs[ex.id] = arr;
     if (plateMode) { plateCounts = {}; updatePlateUI(); }
@@ -4797,7 +4814,7 @@ img, video, canvas, svg { max-width: 100%; }
 
     var isoDate = new Date(dk + 'T12:00:00').toISOString();
     if (!state.logs[ex.id]) state.logs[ex.id] = [];
-    var entry = { weight: w, reps: reps, date: isoDate };
+    var entry = { weight: w, reps: reps, date: isoDate, variant: getSession(ex.id).activeVariant || null };
     if (parsed.plates != null) { entry.plates = parsed.plates; entry.extraLbs = parsed.extraLbs || 0; }
     state.logs[ex.id].push(entry);
     state.logs[ex.id].sort(function(a, b) { return a.date.localeCompare(b.date); });
