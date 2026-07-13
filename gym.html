@@ -253,6 +253,12 @@ img, video, canvas, svg { max-width: 100%; }
   justify-content: center;
 }
 .tab-icon svg { width: 100%; height: 100%; display: block; }
+.po-toprow {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+}
+.po-quick-log-wrap { display: none; }
+.po-quick-log-wrap.is-open { display: block; }
+.po-quick-log { display: flex; }
 .po-day-pill {
   display: inline-flex; align-items: center; gap: 8px;
   padding: 6px 12px;
@@ -2254,11 +2260,14 @@ img, video, canvas, svg { max-width: 100%; }
 <body>
 
 <div class="po-shell">
-  <button class="po-day-pill" type="button" id="dayPill" title="Tap to switch the day filter to today's split">
-    <span class="po-day-date" id="dayPillDate">—</span>
-    <span class="po-day-sep">·</span>
-    <span class="po-day-split" id="dayPillSplit">—</span>
-  </button>
+  <div class="po-toprow">
+    <button class="po-day-pill" type="button" id="dayPill" title="Tap to switch the day filter to today's split">
+      <span class="po-day-date" id="dayPillDate">—</span>
+      <span class="po-day-sep">·</span>
+      <span class="po-day-split" id="dayPillSplit">—</span>
+    </button>
+    <button class="po-day-pill" type="button" id="quickLogToggle" title="Quick log a set">+ Log</button>
+  </div>
 
   <!-- Week strip — read-only status/progress per rotation day, last 5 days
        including today. Tapping today scrolls to Today's Workout; tapping a
@@ -2267,16 +2276,18 @@ img, video, canvas, svg { max-width: 100%; }
        letting a user tap ahead would desync it. -->
   <div class="week-strip" id="weekStrip"></div>
 
-  <!-- Quick Log Bar -->
-  <div class="po-quick-log">
-    <input class="po-quick-input" id="quickLogInput" type="text"
-      placeholder="bench 225×8  ·  hack 3p×9  ·  leg press 3.5p×10  ·  pullups 10"
-      autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
-      inputmode="text">
-    <button class="po-quick-btn" id="quickLogBtn" type="button">Log</button>
-    <button class="import-btn" id="importBtn" type="button">Paste</button>
+  <!-- Quick Log Bar (collapsed by default, opened via #quickLogToggle) -->
+  <div class="po-quick-log-wrap" id="quickLogWrap">
+    <div class="po-quick-log">
+      <input class="po-quick-input" id="quickLogInput" type="text"
+        placeholder="bench 225×8  ·  hack 3p×9  ·  leg press 3.5p×10  ·  pullups 10"
+        autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+        inputmode="text">
+      <button class="po-quick-btn" id="quickLogBtn" type="button">Log</button>
+      <button class="import-btn" id="importBtn" type="button">Paste</button>
+    </div>
+    <div class="po-quick-feedback ql-hidden" id="quickLogFeedback"></div>
   </div>
-  <div class="po-quick-feedback ql-hidden" id="quickLogFeedback"></div>
 
   <!-- Debrief Modal -->
   <div id="debriefModal">
@@ -4510,48 +4521,20 @@ img, video, canvas, svg { max-width: 100%; }
     }
   }
 
-  // ── Ask Coach ─────────────────────────────────────────────────
-  const coachCache = {}; // exId → response text
-
-  $('coachBtn').addEventListener('click', async function() {
+  // ── Ask Coach (local — cue + progression read, zero network) ───
+  $('coachBtn').addEventListener('click', function() {
     const ex = getCurrentEx();
     if (!ex) return;
-    const btn = $('coachBtn');
     const responseEl = $('coachResponse');
     const responseText = $('coachResponseText');
 
-    if (coachCache[ex.id]) {
-      responseText.textContent = coachCache[ex.id];
-      responseEl.classList.add('show');
-      return;
-    }
+    const cues = getCues(ex.id);
+    const cue = cues.length ? cues[0] : 'No cue saved for this one yet.';
+    const rx = getRx(ex, state.logs[ex.id] || []);
+    const reason = rx ? rx.reason : 'Log a set to get a progression read.';
 
-    btn.classList.add('loading');
-    btn.textContent = '⚡ Checking your log…';
-
-    const logs = (state.logs[ex.id] || []).slice(-10);
-    const u = state.units || 'lb';
-    const setsText = logs.map(function(l) {
-      const w = l.plateConfig
-        ? Object.entries(l.plateConfig).map(function(kv) { return kv[1] + '×' + kv[0]; }).join('+')
-        : (l.plates != null ? l.plates + ' plates' : l.weight + u);
-      return l.date.slice(0,10) + ': ' + w + ' × ' + l.reps + ' reps';
-    }).join('\n');
-
-    const message = 'You are Carl\'s lifting coach — blunt, systems-first, zero hype. Open with the answer, never a greeting. Coach me on ' + ex.name + '. My last 10 sets:\n' + setsText + '\nSearch your knowledge base for what you know about this exercise and give me: (1) one specific form cue to lock in next session based on what you know about this movement, and (2) a honest read on my progression trend — should I add weight, hold, or back off, citing the actual numbers above. One prescription, not a menu. Close with a short directive line, not a summary. Keep it to 3-4 sentences, be direct.';
-
-    try {
-      const text = (await askJarvis(message)) || 'No read on this one yet — log a few more sets.';
-      coachCache[ex.id] = text;
-      responseText.textContent = text;
-      responseEl.classList.add('show');
-    } catch (e) {
-      responseText.textContent = "Couldn't reach the log. Check your connection and try again.";
-      responseEl.classList.add('show');
-    }
-
-    btn.classList.remove('loading');
-    btn.textContent = '⚡ Ask Coach';
+    responseText.textContent = cue + ' ' + reason;
+    responseEl.classList.add('show');
   });
 
   // ── Posing Coach ─────────────────────────────────────────────
@@ -4578,32 +4561,23 @@ img, video, canvas, svg { max-width: 100%; }
     try { compressed = await window.compressPhotoDataUrl(dataUrl); } catch {}
     posingPendingPhoto = compressed;
 
-    const base64 = compressed.split(',')[1] || '';
-    const mediaType = (compressed.match(/^data:(image\/[a-z]+);/) || [])[1] || 'image/jpeg';
-
-    try {
-      const res = await fetch(JARVIS_URL + '/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: 'default-user',
-          message: 'Critique this pose.',
-          forcedAgentId: 'gym',
-          image: { base64, mediaType },
-        }),
-      });
-      const data = await res.json();
-      responseText.textContent = data.response || data.message || "Couldn't get a read on that photo.";
-      responseEl.classList.add('show');
-      keepBar.style.display = 'flex';
-    } catch (e) {
-      responseText.textContent = "Couldn't reach the coach. Check your connection and try again.";
-      responseEl.classList.add('show');
-    }
+    responseText.textContent = POSING_CHECKLIST.join('\n');
+    responseEl.classList.add('show');
+    keepBar.style.display = 'flex';
 
     btn.classList.remove('loading');
     btn.textContent = '🧍 Posing Coach';
   }
+
+  // ponytail: static checklist, not per-pose — real vision critique is backlogged (costs tokens)
+  const POSING_CHECKLIST = [
+    'Chin level, neck long — don\'t tuck or crane.',
+    'Lats spread and held, not just flared once.',
+    'Quads and glutes locked hard, no soft knee.',
+    'Check left/right symmetry in the mirror before you shoot.',
+    'Breathe out, hold the flex, then shoot — don\'t shoot mid-inhale.',
+    'Hold 5-8 sec minimum — judges see the settled version, not the flinch.',
+  ];
 
   function posingFileToPhoto(file) {
     const r = new FileReader();
@@ -4952,7 +4926,13 @@ img, video, canvas, svg { max-width: 100%; }
     const input = $('quickLogInput');
     const btn = $('quickLogBtn');
     const fb = $('quickLogFeedback');
+    const wrap = $('quickLogWrap');
+    const toggle = $('quickLogToggle');
     let fbTimer = null;
+    toggle.addEventListener('click', function() {
+      const open = wrap.classList.toggle('is-open');
+      if (open) input.focus();
+    });
     function showFeedback(msg, isError) {
       fb.textContent = msg;
       fb.classList.toggle('error', isError);

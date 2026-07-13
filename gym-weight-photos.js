@@ -294,14 +294,19 @@
     const sessionsPerWeek = (workoutDays.size / actualDays) * 7;
     const frequencyFactor = Math.max(0.4, Math.min(1.2, sessionsPerWeek / 4));
 
-    // Max muscle gain rate per week (kg). Convert to lb if user's units are lb.
+    // Max muscle gain rate per week — lower of two independent cited models:
+    //   McDonald: fixed kg/week ceiling by training age
+    //   Aragon/Helms: % of bodyweight/month by training age (scales to the
+    //   individual instead of a flat number)
     const yt = window.__gym.CONFIG.composition.yearsTraining || 1;
-    let maxMuscleKgPerWeek;
-    if (yt <= 1) maxMuscleKgPerWeek = 0.45;
-    else if (yt === 2) maxMuscleKgPerWeek = 0.23;
-    else maxMuscleKgPerWeek = 0.11;
+    let maxMuscleKgPerWeek, aragonPctMonthly;
+    if (yt <= 1) { maxMuscleKgPerWeek = 0.45; aragonPctMonthly = 1.25; }
+    else if (yt === 2) { maxMuscleKgPerWeek = 0.23; aragonPctMonthly = 0.75; }
+    else { maxMuscleKgPerWeek = 0.11; aragonPctMonthly = 0.375; }
     const unitConv = (window.__gym.state.units === 'lb') ? 2.20462 : 1;
-    const maxMusclePerWeek = maxMuscleKgPerWeek * unitConv;
+    const mcdonaldCeiling = maxMuscleKgPerWeek * unitConv;
+    const aragonCeiling = (endEntry.weight * aragonPctMonthly / 100) / 4.345;
+    const maxMusclePerWeek = Math.min(mcdonaldCeiling, aragonCeiling);
 
     // Estimated muscle: scale by strength gain (capped between 0.5x and 1.5x)
     // AND by training frequency (you can't build muscle you didn't stimulate).
