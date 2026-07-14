@@ -2689,6 +2689,7 @@ img, video, canvas, svg { max-width: 100%; }
       <div class="sub-modal-title" id="subModalTitle">Choose variation</div>
       <div id="subModalOptions"></div>
       <div class="sub-modal-actions">
+        <button class="sub-set-default" id="subEditEx">✎ Edit exercise</button>
         <button class="sub-set-default" id="subSetDefault">Set as default</button>
         <button class="sub-cancel" id="subCancel">Cancel</button>
       </div>
@@ -2829,6 +2830,7 @@ img, video, canvas, svg { max-width: 100%; }
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
         <button class="po-btn-secondary" id="setExport">Export JSON</button>
         <button class="po-btn-secondary" id="setImport">Import JSON</button>
+        <button class="po-btn-secondary" id="setUndoDelete">Undo last delete</button>
         <button class="po-btn-secondary" id="setReset" style="color:var(--bad);border-color:rgba(255,138,138,0.3)">Reset all</button>
       </div>
       <input type="file" id="setImportFile" accept=".json" style="display:none">
@@ -3597,10 +3599,11 @@ img, video, canvas, svg { max-width: 100%; }
     wrap.querySelectorAll('.po-hist-edit').forEach(b => {
       b.addEventListener('click', () => {
         const realIdx = parseInt(b.dataset.idx, 10);
-        const arr = state.logs[state.currentEx] || [];
-        const origIdx = arr.length - 1 - realIdx;
-        const entry = arr[origIdx];
+        const entry = logs[logs.length - 1 - realIdx];
         if (!entry) return;
+        const arr = state.logs[state.currentEx] || [];
+        const origIdx = arr.indexOf(entry);
+        if (origIdx === -1) return;
         // Pre-fill weight input
         if (!ex.bw) $('weightInput').value = entry.weight;
         // Set rep pills
@@ -3628,9 +3631,14 @@ img, video, canvas, svg { max-width: 100%; }
       b.addEventListener('click', () => {
         if (!confirm('Delete this log?')) return;
         const realIdx = parseInt(b.dataset.idx, 10);
+        const entry = logs[logs.length - 1 - realIdx];
+        if (!entry) return;
         const arr = state.logs[state.currentEx] || [];
-        // realIdx is index in REVERSED list; map back to original
-        const origIdx = arr.length - 1 - realIdx;
+        const origIdx = arr.indexOf(entry);
+        if (origIdx === -1) return;
+        if (!state.recentlyDeleted) state.recentlyDeleted = [];
+        state.recentlyDeleted.push({ exId: state.currentEx, entry: entry });
+        if (state.recentlyDeleted.length > 20) state.recentlyDeleted.shift();
         arr.splice(origIdx, 1);
         if (!arr.length) delete state.logs[state.currentEx];
         else state.logs[state.currentEx] = arr;
@@ -4371,6 +4379,74 @@ img, video, canvas, svg { max-width: 100%; }
     'Dumbbell Heel Elevated Lunge':           ['Heel elevation = more quad','Front knee tracks over second toe','Full depth','Full depth for quad stretch, 2-3 sec eccentric, working leg drives — no back-leg assist'],
     'Leg Extension':                          ['Full extension at top','Controlled slow descent','Toes: straight=overall, in=outer, out=VMO','Full extension/squeeze at top, controlled slow eccentric, no crash at bottom'],
     'Seated Calf Raise':                      ['Full heel drop — no partials','2–3 sec eccentric, pause at bottom','Bent knee = soleus','Full heel-drop stretch, 2-3 sec eccentric, pause + squeeze at top'],
+
+    // ── Variant / substitute cues ──────────────────────────────────
+    'Dumbbell Neutral Grip Shoulder Press':   ['Palms face each other throughout','Deltoid drives — no trap shrug','Full stretch at bottom, don\'t bang elbows into ribs','2-3 sec eccentric, full stretch at bottom, no trap shrug at top'],
+    'Smith Incline Machine Chest Press':      ['30–45° bench, bar path stays fixed','Elbows 45–60° from torso','Lower to full upper pec stretch','Full stretch at bottom, 2-3 sec eccentric, squeeze pecs at top'],
+    'Machine Flat Chest Press':               ['Handles to mid-chest line','Elbows 45–60° from torso','Full stretch at bottom, don\'t let the stack slam','2-3 sec eccentric, full stretch at bottom, squeeze pecs at top'],
+    'Barbell / Dumbbell Flat Chest Press':     ['Bar/DBs to lower sternum','Elbows 45–60° from torso, wrists stacked','Full stretch at bottom','2-3 sec eccentric, full stretch at bottom, squeeze pecs at top'],
+    'Seated Cable Flat Chest Press':          ['Constant tension — no lockout rest at top','Elbows 45–60° from torso','Full stretch at bottom of the press','2-3 sec eccentric, full stretch at bottom, squeeze pecs at top'],
+    'Dip Machine (Chest Bias)':               ['Lean forward = chest bias','Controlled 2–3 sec descent','Stop at full pec stretch — no shoulder roll','2-3 sec descent, full pec stretch at bottom, squeeze at top'],
+    'Chest Dip (RG Variant)':                 ['Ring grip lets shoulders rotate naturally','Lean forward for chest, upright for triceps','Stop at full pec stretch — no shoulder roll','2-3 sec descent, full pec stretch at bottom, squeeze at top'],
+    'Other Dip Variations':                   ['Lean forward = chest bias, upright = triceps bias','Controlled 2–3 sec descent','Stop at full pec stretch — no shoulder roll','2-3 sec descent, full pec stretch at bottom, squeeze at top'],
+    'Pec Dec Fly (Upper Chest Bias)':         ['Slight upward arc = upper chest','Constant movement — not static at top','Don\'t clap handles/pads','Full stretch at bottom (arms back), squeeze without clapping at top'],
+    'Incline Dumbbell Pec Fly':               ['30–45° bench, slight elbow bend held constant','Arms travel fully back into stretch','Don\'t let dumbbells crash at bottom','Full stretch at bottom (arms back), squeeze at top without clapping'],
+    'Seated Machine Lateral Raise':           ['Slight forward lean, lead with elbows','Stop at shoulder height — above = traps','No momentum off the pad','2 sec controlled eccentric, full stretch at bottom, no pause at top'],
+    'Standing Machine Lateral Raise':         ['Slight forward lean, lead with elbows','Stop at shoulder height — above = traps','No body English to start the rep','2 sec controlled eccentric, full stretch at bottom, no pause at top'],
+    'Dumbbell Overhead Extension':            ['Elbows fixed and close to head','Full extension + full stretch every rep','Elbows flare = drop the weight','Full overhead stretch at bottom, 2-3 sec eccentric, squeeze at full extension'],
+    'Machine Overhead Triceps Extension':     ['Elbows pinned to pads throughout','Full extension at top, full stretch at bottom','Don\'t shrug into the movement','Full overhead stretch at bottom, 2-3 sec eccentric, squeeze at full extension'],
+    'Machine Triceps Extension':              ['Elbows fixed at the pivot point','Full extension + full stretch every rep','No body swing to finish the rep','Full stretch at bottom, 2-3 sec eccentric, squeeze at full extension'],
+    'Wide Grip Pullup':                       ['Depress scapulae before pulling','Elbows flared wide and out','Full dead-hang at bottom','Full stretch at bottom, 2-3 sec controlled descent, squeeze scapula at top'],
+    'Lat Pulldown Machine':                   ['Depress scapulae before pulling','Elbows flared wide and out','Full arm extension at top','Full overhead stretch, 2-3 sec controlled return, squeeze scapula at peak contraction'],
+    'Smith Machine UH Barbell Row':           ['Underhand grip biases lower lats/biceps','Lean forward to stretch, sit up to contract','Elbows to hips, not flared','Lean into full stretch each rep, 2-3 sec eccentric, squeeze at contraction'],
+    'Underhand Grip Barbell Row':             ['Underhand grip biases lower lats/biceps','Hinge at hips, flat back throughout','Elbows to hips, not flared','Full stretch at bottom, 2-3 sec eccentric, squeeze elbows back at contraction'],
+    'Cable High Row':                         ['Chest tall, pull to upper chest/collarbone','Elbows wide and up on the pull','Full overhead-ish stretch at start','Full stretch at start, 2-3 sec eccentric, squeeze at full contraction'],
+    'Nautilus Lat Pulldown':                  ['Chest up, slight lean back only','Elbows wide and down on pull','Full arm extension overhead at top','Full overhead stretch, 2-3 sec eccentric, squeeze at full contraction'],
+    'High Row Setup on Lat Pulldown':         ['Set pad/bar for a high-row angle, not straight down','Elbows wide and down on the pull','Full extension at the top of the stretch','Full overhead stretch, 2-3 sec eccentric, squeeze at full contraction'],
+    'Cable Low Row':                          ['Full arm extension at start — get the stretch','Retract scapulae before pulling','Elbows in close to body','Full stretch at start, 2-3 sec eccentric, squeeze elbows back at contraction'],
+    'Single Arm Landmine Row':                ['Full arm extension at start — get the stretch','Brace core, minimal torso rotation','Elbow drives back close to body','Full stretch at start, 2-3 sec eccentric, squeeze at contraction'],
+    'Machine Lat Pullover':                   ['Arms mostly straight — not a row','Lats pull arms down/back — not a shoulder press','Full overhead stretch at top','Full overhead stretch every rep, 2-3 sec eccentric, squeeze lats at bottom'],
+    'Dumbbell Lat Pullover':                  ['Arms mostly straight — not a row','Lats pull arms up from behind head — not a press','Full overhead stretch behind head','Full overhead stretch every rep, 2-3 sec eccentric, squeeze lats at top'],
+    'Machine Rear Delt Fly':                  ['Arms stay at shoulder height','Shoulder joint moves — not elbow','Light weight — no body swing','Reach into stretch at start, 2 sec eccentric, squeeze at rear every rep'],
+    'Dumbbell Rear Delt Fly':                 ['Hinge forward, arms stay at shoulder height','Shoulder joint moves — not elbow','Light weight — no body swing/momentum','Reach into stretch at start, 2 sec eccentric, squeeze at rear every rep'],
+    'Bayesian Cable Curl':                    ['Arm behind body = long head stretch','Elbow stays pinned back throughout','Slow controlled eccentric','Full stretch behind body, 3 sec eccentric, squeeze at top of curl'],
+    'Seated Incline Dumbbell Curl':           ['Incline bench pins the shoulder back for full stretch','Elbow stays behind the torso line','Slow controlled eccentric','Full stretch behind body, 3 sec eccentric, squeeze at top of curl'],
+    'Pendulum Squat':                         ['Full depth — parallel or below','Drive through mid-foot','Fixed arc keeps hips from shooting back','Full depth for quad stretch, 2-3 sec eccentric, continuous tension — no lockout pause'],
+    'Smith Machine Squat (Quad Bias)':        ['Feet slightly forward of the bar path for quad bias','Full depth — parallel or below','Don\'t let hips shoot back','Full depth for quad stretch, 2-3 sec eccentric, continuous tension — no lockout pause'],
+    'Barbell Squat (Quad Bias)':              ['High-bar, upright torso for quad bias','Full depth — parallel or below','Drive through mid-foot','Full depth for quad stretch, 2-3 sec eccentric, continuous tension — no lockout pause'],
+    'Hack Squat Sissy Squats':                ['Deep knee flexion = quad stretch','Heels stay down, torso stays upright','Don\'t half rep — stretch at bottom is the point','3 sec eccentric into deep stretch, no lockout at top, continuous tension'],
+    'Sissy Squat on Sissy Stand':             ['Lean back as knees travel forward — straight line hip to head','Deep knee flexion = quad stretch','No lockout at top','3 sec eccentric into deep stretch, no lockout at top, continuous tension'],
+    'Leg Press Quad Bias':                    ['Feet low and narrow on the platform for quad bias','Deep knee flexion = quad stretch','No lockout at top','3 sec eccentric into deep stretch, no lockout at top, continuous tension'],
+    'Glute Ham Raise':                        ['Full extension at bottom — get the stretch','Hip flexion = longer ham = more growth','Control the eccentric — don\'t just drop','Full stretch at bottom every rep, 2-3 sec eccentric, squeeze at full contraction'],
+    'Cable Hip Extension Machine':            ['Push hips back, minimal knee bend','Feel hamstring/glute fully stretch before reversing','Squeeze glutes hard at lockout, don\'t hyperextend the low back','Full stretch before reversing, 2-3 sec eccentric, squeeze glutes at lockout'],
+    'Single Leg Hip Extension':               ['Push hips back on the working leg, minimal knee bend','Feel hamstring/glute fully stretch before reversing','Keep hips square — no rotation','Full stretch before reversing, 2-3 sec eccentric, squeeze glutes at lockout'],
+    'V-Squat Good Morning':                   ['Hinge from the hips, soft knees','Feel hamstring fully stretch before reversing','Flat back throughout — no rounding','Full hamstring stretch before reversing, 2-3 sec eccentric, squeeze glutes at lockout'],
+    'Barbell Good Morning':                   ['Hinge from the hips, soft knees, bar on traps','Feel hamstring fully stretch before reversing','Flat back throughout — no rounding','Full hamstring stretch before reversing, 2-3 sec eccentric, squeeze glutes at lockout'],
+    'Cable Hip Adduction':                    ['Full ROM in stretch — don\'t shortcut','Controlled return to full open','No torso lean to assist','Full stretch at open position, controlled eccentric, squeeze hard at closed position'],
+    'Smith Machine Calf Raise':               ['Full heel drop — no partials','2–3 sec eccentric, pause at bottom','Straight leg = gastroc bias','Full heel-drop stretch, 2-3 sec eccentric, pause + squeeze at top'],
+    'Machine Incline Chest Press':            ['30–45° bench only — above = front delt','Elbows 45–60° from torso','Lower to full upper pec stretch','Full stretch at bottom, 2-3 sec eccentric, squeeze pecs at top'],
+    'Smith Machine Barbell Row':               ['Hinge at hips, flat back throughout','Elbows to hips — not flared','Full stretch at bottom before pulling','Full stretch at bottom, 2-3 sec eccentric, squeeze scapulae at top'],
+    'Landmine T-Bar Row':                     ['Chest over the bar, hinge from hips','Elbows at 45° from body','Full extension at bottom','Full stretch at bottom, 2-3 sec eccentric, squeeze scapulae at top'],
+    'Barbell Row':                            ['Hinge at hips, flat back throughout','Elbows to hips, pull to lower ribs','Full extension at bottom — no rounding to reach it','Full stretch at bottom, 2-3 sec eccentric, squeeze scapulae at top'],
+    'Barbell Narrow Grip Bench Press':        ['Grip shoulder-width, elbows in close','Bar to lower chest','Triceps drive — not pecs','Full extension lockout at top, 2-3 sec eccentric, bar to lower chest for full stretch'],
+    'Machine Narrow Grip Chest Press':        ['Grip shoulder-width, elbows in close','Handles to lower chest line','Triceps drive — not pecs','Full extension lockout at top, 2-3 sec eccentric, full stretch at bottom'],
+    'Narrow Grip Push-up':                    ['Hands shoulder-width, elbows in close','Chest to just above the floor','Triceps drive — not pecs','Full extension lockout at top, 2-3 sec eccentric, full stretch at bottom'],
+    'Nautilus Lat Pulldown Machine':          ['Full overhead arm extension at top','Elbows tuck in and drive down','Bar/handle to clavicle','Full overhead stretch, 2-3 sec eccentric, squeeze at bottom of pull'],
+    'Single Arm Lat Pulldown':                ['Full overhead arm extension at top','Elbow tucks in and drives down','Minimal torso lean to assist','Full overhead stretch, 2-3 sec eccentric, squeeze at bottom of pull'],
+    'Barbell Preacher Curl':                  ['Full extension at bottom — don\'t cut','Upper arms stay pinned to the pad','Slow eccentric','Full stretch at bottom, 3 sec controlled eccentric, squeeze hard at top'],
+    'Standing Cable Curl':                    ['Constant tension — no dead spot at bottom','Elbows pinned to sides','Slow eccentric, no swinging','Full stretch at bottom, 2-3 sec eccentric, squeeze hard at top'],
+    'Cable Elbow Supported Triceps Pushdown': ['Elbow braced on the pad — fully isolated','Only forearm moves','Full extension at bottom','Full extension/squeeze at bottom, 2-3 sec eccentric, elbow pinned throughout'],
+    'Triceps Crossbody Extension':            ['Elbow pinned to side, arm crosses the body','Full extension at bottom','No shoulder rotation to assist','Full extension/squeeze at bottom, 2-3 sec eccentric, elbow pinned throughout'],
+    'Barbell / Dumbbell / Trap Bar RDL':      ['Push hips back — not a squat','Bar/DBs slide down legs, close to body','Feel hamstring fully stretch','Full hamstring stretch before reversing, 2-3 sec eccentric, squeeze glutes at lockout'],
+    'V-Squat Machine Good Morning':           ['Hinge from hips against the pad, soft knees','Feel hamstring fully stretch before reversing','Flat back throughout — no rounding','Full hamstring stretch before reversing, 2-3 sec eccentric, squeeze glutes at lockout'],
+    'Arsenal Posterior Chain Developer':      ['Push hips back into the pad, minimal knee bend','Feel hamstring/glute fully stretch before reversing','Squeeze glutes hard at lockout','Full stretch before reversing, 2-3 sec eccentric, squeeze glutes at lockout'],
+    '45° Sled Leg Press':                     ['Full depth — feel the quad stretch','Drive through mid-foot','Don\'t lock out at top','Full depth for quad stretch, 2-3 sec eccentric, no lockout — continuous tension'],
+    'Horizontal Leg Press':                   ['Full depth — feel the quad stretch','Drive through mid-foot','Don\'t lock out at top','Full depth for quad stretch, 2-3 sec eccentric, no lockout — continuous tension'],
+    'Dumbbell Split Squat':                   ['Front knee tracks over second toe','Full depth on the front leg','Working leg drives — no back-leg push-off','Full depth for quad stretch, 2-3 sec eccentric, working leg drives — no back-leg assist'],
+    'Smith Machine Split Squat':              ['Front knee tracks over second toe','Full depth on the front leg','Fixed bar path — don\'t lean into it','Full depth for quad stretch, 2-3 sec eccentric, working leg drives — no back-leg assist'],
+    'DB/BB Walking Lunge':                    ['Front knee tracks over second toe','Full depth each step','Drive through the front heel to stand','Full depth for quad stretch, 2-3 sec eccentric, front leg drives — no bounce'],
+    'Sissy Squat':                            ['Lean back as knees travel forward — straight line hip to head','Deep knee flexion = quad stretch','No lockout at top','3 sec eccentric into deep stretch, no lockout at top, continuous tension'],
+    'Bent Knee Calf Press on Leg Press':      ['Full heel drop — no partials','2–3 sec eccentric, pause at bottom','Bent knee = soleus bias','Full heel-drop stretch, 2-3 sec eccentric, pause + squeeze at top'],
   };
 
   const MUSCLE_PRIMARY = {
@@ -4414,7 +4490,9 @@ img, video, canvas, svg { max-width: 100%; }
     const saved = state.cues && state.cues[exId];
     if (saved && saved.length) return saved;
     const ex = (state.exercises || []).find(function(e) { return e.id === exId; });
-    return (ex && DEFAULT_CUES[ex.name]) || [];
+    if (!ex) return [];
+    const variant = getSession(exId).activeVariant;
+    return (variant && DEFAULT_CUES[variant]) || DEFAULT_CUES[ex.name] || [];
   }
   function saveCues(exId, lines) {
     if (!state.cues) state.cues = {};
@@ -4423,16 +4501,21 @@ img, video, canvas, svg { max-width: 100%; }
   }
 
   let restTimerInterval = null;
-  let restTimerRemaining = 0;
+  let restTimerEndAt = 0; // wall-clock ms — survives setInterval throttling/suspension in background
 
   function restTimerMessage(ex) {
     const muscle = MUSCLE_PRIMARY[ex.name] || 'the target muscle';
     return 'Squeeze your ' + muscle + ' — hold the peak contraction.';
   }
 
+  function restTimerRemainingSecs() {
+    return Math.max(0, Math.round((restTimerEndAt - Date.now()) / 1000));
+  }
+
   function updateRestTimerDisplay() {
-    const mins = Math.floor(restTimerRemaining / 60);
-    const secs = restTimerRemaining % 60;
+    const remaining = restTimerRemainingSecs();
+    const mins = Math.floor(remaining / 60);
+    const secs = remaining % 60;
     $('restTimerCount').textContent = mins + ':' + String(secs).padStart(2, '0');
   }
 
@@ -4444,13 +4527,13 @@ img, video, canvas, svg { max-width: 100%; }
   function startRestTimer(ex) {
     stopRestTimer();
     const repMin = parseInt(ex.repMin, 10) || 8;
-    restTimerRemaining = repMin <= 6 ? 150 : 75; // heavy (repMin 4-8) = 2:30, isolation (8-16) = 1:15
+    const secs = repMin <= 6 ? 150 : 75; // heavy (repMin 4-8) = 2:30, isolation (8-16) = 1:15
+    restTimerEndAt = Date.now() + secs * 1000;
     $('restTimerMsg').textContent = restTimerMessage(ex);
     $('restTimerBar').style.display = 'flex';
     updateRestTimerDisplay();
     restTimerInterval = setInterval(function() {
-      restTimerRemaining--;
-      if (restTimerRemaining <= 0) { stopRestTimer(); return; }
+      if (restTimerRemainingSecs() <= 0) { stopRestTimer(); return; }
       updateRestTimerDisplay();
     }, 1000);
   }
@@ -4532,19 +4615,53 @@ img, video, canvas, svg { max-width: 100%; }
   });
 
   // ── Posing Coach ─────────────────────────────────────────────
-  // ponytail: static checklist, not per-pose — real vision critique is backlogged (costs tokens).
+  // ponytail: static per-pose checklists, not live vision critique (backlogged, costs tokens).
   // Photo capture lives in the Progress Photos section, not here.
-  const POSING_CHECKLIST = [
-    'Chin level, neck long — don\'t tuck or crane.',
-    'Lats spread and held, not just flared once.',
-    'Quads and glutes locked hard, no soft knee.',
-    'Check left/right symmetry in the mirror before you shoot.',
-    'Breathe out, hold the flex, then shoot — don\'t shoot mid-inhale.',
-    'Hold 5-8 sec minimum — judges see the settled version, not the flinch.',
+  const MANDATORY_POSES = [
+    { name: 'Front Relaxed', cues: [
+      'Feet shoulder width, weight even, hands loose at sides.',
+      'Chin level, neck long — don\'t tuck or crane.',
+      'Quads and abs tight even though it reads as "relaxed."',
+    ]},
+    { name: 'Front Double Biceps', cues: [
+      'Lats spread and held, not just flared once.',
+      'Elbows up and forward of the biceps peak, not out to the sides.',
+      'Quads and glutes locked hard, no soft knee.',
+      'Crunch the abs down, ribcage doesn\'t float up.',
+    ]},
+    { name: 'Side Chest', cues: [
+      'Pick your better side, front foot turned out toward judges.',
+      'Chest driven up and out, near arm crushes into the far bicep.',
+      'Rear leg quad flexed and visible — don\'t hide it behind the front leg.',
+    ]},
+    { name: 'Back Double Biceps', cues: [
+      'Spread the lats wide, hold — don\'t let them collapse after the first flare.',
+      'Calves flexed, one heel raised slightly to peak the calf.',
+      'Glutes and hamstrings locked, chin still level.',
+    ]},
+    { name: 'Side Triceps', cues: [
+      'Same side as your side chest, front foot turned out.',
+      'Extend the rear arm straight down, triceps locked, not bent.',
+      'Chest up, stomach pulled in, don\'t let the pose collapse forward.',
+    ]},
+    { name: 'Abdominal & Thigh', cues: [
+      'Hands behind head, one leg forward, both quads flexed.',
+      'Sharp exhale-crunch right before the shoot to pop the abs.',
+      'Keep shoulders back — don\'t hunch to force the crunch.',
+    ]},
+    { name: 'Most Muscular', cues: [
+      'Crash the whole body inward — traps, delts, chest, quads all locked at once.',
+      'Bend from the waist, don\'t just clench arms.',
+      'Hold it, this is the pose most likely to look flat if you flinch early.',
+    ]},
   ];
+  const POSING_FOOTER = 'Check left/right symmetry in the mirror before you shoot. Breathe out, hold the flex, then shoot — don\'t shoot mid-inhale. Hold 5-8 sec minimum, judges see the settled version, not the flinch.';
+  let posingPoseIdx = 0;
 
   $('posingCoachBtn').addEventListener('click', function() {
-    $('posingResponseText').textContent = POSING_CHECKLIST.join('\n');
+    const pose = MANDATORY_POSES[posingPoseIdx % MANDATORY_POSES.length];
+    posingPoseIdx++;
+    $('posingResponseText').textContent = pose.name.toUpperCase() + '\n\n' + pose.cues.join('\n') + '\n\n' + POSING_FOOTER;
     $('posingResponse').classList.add('show');
   });
 
@@ -4709,8 +4826,9 @@ img, video, canvas, svg { max-width: 100%; }
 
   document.querySelectorAll('.po-rest-timer-adj').forEach(function(btn) {
     btn.addEventListener('click', function() {
-      if (!restTimerInterval && restTimerRemaining <= 0) return;
-      restTimerRemaining = Math.max(0, restTimerRemaining + parseInt(btn.dataset.delta, 10));
+      if (!restTimerInterval && restTimerRemainingSecs() <= 0) return;
+      restTimerEndAt += parseInt(btn.dataset.delta, 10) * 1000;
+      if (restTimerEndAt < Date.now()) restTimerEndAt = Date.now();
       updateRestTimerDisplay();
     });
   });
@@ -5096,6 +5214,12 @@ img, video, canvas, svg { max-width: 100%; }
     $('exModalBg').classList.add('show');
     setTimeout(() => $('exName').focus(), 60);
   }
+  $('subEditEx').addEventListener('click', () => {
+    const ex = state.exercises.find(e => e.id === subPickerExId);
+    if (!ex) return;
+    closeSubPicker();
+    openExModal('edit', ex);
+  });
   function toggleBwFields() {
     const isBw = $('exBw').checked;
     $('exStartWeightField').style.display = isBw ? 'none' : '';
@@ -5330,6 +5454,17 @@ img, video, canvas, svg { max-width: 100%; }
     const a = document.createElement('a');
     a.href = url; a.download = 'po-coach-data-' + new Date().toISOString().slice(0,10) + '.json';
     a.click(); URL.revokeObjectURL(url);
+  });
+  $('setUndoDelete').addEventListener('click', () => {
+    const bank = state.recentlyDeleted || [];
+    if (!bank.length) { alert('No recently deleted sets.'); return; }
+    const last = bank[bank.length - 1];
+    const arr = state.logs[last.exId] || (state.logs[last.exId] = []);
+    arr.push(last.entry);
+    arr.sort((a, b) => new Date(a.date) - new Date(b.date));
+    bank.pop();
+    saveState(); renderSettings(); renderAll();
+    alert('Restored ' + formatSet(last.entry, (state.exercises || []).find(e => e.id === last.exId)) + '.');
   });
   $('setImport').addEventListener('click', () => $('setImportFile').click());
   $('setImportFile').addEventListener('change', e => {
@@ -5792,7 +5927,7 @@ img, video, canvas, svg { max-width: 100%; }
 
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) pcFlushPushOnUnload();
-    else { pcPullRemote(); pcCheckForUpdate(); }
+    else { pcPullRemote(); pcCheckForUpdate(); if (restTimerInterval) updateRestTimerDisplay(); }
   });
   window.addEventListener('pageshow', (e) => {
     if (e.persisted) { pcPullRemote(); pcCheckForUpdate(); }
