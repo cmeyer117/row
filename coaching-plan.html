@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Plan — Carl's Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="topbar.js" defer></script>
+<script src="coaching-templates.js"></script>
+<style>
+:root { --text-primary: #F4F1EA; --text-secondary: #B8B6B0; --text-tertiary: #76746E; --accent: #6EE7B7; --danger: #FF6B6B; --font: -apple-system, BlinkMacSystemFont, "Inter", sans-serif; --font-serif: 'Instrument Serif', Georgia, serif; }
+* { box-sizing: border-box; }
+html, body { margin: 0; background: #000; color: var(--text-secondary); font-family: var(--font); }
+body { padding: max(28px, env(safe-area-inset-top)) 20px 60px; }
+.page { max-width: 720px; margin: 0 auto; }
+.plan-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
+.plan-name { font-family: var(--font-serif); font-size: 28px; font-style: italic; color: var(--text-primary); }
+.plan-id { font-family: monospace; font-size: 11px; color: var(--text-tertiary); }
+.review-banner { background: rgba(255,107,107,0.12); border: 1px solid rgba(255,107,107,0.3); color: var(--danger); padding: 14px; border-radius: 12px; margin: 14px 0; }
+.section-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06); border-radius: 16px; padding: 18px; margin-bottom: 14px; }
+.section-card h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--accent); margin: 0 0 10px; }
+.day-block { margin-bottom: 10px; }
+.day-block h3 { font-size: 14px; color: var(--text-primary); margin: 0 0 4px; }
+.day-block ul { margin: 0; padding-left: 18px; font-size: 13px; }
+textarea { width: 100%; min-height: 90px; padding: 10px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.08); background: rgba(0,0,0,0.28); color: var(--text-primary); font-family: inherit; }
+.btn { padding: 11px 20px; border: 0; border-radius: 12px; background: linear-gradient(135deg, #6EE7B7 0%, #34D399 100%); color: #052e16; font-family: inherit; font-weight: 700; cursor: pointer; margin-right: 8px; }
+.btn-secondary { background: rgba(255,255,255,0.08); color: var(--text-primary); }
+@media print {
+  #topbar, #bottombar, #auth-overlay, .no-print { display: none !important; }
+  body { background: #fff; color: #000; padding: 20px; }
+  .section-card, .plan-header { background: none; border: none; color: #000; }
+}
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="plan-header">
+    <div class="plan-name" id="planName">Loading…</div>
+    <div class="plan-id" id="planIdLabel"></div>
+  </div>
+
+  <div id="reviewBanner" class="review-banner" style="display:none;">
+    ⚠ Needs review — injury flags or an unusual stage/goal/equipment combination were detected. Confirm the plan below is safe for this client before issuing.
+    <div style="margin-top:8px;"><button type="button" class="btn no-print" id="confirmReviewBtn">Mark reviewed</button></div>
+  </div>
+
+  <div class="section-card">
+    <h2>Training</h2>
+    <div id="trainingSummary" style="margin-bottom:10px;"></div>
+    <div id="trainingDays"></div>
+    <div id="equipmentNote" style="margin-top:8px;font-size:12px;color:var(--danger);"></div>
+  </div>
+
+  <div class="section-card">
+    <h2>Diet</h2>
+    <div id="dietSummary" style="margin-bottom:8px;"></div>
+    <div id="dietApproach" style="margin-bottom:8px;"></div>
+    <div id="dietFood"></div>
+  </div>
+
+  <div class="section-card">
+    <h2>Advice</h2>
+    <div id="adviceText"></div>
+  </div>
+
+  <div class="section-card no-print">
+    <h2>Personalization note (for <span id="noteClientName"></span>, <span id="notePlanId"></span>)</h2>
+    <textarea id="personalizationNote" placeholder="Written separately — paste in, don't generate here."></textarea>
+    <div style="margin-top:10px;">
+      <button type="button" class="btn btn-secondary" id="saveNoteBtn">Save note</button>
+    </div>
+  </div>
+
+  <div class="no-print" style="margin-top:10px;">
+    <button type="button" class="btn" id="markIssuedBtn">Mark Issued</button>
+    <button type="button" class="btn btn-secondary" id="printBtn">Print / Save PDF</button>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  const SUPABASE_URL = 'https://vikpcejlyxieguorwysf.supabase.co';
+  const SUPABASE_KEY = 'sb_publishable_EvWPtfW1FBW5Vf-H6w0yHw_PcXK4imv';
+  const supa = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  const clientId = new URLSearchParams(window.location.search).get('id');
+  let currentClient = null;
+
+  function renderPlan(client, plan) {
+    document.getElementById('planName').textContent = client.name;
+    document.getElementById('planIdLabel').textContent = client.plan_id;
+    document.getElementById('noteClientName').textContent = client.name;
+    document.getElementById('notePlanId').textContent = client.plan_id;
+
+    document.getElementById('reviewBanner').style.display = (client.needs_review && client.status !== 'issued') ? 'block' : 'none';
+
+    document.getElementById('trainingSummary').textContent = plan.training.summary;
+    const daysEl = document.getElementById('trainingDays');
+    daysEl.innerHTML = '';
+    plan.training.days.forEach((d) => {
+      const div = document.createElement('div');
+      div.className = 'day-block';
+      div.innerHTML = '<h3>' + d.name + '</h3><ul>' + d.exercises.map((e) => '<li>' + e + '</li>').join('') + '</ul>';
+      daysEl.appendChild(div);
+    });
+    document.getElementById('equipmentNote').textContent = plan.equipmentNote || '';
+
+    document.getElementById('dietSummary').textContent = plan.diet.summary;
+    document.getElementById('dietApproach').textContent = plan.diet.approach;
+    document.getElementById('dietFood').textContent = plan.diet.foodGuidance;
+
+    document.getElementById('adviceText').textContent = plan.advice;
+    document.getElementById('personalizationNote').value = client.personalization_note || '';
+  }
+
+  async function load() {
+    if (!clientId) { document.getElementById('planName').textContent = 'No client ID given'; return; }
+    const { data, error } = await supa.from('coaching_clients').select('*').eq('id', clientId).single();
+    if (error || !data) { document.getElementById('planName').textContent = 'Client not found'; return; }
+    currentClient = data;
+    const intake = {
+      stage: data.stage, goal: data.goal, equipment: data.equipment,
+      trainingDaysPerWeek: data.training_days_per_week, sessionLength: data.session_length,
+      injuryFlags: data.injury_flags || []
+    };
+    const plan = (data.status === 'issued' && data.issued_snapshot)
+      ? data.issued_snapshot.plan
+      : window.CoachingTemplates.assemblePlan(intake);
+    renderPlan(data, plan);
+  }
+
+  document.getElementById('confirmReviewBtn').addEventListener('click', async () => {
+    await supa.from('coaching_clients').update({ needs_review: false }).eq('id', clientId);
+    document.getElementById('reviewBanner').style.display = 'none';
+  });
+
+  document.getElementById('saveNoteBtn').addEventListener('click', async () => {
+    const note = document.getElementById('personalizationNote').value;
+    await supa.from('coaching_clients').update({ personalization_note: note }).eq('id', clientId);
+  });
+
+  document.getElementById('markIssuedBtn').addEventListener('click', async () => {
+    if (currentClient.needs_review) { alert('Mark reviewed before issuing — injury flags or an unusual combination need your confirmation first.'); return; }
+    const intake = {
+      stage: currentClient.stage, goal: currentClient.goal, equipment: currentClient.equipment,
+      trainingDaysPerWeek: currentClient.training_days_per_week, sessionLength: currentClient.session_length,
+      injuryFlags: currentClient.injury_flags || []
+    };
+    const plan = window.CoachingTemplates.assemblePlan(intake);
+    const note = document.getElementById('personalizationNote').value;
+    const snapshot = { plan: plan, personalizationNote: note, issuedAt: new Date().toISOString() };
+    const { error } = await supa.from('coaching_clients').update({
+      status: 'issued', issued_snapshot: snapshot, personalization_note: note
+    }).eq('id', clientId);
+    if (!error) { alert('Plan marked issued — the snapshot is now frozen.'); load(); }
+  });
+
+  document.getElementById('printBtn').addEventListener('click', () => window.print());
+
+  load();
+})();
+</script>
+</body>
+</html>
