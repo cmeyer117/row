@@ -26,6 +26,7 @@ body { padding: max(28px, env(safe-area-inset-top)) 20px 60px; }
 textarea { width: 100%; min-height: 90px; padding: 10px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.08); background: rgba(0,0,0,0.28); color: var(--text-primary); font-family: inherit; }
 .btn { padding: 11px 20px; border: 0; border-radius: 12px; background: linear-gradient(135deg, #6EE7B7 0%, #34D399 100%); color: #052e16; font-family: inherit; font-weight: 700; cursor: pointer; margin-right: 8px; }
 .btn-secondary { background: rgba(255,255,255,0.08); color: var(--text-primary); }
+#printNote { display: none; }
 @media print {
   #topbar, #bottombar, #auth-overlay, .no-print { display: none !important; }
   body { background: #fff; color: #000; padding: 20px; }
@@ -50,6 +51,7 @@ textarea { width: 100%; min-height: 90px; padding: 10px; border-radius: 10px; bo
     <div id="trainingSummary" style="margin-bottom:10px;"></div>
     <div id="trainingDays"></div>
     <div id="equipmentNote" style="margin-top:8px;font-size:12px;color:var(--danger);"></div>
+    <div id="availabilityNote" style="margin-top:8px;font-size:12px;color:var(--text-tertiary);"></div>
   </div>
 
   <div class="section-card">
@@ -71,6 +73,8 @@ textarea { width: 100%; min-height: 90px; padding: 10px; border-radius: 10px; bo
       <button type="button" class="btn btn-secondary" id="saveNoteBtn">Save note</button>
     </div>
   </div>
+
+  <div id="printNote" class="section-card"></div>
 
   <div class="no-print" style="margin-top:10px;">
     <button type="button" class="btn" id="markIssuedBtn">Mark Issued</button>
@@ -112,6 +116,14 @@ textarea { width: 100%; min-height: 90px; padding: 10px; border-radius: 10px; bo
 
     document.getElementById('adviceText').textContent = plan.advice;
     document.getElementById('personalizationNote').value = client.personalization_note || '';
+
+    const availabilityEl = document.getElementById('availabilityNote');
+    availabilityEl.textContent = 'Client availability: ' + client.training_days_per_week + ' days/week, ' +
+      client.session_length + ' min sessions — template above runs its own fixed split, adjust manually if it doesn\'t match.';
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   }
 
   async function load() {
@@ -158,10 +170,22 @@ textarea { width: 100%; min-height: 90px; padding: 10px; border-radius: 10px; bo
     const { error } = await supa.from('coaching_clients').update({
       status: 'issued', issued_snapshot: snapshot, personalization_note: note
     }).eq('id', clientId);
-    if (!error) { alert('Plan marked issued — the snapshot is now frozen.'); load(); }
+    if (error) { alert('Save failed: ' + error.message); return; }
+    alert('Plan marked issued — the snapshot is now frozen.');
+    load();
   });
 
-  document.getElementById('printBtn').addEventListener('click', () => window.print());
+  document.getElementById('printBtn').addEventListener('click', () => {
+    const note = document.getElementById('personalizationNote').value;
+    const printNoteEl = document.getElementById('printNote');
+    if (note.trim()) {
+      printNoteEl.innerHTML = '<h2>Note</h2><div>' + escapeHtml(note) + '</div>';
+      printNoteEl.style.display = 'block';
+    } else {
+      printNoteEl.style.display = 'none';
+    }
+    window.print();
+  });
 
   load();
 })();
