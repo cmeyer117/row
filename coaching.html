@@ -110,7 +110,7 @@ body { min-height: 100vh; padding: max(28px, env(safe-area-inset-top)) 20px 60px
       const badgeLabel = c.status === 'issued' ? 'ISSUED' : (c.needs_review ? 'NEEDS REVIEW' : 'DRAFT');
       a.innerHTML =
         '<div><div class="client-name">' + escapeHtml(c.name) + '</div>' +
-        '<div class="client-meta">' + c.stage + ' · ' + c.goal + ' · ' + c.plan_id + '</div></div>' +
+        '<div class="client-meta">' + escapeHtml(c.stage) + ' · ' + escapeHtml(c.goal) + ' · ' + escapeHtml(c.plan_id) + '</div></div>' +
         '<span class="badge ' + badgeClass + '">' + badgeLabel + '</span>';
       listEl.appendChild(a);
     });
@@ -121,9 +121,11 @@ body { min-height: 100vh; padding: max(28px, env(safe-area-inset-top)) 20px 60px
   }
 
   document.getElementById('addClientBtn').addEventListener('click', async () => {
+    const btn = document.getElementById('addClientBtn');
+    btn.disabled = true;
     const statusEl = document.getElementById('addStatus');
     const name = document.getElementById('cName').value.trim();
-    if (!name) { statusEl.textContent = 'Client name required.'; return; }
+    if (!name) { statusEl.textContent = 'Client name required.'; btn.disabled = false; return; }
     const intake = {
       stage: document.getElementById('cStage').value,
       goal: document.getElementById('cGoal').value,
@@ -132,6 +134,8 @@ body { min-height: 100vh; padding: max(28px, env(safe-area-inset-top)) 20px 60px
       sessionLength: parseInt(document.getElementById('cLength').value, 10),
       injuryFlags: Array.from(document.querySelectorAll('.injFlag:checked')).map((el) => el.value)
     };
+    if (isNaN(intake.trainingDaysPerWeek) || intake.trainingDaysPerWeek < 1 || intake.trainingDaysPerWeek > 7) { statusEl.textContent = 'Training days must be 1-7.'; btn.disabled = false; return; }
+    if (isNaN(intake.sessionLength) || intake.sessionLength <= 0) { statusEl.textContent = 'Session length must be greater than 0.'; btn.disabled = false; return; }
     const needsReview = window.CoachingTemplates.needsReview(intake);
     const { data, error } = await supa.from('coaching_clients').insert({
       plan_id: genPlanId(),
@@ -145,7 +149,7 @@ body { min-height: 100vh; padding: max(28px, env(safe-area-inset-top)) 20px 60px
       needs_review: needsReview,
       status: 'draft'
     }).select().single();
-    if (error) { statusEl.textContent = 'Save failed: ' + error.message; return; }
+    if (error) { statusEl.textContent = 'Save failed: ' + error.message; btn.disabled = false; return; }
     window.location.href = 'coaching-plan.html?id=' + encodeURIComponent(data.id);
   });
 
