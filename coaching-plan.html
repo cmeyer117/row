@@ -131,13 +131,18 @@ textarea { width: 100%; min-height: 90px; padding: 10px; border-radius: 10px; bo
   }
 
   document.getElementById('confirmReviewBtn').addEventListener('click', async () => {
-    await supa.from('coaching_clients').update({ needs_review: false }).eq('id', clientId);
+    const { error } = await supa.from('coaching_clients').update({ needs_review: false }).eq('id', clientId);
+    if (error) { alert('Save failed: ' + error.message); return; }
+    currentClient.needs_review = false;
     document.getElementById('reviewBanner').style.display = 'none';
   });
 
   document.getElementById('saveNoteBtn').addEventListener('click', async () => {
     const note = document.getElementById('personalizationNote').value;
-    await supa.from('coaching_clients').update({ personalization_note: note }).eq('id', clientId);
+    const { error } = await supa.from('coaching_clients').update({ personalization_note: note }).eq('id', clientId);
+    if (error) { alert('Save failed: ' + error.message); return; }
+    currentClient.personalization_note = note;
+    alert('Note saved.');
   });
 
   document.getElementById('markIssuedBtn').addEventListener('click', async () => {
