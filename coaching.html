@@ -109,15 +109,11 @@ body { min-height: 100vh; padding: max(28px, env(safe-area-inset-top)) 20px 60px
       const badgeClass = c.status === 'issued' ? 'badge-issued' : (c.needs_review ? 'badge-review' : 'badge-draft');
       const badgeLabel = c.status === 'issued' ? 'ISSUED' : (c.needs_review ? 'NEEDS REVIEW' : 'DRAFT');
       a.innerHTML =
-        '<div><div class="client-name">' + escapeHtml(c.name) + '</div>' +
-        '<div class="client-meta">' + escapeHtml(c.stage) + ' · ' + escapeHtml(c.goal) + ' · ' + escapeHtml(c.plan_id) + '</div></div>' +
+        '<div><div class="client-name">' + window.CoachingTemplates.escapeHtml(c.name) + '</div>' +
+        '<div class="client-meta">' + window.CoachingTemplates.escapeHtml(c.stage) + ' · ' + window.CoachingTemplates.escapeHtml(c.goal) + ' · ' + window.CoachingTemplates.escapeHtml(c.plan_id) + '</div></div>' +
         '<span class="badge ' + badgeClass + '">' + badgeLabel + '</span>';
       listEl.appendChild(a);
     });
-  }
-
-  function escapeHtml(s) {
-    return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   }
 
   document.getElementById('addClientBtn').addEventListener('click', async () => {

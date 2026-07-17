@@ -89,10 +89,14 @@
     };
   }
 
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+
   if (typeof window !== 'undefined') {
-    window.CoachingTemplates = { STAGES: STAGES, assemblePlan: assemblePlan, needsReview: needsReview };
+    window.CoachingTemplates = { STAGES: STAGES, assemblePlan: assemblePlan, needsReview: needsReview, escapeHtml: escapeHtml };
   }
   if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { STAGES: STAGES, assemblePlan: assemblePlan, needsReview: needsReview };
+    module.exports = { STAGES: STAGES, assemblePlan: assemblePlan, needsReview: needsReview, escapeHtml: escapeHtml };
   }
 })();

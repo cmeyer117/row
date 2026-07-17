@@ -122,10 +122,6 @@ textarea { width: 100%; min-height: 90px; padding: 10px; border-radius: 10px; bo
       client.session_length + ' min sessions — template above runs its own fixed split, adjust manually if it doesn\'t match.';
   }
 
-  function escapeHtml(s) {
-    return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  }
-
   async function load() {
     if (!clientId) { document.getElementById('planName').textContent = 'No client ID given'; return; }
     const { data, error } = await supa.from('coaching_clients').select('*').eq('id', clientId).single();
@@ -179,7 +175,7 @@ textarea { width: 100%; min-height: 90px; padding: 10px; border-radius: 10px; bo
     const note = document.getElementById('personalizationNote').value;
     const printNoteEl = document.getElementById('printNote');
     if (note.trim()) {
-      printNoteEl.innerHTML = '<h2>Note</h2><div>' + escapeHtml(note) + '</div>';
+      printNoteEl.innerHTML = '<h2>Note</h2><div>' + window.CoachingTemplates.escapeHtml(note) + '</div>';
       printNoteEl.style.display = 'block';
     } else {
       printNoteEl.style.display = 'none';
