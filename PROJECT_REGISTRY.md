@@ -24,7 +24,7 @@ Purpose: Prevent duplicate builds and stale-data rebuilds. Read this before buil
 
 ## Coaching Dashboard (row)
 - **Deployed**: https://row-sage.vercel.app
-- **Repo**: `row` repo (standalone), branch `feat/coaching-dashboard`
+- **Repo**: https://github.com/cmeyer117/row (main)
 - **Stack**: Vanilla HTML/JS/Supabase, no build step
 - **Note**: Also referred to as "coaching-dashboard" or "the dashboard". 2026-07-17: added `coaching.html`/`coaching-plan.html` (coach-side client intake + plan-assembly tool) and a `coaching_clients` Supabase table.
 - **Last updated**: 2026-07-17
