@@ -698,17 +698,11 @@ Check the Vercel dashboard (or `vercel ls`) for a new deployment triggered by th
 
 ---
 
-## Status (2026-07-17, end of session)
+## Status (2026-07-17, shipped)
 
-All 8 tasks built, reviewed, and live-verified against the real `coaching_clients` Supabase table (clean-client flow, injury-flagged review gate, snapshot freeze, mobile layout — all confirmed working). Pushed to `feat/coaching-dashboard`, preview deploy live and green (`row-49re02dlf-carl-meyer-s-projects.vercel.app`), `main`/production untouched.
+All 8 tasks built, reviewed, and live-verified against the real `coaching_clients` Supabase table (clean-client flow, injury-flagged review gate, snapshot freeze, mobile layout — all confirmed working). A final whole-branch review then found 2 more real bugs, both fixed and re-verified live before merge: the personalization note wasn't reaching printed/PDF output (`no-print` CSS hid it entirely — added a separate print-only element populated from the note right before `window.print()`), and `markIssuedBtn` silently swallowed a failed save (missed the same error-check-first pattern already applied to its two sibling handlers). Also added the previously-missing "client availability" line (`training_days_per_week`/`session_length`) to the plan render, which was captured on intake but never shown anywhere.
 
-**Final whole-branch review found 2 blocking bugs, not yet fixed:**
-1. `coaching-plan.html` — the personalization-note `section-card` has class `no-print`, and `@media print` hides `.no-print` — so a coach's note to the client never appears in the printed/PDF output. Fix: add a separate non-`no-print` element populated with the note's text right before `window.print()` fires, leave the editable textarea `no-print` as-is.
-2. `coaching-plan.html` `markIssuedBtn` handler — `if (!error) { alert(...); load(); }` has no `else`, so a failed save is silent. The same pattern was already fixed on `confirmReviewBtn`/`saveNoteBtn` in commit `7ab9cda` — this third call site was missed. Fix: mirror those two handlers (check error first, alert on failure, return).
-
-**Lower-priority, not blocking:** `training_days_per_week`/`session_length` are captured on intake but never rendered anywhere in the assembled plan — silently unused. Worth a one-line "client availability" note in `renderPlan()`, not urgent.
-
-**Next session:** fix the 2 blocking bugs above in `coaching-plan.html`, then `superpowers:finishing-a-development-branch` to merge `feat/coaching-dashboard` into `main`.
+**Merged to `main` and live in production:** `row-sage.vercel.app/coaching.html` and `row-sage.vercel.app/coaching-plan.html`, confirmed serving real content post-deploy. `feat/coaching-dashboard` deleted (local + remote) after a clean fast-forward merge.
 
 ## Self-Review Notes
 
