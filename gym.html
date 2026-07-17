@@ -5544,6 +5544,22 @@ img, video, canvas, svg { max-width: 100%; }
 <script src="hype-audio.js"></script>
 <script src="hype-player-widget.js"></script>
 <script>
+// hype_audio gets its own independent app_state row via the plain
+// initCloudSync() helper (sync.js) — deliberately NOT bundled into
+// PC_SYNCED_KEYS/'po-coach' above. That mechanism is gym.html's own
+// bespoke sync for its own data; sharing its row with a second,
+// differently-scoped sync call (this page vs. the standalone app)
+// would have each overwrite the other's subset of that row's data.
+// Gated on DOMContentLoaded since sync.js loads deferred but this
+// script tag doesn't, so window.initCloudSync isn't guaranteed to
+// exist yet at parse time.
+document.addEventListener('DOMContentLoaded', function () {
+  if (window.initCloudSync) {
+    window.initCloudSync({ appKey: 'hype-audio', syncedKeys: ['hype_audio'] });
+  }
+});
+</script>
+<script>
 (function() {
   // ============================================================
   // BOOT
@@ -5573,7 +5589,7 @@ img, video, canvas, svg { max-width: 100%; }
   const SUPABASE_URL = 'https://vikpcejlyxieguorwysf.supabase.co';
   const SUPABASE_KEY = 'sb_publishable_EvWPtfW1FBW5Vf-H6w0yHw_PcXK4imv';
   const APP_KEY = 'po-coach';
-  const PC_SYNCED_KEYS = ['po_coach_v1', 'po_coach_workout_done', 'po_coach_weights', 'po_coach_photos', 'hype_audio'];
+  const PC_SYNCED_KEYS = ['po_coach_v1', 'po_coach_workout_done', 'po_coach_weights', 'po_coach_photos'];
 
   let pcSupa = null;
   // gym-weight-photos.js's uploadPhotoToStorage() needs to read pcSupa —
