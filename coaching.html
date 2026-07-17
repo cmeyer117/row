@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#050506">
+<title>Coaching — Carl's Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="topbar.js" defer></script>
+<script src="coaching-templates.js"></script>
+<style>
+:root {
+  --text-primary: #F4F1EA; --text-secondary: #B8B6B0; --text-tertiary: #76746E;
+  --accent: #6EE7B7; --danger: #FF6B6B;
+  --font: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-serif: 'Instrument Serif', Georgia, serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: #000; color: var(--text-secondary); font-family: var(--font); }
+body { min-height: 100vh; padding: max(28px, env(safe-area-inset-top)) 20px 60px; }
+.page { max-width: 720px; margin: 0 auto; }
+.dash-title { margin: 0 0 18px; font-family: var(--font-serif); font-size: 30px; font-weight: 700; font-style: italic; color: var(--text-primary); }
+.card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06); border-radius: 16px; padding: 18px; margin-bottom: 14px; }
+.field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+.field label { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-tertiary); }
+.field input, .field select {
+  padding: 11px 14px; border: 1px solid rgba(255,255,255,0.08); border-radius: 10px;
+  background: rgba(0,0,0,0.28); color: var(--text-primary); font-family: inherit; font-size: 14px; outline: none;
+}
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.checks { display: flex; flex-wrap: wrap; gap: 8px; }
+.chk { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-primary); }
+.btn { padding: 11px 20px; border: 0; border-radius: 12px; background: linear-gradient(135deg, #6EE7B7 0%, #34D399 100%); color: #052e16; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.client-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-radius: 12px; background: rgba(255,255,255,0.035); margin-bottom: 6px; text-decoration: none; }
+.client-name { color: var(--text-primary); font-weight: 600; }
+.client-meta { font-family: var(--font-mono); font-size: 11px; color: var(--text-tertiary); }
+.badge { font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; padding: 3px 8px; border-radius: 999px; }
+.badge-draft { background: rgba(255,255,255,0.08); color: var(--text-tertiary); }
+.badge-review { background: rgba(255,107,107,0.15); color: var(--danger); }
+.badge-issued { background: rgba(110,231,183,0.15); color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="page">
+  <h1 class="dash-title">Coaching</h1>
+
+  <div class="card">
+    <div class="field"><label>Client name</label><input id="cName" type="text" placeholder="Client name"></div>
+    <div class="row2">
+      <div class="field"><label>Stage</label>
+        <select id="cStage"><option value="beginner">Beginner</option><option value="intermediate">Intermediate</option><option value="advanced">Advanced</option></select>
+      </div>
+      <div class="field"><label>Goal</label>
+        <select id="cGoal"><option value="cut">Cut</option><option value="bulk">Bulk</option><option value="recomp">Recomp</option><option value="contest-prep">Contest prep</option></select>
+      </div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>Equipment</label>
+        <select id="cEquip"><option value="full-gym">Full gym</option><option value="home">Home</option><option value="limited">Limited</option></select>
+      </div>
+      <div class="field"><label>Training days/week</label><input id="cDays" type="number" min="1" max="7" value="4"></div>
+    </div>
+    <div class="field"><label>Session length (minutes)</label><input id="cLength" type="number" min="15" value="60"></div>
+    <div class="field">
+      <label>Injury flags</label>
+      <div class="checks">
+        <label class="chk"><input type="checkbox" value="shoulder" class="injFlag"> Shoulder</label>
+        <label class="chk"><input type="checkbox" value="elbow" class="injFlag"> Elbow</label>
+        <label class="chk"><input type="checkbox" value="knee" class="injFlag"> Knee</label>
+        <label class="chk"><input type="checkbox" value="lower-back" class="injFlag"> Lower back</label>
+      </div>
+    </div>
+    <button type="button" class="btn" id="addClientBtn">+ Add Client</button>
+    <div id="addStatus" style="font-size:12px;color:var(--text-tertiary);margin-top:8px;"></div>
+  </div>
+
+  <div class="card">
+    <div id="clientList"></div>
+    <div id="emptyClients" style="display:none;color:var(--text-tertiary);font-size:13px;text-align:center;padding:14px;">No clients yet — add one above.</div>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  const SUPABASE_URL = 'https://vikpcejlyxieguorwysf.supabase.co';
+  const SUPABASE_KEY = 'sb_publishable_EvWPtfW1FBW5Vf-H6w0yHw_PcXK4imv';
+  const supa = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  function genPlanId() {
+    return 'plan_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  }
+
+  async function loadClients() {
+    const { data, error } = await supa.from('coaching_clients').select('*').order('created_at', { ascending: false });
+    const listEl = document.getElementById('clientList');
+    const emptyEl = document.getElementById('emptyClients');
+    listEl.innerHTML = '';
+    if (error || !data || data.length === 0) { emptyEl.style.display = 'block'; return; }
+    emptyEl.style.display = 'none';
+    data.forEach((c) => {
+      const a = document.createElement('a');
+      a.href = 'coaching-plan.html?id=' + encodeURIComponent(c.id);
+      a.className = 'client-row';
+      const badgeClass = c.status === 'issued' ? 'badge-issued' : (c.needs_review ? 'badge-review' : 'badge-draft');
+      const badgeLabel = c.status === 'issued' ? 'ISSUED' : (c.needs_review ? 'NEEDS REVIEW' : 'DRAFT');
+      a.innerHTML =
+        '<div><div class="client-name">' + escapeHtml(c.name) + '</div>' +
+        '<div class="client-meta">' + c.stage + ' · ' + c.goal + ' · ' + c.plan_id + '</div></div>' +
+        '<span class="badge ' + badgeClass + '">' + badgeLabel + '</span>';
+      listEl.appendChild(a);
+    });
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+
+  document.getElementById('addClientBtn').addEventListener('click', async () => {
+    const statusEl = document.getElementById('addStatus');
+    const name = document.getElementById('cName').value.trim();
+    if (!name) { statusEl.textContent = 'Client name required.'; return; }
+    const intake = {
+      stage: document.getElementById('cStage').value,
+      goal: document.getElementById('cGoal').value,
+      equipment: document.getElementById('cEquip').value,
+      trainingDaysPerWeek: parseInt(document.getElementById('cDays').value, 10),
+      sessionLength: parseInt(document.getElementById('cLength').value, 10),
+      injuryFlags: Array.from(document.querySelectorAll('.injFlag:checked')).map((el) => el.value)
+    };
+    const needsReview = window.CoachingTemplates.needsReview(intake);
+    const { data, error } = await supa.from('coaching_clients').insert({
+      plan_id: genPlanId(),
+      name: name,
+      stage: intake.stage,
+      goal: intake.goal,
+      equipment: intake.equipment,
+      training_days_per_week: intake.trainingDaysPerWeek,
+      session_length: intake.sessionLength,
+      injury_flags: intake.injuryFlags,
+      needs_review: needsReview,
+      status: 'draft'
+    }).select().single();
+    if (error) { statusEl.textContent = 'Save failed: ' + error.message; return; }
+    window.location.href = 'coaching-plan.html?id=' + encodeURIComponent(data.id);
+  });
+
+  loadClients();
+})();
+</script>
+</body>
+</html>
