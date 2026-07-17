@@ -88,16 +88,17 @@ These six skills are mandatory every session. Load them first, in order.
 
 At the start of any Cowork session, immediately request access to `G:\My Drive\Claude\` if it is not already connected. Never save final deliverables to the AppData temp folder — always copy to the above paths.
 
-## Projects Overview
+## Project Overview
 
-This workspace contains four distinct projects:
+This repo (`row`) is the Row fitness dashboard: a single static multi-page vanilla HTML/JS app with Supabase for persistence, no build step, no framework. Deployed to Vercel at `https://row-sage.vercel.app`.
 
-| Project | Description |
-| --- | --- |
-| `coaching-dashboard` | React app for managing fitness clients: check-ins, macro tracking, lift progress |
-| `accounting-automation` | AI workflow automation system for an accounting firm |
-| `jarvis` | AI assistant — React UI on Vercel, Express backend on Railway, ElevenLabs voice, Mem0 memory, Claude brain |
-| `content-system` | Content planning and publishing pipeline for TikTok, Instagram, and YouTube |
+Pages: `index.html`, `main.html`, `health.html`, `gym.html`, `finance.html`, `mobility.html`, `po-water.html`, `coaching.html`, `coaching-plan.html`.
+
+Shared logic:
+- `sync.js` — cloud sync to a Supabase `app_state` table
+- `topbar.js` — nav + passphrase gate (`AUTH_PASS`/`AUTH_KEY` in-file)
+
+Jarvis (AI assistant) lives in a separate repo, `cmeyer117/claude-workspace`, subfolder `jarvis/` — it is not part of this repo. `accounting-automation` and `content-system` are not built yet as of this writing.
 
 ## TypeScript Rules
 
@@ -143,8 +144,8 @@ npm run typecheck # tsc --noEmit (run this before committing)
 
 ## Architecture Intentions
 
-### coaching-dashboard
-Client-facing data flows through a REST or tRPC API. State management should be kept close to the component unless data needs to be shared across routes, in which case use React Context or a lightweight store (Zustand preferred). Forms (check-ins, macros) should validate with Zod.
+### row (this repo)
+No React, no state management library, no API layer — plain DOM/JS per page. Cross-page/session persistence goes through `sync.js` to the Supabase `app_state` table. Keep new pages consistent with the existing vanilla HTML/JS pattern; don't introduce a framework or build step for one feature.
 
 ### accounting-automation
 AI workflows are triggered by events (document upload, scheduled job, etc.) and return structured outputs. All AI calls should be wrapped in typed functions with Zod-validated responses — never trust raw model output shapes.
