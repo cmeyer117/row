@@ -35,6 +35,14 @@ assert(picked && picked.id === '2', 'pickRandom respects a mentality filter');
 const pickedNone = H.pickRandom({ mentality: 'nonexistent' });
 assert(pickedNone === null, 'pickRandom returns null when nothing matches');
 
+// pickRandom with pillar filter — clips 1/2 have no pillar (unmigrated legacy shape)
+H.addClip({ id: '3', title: 'C', mentality: 'worship', pillar: 'faith', play_count: 0 });
+const pickedIron = H.pickRandom({ pillar: 'iron' });
+assert(pickedIron === null, 'pickRandom with pillar:iron finds nothing among unmigrated/faith clips');
+const pickedFaith = H.pickRandom({ pillar: 'faith' });
+assert(pickedFaith && pickedFaith.id === '3', 'pickRandom respects a pillar filter');
+H.deleteClip('3');
+
 // deleteClip
 H.deleteClip('1');
 assert(H.listClips().length === 1 && H.listClips()[0].id === '2', 'deleteClip removes only the target clip');
