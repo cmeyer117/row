@@ -698,6 +698,18 @@ Check the Vercel dashboard (or `vercel ls`) for a new deployment triggered by th
 
 ---
 
+## Status (2026-07-17, end of session)
+
+All 8 tasks built, reviewed, and live-verified against the real `coaching_clients` Supabase table (clean-client flow, injury-flagged review gate, snapshot freeze, mobile layout — all confirmed working). Pushed to `feat/coaching-dashboard`, preview deploy live and green (`row-49re02dlf-carl-meyer-s-projects.vercel.app`), `main`/production untouched.
+
+**Final whole-branch review found 2 blocking bugs, not yet fixed:**
+1. `coaching-plan.html` — the personalization-note `section-card` has class `no-print`, and `@media print` hides `.no-print` — so a coach's note to the client never appears in the printed/PDF output. Fix: add a separate non-`no-print` element populated with the note's text right before `window.print()` fires, leave the editable textarea `no-print` as-is.
+2. `coaching-plan.html` `markIssuedBtn` handler — `if (!error) { alert(...); load(); }` has no `else`, so a failed save is silent. The same pattern was already fixed on `confirmReviewBtn`/`saveNoteBtn` in commit `7ab9cda` — this third call site was missed. Fix: mirror those two handlers (check error first, alert on failure, return).
+
+**Lower-priority, not blocking:** `training_days_per_week`/`session_length` are captured on intake but never rendered anywhere in the assembled plan — silently unused. Worth a one-line "client availability" note in `renderPlan()`, not urgent.
+
+**Next session:** fix the 2 blocking bugs above in `coaching-plan.html`, then `superpowers:finishing-a-development-branch` to merge `feat/coaching-dashboard` into `main`.
+
 ## Self-Review Notes
 
 - **Spec coverage:** hosting (Task 1, 4, 5), data store (Task 2), content layer (Task 3), assembly logic (Task 3), export (Task 5 print CSS), access gate (already exists via `topbar.js`, confirmed not duplicated), plan snapshot/versioning (Task 5 `issued_snapshot`), injury review gate (Task 3 `needsReview` + Task 5 banner), personalization note labeling (Task 5 shows client name/plan ID on the field) — all covered.
