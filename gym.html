@@ -4804,10 +4804,15 @@ img, video, canvas, svg { max-width: 100%; }
     const dateKey = getChipDate('logDateInput');
     const isoDate = new Date(dateKey + 'T12:00:00').toISOString();
     const arr = state.logs[ex.id] || [];
+    const priorLogs = arr.slice();
     const activeVariant = getSession(ex.id).activeVariant || null;
     arr.push(Object.assign({ weight: w, reps: reps, date: isoDate, variant: activeVariant }, entry));
     arr.sort((a, b) => a.date.localeCompare(b.date));
     state.logs[ex.id] = arr;
+    if (window.GymWorkoutEvents && window.__gym && typeof window.__gym.logWorkoutEvent === 'function') {
+      const eventType = window.GymWorkoutEvents.classifyWorkoutEvent({ weight: w, reps: reps }, priorLogs, ex);
+      if (eventType) window.__gym.logWorkoutEvent(ex.name, eventType, w, reps, !!ex.bw);
+    }
     if (plateMode) { plateCounts = {}; updatePlateUI(); }
     resetChipToToday('logDateChip', 'logDateInput');
     startRestTimer(ex);
@@ -4948,6 +4953,7 @@ img, video, canvas, svg { max-width: 100%; }
 
     var isoDate = new Date(dk + 'T12:00:00').toISOString();
     if (!state.logs[ex.id]) state.logs[ex.id] = [];
+    var priorLogs = state.logs[ex.id].slice();
     var entry = { weight: w, reps: reps, date: isoDate, variant: getSession(ex.id).activeVariant || null };
     if (parsed.plates != null) { entry.plates = parsed.plates; entry.extraLbs = parsed.extraLbs || 0; }
     state.logs[ex.id].push(entry);
@@ -4955,6 +4961,10 @@ img, video, canvas, svg { max-width: 100%; }
     state.currentEx = ex.id;
     saveState(); renderAll();
     if (typeof wtRender === 'function') wtRender();
+    if (window.GymWorkoutEvents && window.__gym && typeof window.__gym.logWorkoutEvent === 'function') {
+      var eventType = window.GymWorkoutEvents.classifyWorkoutEvent({ weight: w, reps: reps }, priorLogs, ex);
+      if (eventType) window.__gym.logWorkoutEvent(ex.name, eventType, w, reps, !!ex.bw);
+    }
     return { ok: true, msg: '✓  ' + ex.name + '  ·  ' + formatSet(entry, ex) };
   }
 
@@ -5541,6 +5551,7 @@ img, video, canvas, svg { max-width: 100%; }
 })();
 </script>
 <script src="gym-weight-photos.js"></script>
+<script src="gym-workout-events.js"></script>
 <script src="hype-audio.js"></script>
 <script src="hype-player-widget.js"></script>
 <script>
@@ -5595,6 +5606,32 @@ document.addEventListener('DOMContentLoaded', function () {
   // gym-weight-photos.js's uploadPhotoToStorage() needs to read pcSupa —
   // expose it live since it's reassigned below once the client connects.
   Object.defineProperty(window.__gym, 'pcSupa', { get: () => pcSupa });
+
+  // Fire-and-forget insert for the journal-reactive-prompts feature —
+  // must never block or throw into the caller (set-logging is the primary
+  // action, this is a side-channel nudge for Vessel). SUPABASE_URL/KEY are
+  // declared above in this same script scope.
+  window.__gym.logWorkoutEvent = function (exerciseName, eventType, weight, reps, isBodyweight) {
+    try {
+      fetch(SUPABASE_URL + '/rest/v1/workout_events', {
+        method: 'POST',
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': 'Bearer ' + SUPABASE_KEY,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=minimal',
+        },
+        body: JSON.stringify({
+          exercise_name: exerciseName,
+          event_type: eventType,
+          weight: weight,
+          reps: reps,
+          is_bodyweight: !!isBodyweight,
+        }),
+        keepalive: true,
+      }).catch(function () {});
+    } catch (e) {}
+  };
   let pcPushTimer = null;
   let pcSuppressSync = false;
   let pcPendingRemote = null;
