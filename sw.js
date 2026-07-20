@@ -18,3 +18,14 @@ self.addEventListener('fetch', e => {
       .catch(() => caches.match(e.request).then(cached => cached || caches.match(OFFLINE)))
   );
 });
+
+self.addEventListener('push', e => {
+  let data = { title: 'Row', body: 'New notification' };
+  try { if (e.data) data = e.data.json(); } catch (_) {}
+  e.waitUntil(self.registration.showNotification(data.title, { body: data.body, icon: '/icons/icon-192.png' }));
+});
+
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  e.waitUntil(clients.openWindow('/gym.html'));
+});
