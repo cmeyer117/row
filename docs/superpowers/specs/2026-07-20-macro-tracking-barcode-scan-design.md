@@ -28,7 +28,7 @@ Row is Carl's daily-use fitness dashboard during an active recomp, but has zero 
 | column | type | notes |
 |---|---|---|
 | id | uuid | pk |
-| date | date | local calendar day the food was logged for — computed from the browser's local time (`getFullYear/Month/Date()`), not `toISOString()`/UTC. Vessel hit this exact bug class with UTC-keyed dates; avoid it here by deriving the key client-side from local time before writing. |
+| log_date | date | local calendar day the food was logged for — computed from the browser's local time (`getFullYear/Month/Date()`), not `toISOString()`/UTC. Vessel hit this exact bug class with UTC-keyed dates; avoid it here by deriving the key client-side from local time before writing. Named `log_date`, not `date`, to avoid the reserved-word ambiguity. |
 | name | text | product name or manual entry name |
 | protein_g | numeric | |
 | carb_g | numeric | |

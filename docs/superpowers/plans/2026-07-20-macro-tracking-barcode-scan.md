@@ -24,13 +24,17 @@ create table if not exists food_log (
   id uuid primary key default gen_random_uuid(),
   log_date date not null,
   name text not null,
-  protein_g numeric not null default 0,
-  carb_g numeric not null default 0,
-  fat_g numeric not null default 0,
-  calories numeric not null default 0,
+  protein_g numeric not null default 0 check (protein_g >= 0),
+  carb_g numeric not null default 0 check (carb_g >= 0),
+  fat_g numeric not null default 0 check (fat_g >= 0),
+  calories numeric not null default 0 check (calories >= 0),
   source text not null check (source in ('barcode', 'manual')),
   barcode text,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  constraint food_log_barcode_matches_source check (
+    (source = 'barcode' and barcode is not null) or
+    (source = 'manual' and barcode is null)
+  )
 );
 
 create index if not exists food_log_log_date_idx on food_log (log_date);
@@ -114,40 +118,56 @@ git commit -m "feat: add food_log table migration"
     };
   }
 
+  // A product only counts as having usable per-serving data if ALL FOUR
+  // macro fields are present — a product with proteins_serving but no
+  // energy-kcal_serving would otherwise silently report 0 calories.
+  function hasCompleteServingData(nutriments) {
+    return ['proteins_serving', 'carbohydrates_serving', 'fat_serving', 'energy-kcal_serving']
+      .every((k) => nutriments[k] != null);
+  }
+
+  function num(v, fallback) {
+    const n = Number(v);
+    return Number.isFinite(n) && n >= 0 ? n : fallback;
+  }
+
   // nutriments: the raw `nutriments` object from an Open Food Facts
-  // product response. quantity: number of servings logged (only used
-  // when serving-level data exists). gramsOverride: grams eaten, used
-  // only as the fallback when a product has no per-serving nutrients.
+  // product response. quantity: number of servings logged — only used
+  // when hasCompleteServingData(nutriments) is true. gramsOverride: grams
+  // eaten — required (by the caller) whenever serving data is incomplete;
+  // this function still falls back to 100g if the caller omits it so it
+  // never throws, but the UI must not skip prompting for grams in that case.
   function resolveServingMacros(nutriments, quantity, gramsOverride) {
     nutriments = nutriments || {};
-    const hasServing = nutriments['proteins_serving'] != null;
-    if (hasServing && gramsOverride == null) {
-      const q = quantity || 1;
+    if (hasCompleteServingData(nutriments) && gramsOverride == null) {
+      const q = num(quantity, 1);
       return {
-        protein_g: round1((nutriments['proteins_serving'] || 0) * q),
-        carb_g: round1((nutriments['carbohydrates_serving'] || 0) * q),
-        fat_g: round1((nutriments['fat_serving'] || 0) * q),
-        calories: round1((nutriments['energy-kcal_serving'] || 0) * q),
+        protein_g: round1(num(nutriments['proteins_serving'], 0) * q),
+        carb_g: round1(num(nutriments['carbohydrates_serving'], 0) * q),
+        fat_g: round1(num(nutriments['fat_serving'], 0) * q),
+        calories: round1(num(nutriments['energy-kcal_serving'], 0) * q),
       };
     }
-    const grams = gramsOverride != null ? gramsOverride : 100;
+    const grams = gramsOverride != null ? num(gramsOverride, 100) : 100;
     const factor = grams / 100;
     return {
-      protein_g: round1((nutriments['proteins_100g'] || 0) * factor),
-      carb_g: round1((nutriments['carbohydrates_100g'] || 0) * factor),
-      fat_g: round1((nutriments['fat_100g'] || 0) * factor),
-      calories: round1((nutriments['energy-kcal_100g'] || 0) * factor),
+      protein_g: round1(num(nutriments['proteins_100g'], 0) * factor),
+      carb_g: round1(num(nutriments['carbohydrates_100g'], 0) * factor),
+      fat_g: round1(num(nutriments['fat_100g'], 0) * factor),
+      calories: round1(num(nutriments['energy-kcal_100g'], 0) * factor),
     };
   }
 
   // targets: { proteinG, carbG, fatG, calories }
   // entries: array of food_log rows for today ({ protein_g, carb_g, fat_g, calories })
+  // Values are coerced through num() — a corrupt/non-numeric row (e.g. from
+  // a future bad write) contributes 0 rather than producing NaN totals.
   function remainingBudget(targets, entries) {
     const consumed = (entries || []).reduce((acc, e) => ({
-      protein_g: acc.protein_g + (e.protein_g || 0),
-      carb_g: acc.carb_g + (e.carb_g || 0),
-      fat_g: acc.fat_g + (e.fat_g || 0),
-      calories: acc.calories + (e.calories || 0),
+      protein_g: acc.protein_g + num(e.protein_g, 0),
+      carb_g: acc.carb_g + num(e.carb_g, 0),
+      fat_g: acc.fat_g + num(e.fat_g, 0),
+      calories: acc.calories + num(e.calories, 0),
     }), { protein_g: 0, carb_g: 0, fat_g: 0, calories: 0 });
 
     return {
@@ -159,7 +179,7 @@ git commit -m "feat: add food_log table migration"
     };
   }
 
-  const api = { calculateMacros, resolveServingMacros, remainingBudget };
+  const api = { calculateMacros, resolveServingMacros, remainingBudget, hasCompleteServingData };
   if (typeof window !== 'undefined') window.MacroCalc = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })();
@@ -171,7 +191,7 @@ git commit -m "feat: add food_log table migration"
 // Run with: node macro-calc.selfcheck.js
 'use strict';
 
-const { calculateMacros, resolveServingMacros, remainingBudget } = require('./macro-calc.js');
+const { calculateMacros, resolveServingMacros, remainingBudget, hasCompleteServingData } = require('./macro-calc.js');
 
 function assertEqual(actual, expected, label) {
   if (actual !== expected) {
@@ -202,9 +222,18 @@ assertEqual(s2.protein_g, 10, 'resolveServingMacros scales with quantity');
 
 // resolveServingMacros — product with NO serving data, falls back to grams.
 const noServing = { 'proteins_100g': 20, 'carbohydrates_100g': 0, 'fat_100g': 10, 'energy-kcal_100g': 180 };
+assertEqual(hasCompleteServingData(noServing), false, 'hasCompleteServingData is false with no serving fields at all');
 const s3 = resolveServingMacros(noServing, 1, 150);
 assertEqual(s3.protein_g, 30, 'resolveServingMacros falls back to per-100g x grams when no serving data');
 assertEqual(s3.calories, 270, 'resolveServingMacros calories fallback math');
+
+// resolveServingMacros — PARTIAL serving data (protein present, calories
+// missing) must NOT be treated as complete, or calories would silently
+// report 0. This is the exact bug Codex's terra review flagged.
+const partialServing = { 'proteins_serving': 5, 'carbohydrates_serving': 37, 'fat_serving': 4, 'proteins_100g': 9.62, 'carbohydrates_100g': 71.15, 'fat_100g': 7.69, 'energy-kcal_100g': 385 };
+assertEqual(hasCompleteServingData(partialServing), false, 'hasCompleteServingData is false when energy-kcal_serving is missing');
+const s4 = resolveServingMacros(partialServing, 1, 80);
+assertEqual(s4.calories, 308, 'resolveServingMacros correctly falls back to per-100g x grams for partial serving data');
 
 // remainingBudget — subtracts today's entries from targets.
 const targets = { proteinG: 180, carbG: 240, fatG: 62, calories: 2242 };
@@ -220,6 +249,11 @@ assertEqual(b.consumed.protein_g, 70, 'remainingBudget tracks consumed total too
 // remainingBudget — empty log returns full targets remaining.
 const b2 = remainingBudget(targets, []);
 assertEqual(b2.protein_g, 180, 'remainingBudget with no entries returns full target');
+
+// remainingBudget — a corrupt/non-numeric row contributes 0, not NaN.
+const b3 = remainingBudget(targets, [{ protein_g: 'not-a-number', carb_g: null, fat_g: undefined, calories: 100 }]);
+assertEqual(b3.protein_g, 180, 'remainingBudget treats non-numeric fields as 0 instead of propagating NaN');
+assertEqual(b3.calories, 2142, 'remainingBudget still counts the valid numeric field on the same row');
 
 console.log('macro-calc.selfcheck.js: all assertions passed');
 ```
@@ -703,16 +737,28 @@ async function fetchTodayEntries() {
   return data || [];
 }
 
+// Both return { error } (error === null on success) so callers can decide
+// whether to close a modal / refresh, or show the failure instead of
+// silently behaving as if the write succeeded.
 async function insertEntry(entry) {
   const client = getSupa();
-  if (!client) return;
-  await client.from('food_log').insert(Object.assign({ log_date: todayKey() }, entry));
+  if (!client) return { error: new Error('Supabase not ready') };
+  const { error } = await client.from('food_log').insert(Object.assign({ log_date: todayKey() }, entry));
+  return { error };
 }
 
 async function deleteEntry(id) {
   const client = getSupa();
-  if (!client) return;
-  await client.from('food_log').delete().eq('id', id);
+  if (!client) return { error: new Error('Supabase not ready') };
+  const { error } = await client.from('food_log').delete().eq('id', id);
+  return { error };
+}
+
+function showEntryError(message) {
+  // Minimal, dependency-free surfacing — no toast/notification library
+  // exists anywhere in this repo, so a plain alert is the lazy-correct
+  // choice rather than introducing one for a single error path.
+  window.alert(message);
 }
 
 function renderBudget(remaining, targets) {
@@ -748,7 +794,8 @@ function renderTodayList(entries) {
     row.querySelector('.mt-entry-macros').textContent =
       Math.round(e.protein_g) + 'p / ' + Math.round(e.carb_g) + 'c / ' + Math.round(e.fat_g) + 'f — ' + Math.round(e.calories) + 'cal';
     row.querySelector('.mt-entry-del').addEventListener('click', async () => {
-      await deleteEntry(e.id);
+      const { error } = await deleteEntry(e.id);
+      if (error) { showEntryError('Could not delete entry — try again.'); return; }
       refresh();
     });
     list.appendChild(row);
@@ -805,6 +852,13 @@ $('mtTabHistory').addEventListener('click', () => {
 });
 
 refresh();
+
+// A tab left open across local midnight would otherwise keep showing
+// yesterday's budget/list until something happens to call refresh() —
+// re-run it whenever the tab regains focus/visibility, same pattern
+// topbar.js's old water-pill render() used for the same reason.
+window.addEventListener('focus', refresh);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
 
 document.addEventListener('DOMContentLoaded', function () {
   try { if (window.self !== window.top) return; } catch (e) { return; }
@@ -893,18 +947,24 @@ function closeManualModal() { $('mtManualModalBg').classList.remove('show'); }
 
 $('mtManualBtn').addEventListener('click', openManualModal);
 $('mtManualCancel').addEventListener('click', closeManualModal);
+function nonNegative(value) {
+  const n = Number(value);
+  return Number.isFinite(n) && n >= 0 ? n : 0;
+}
+
 $('mtManualSave').addEventListener('click', async () => {
   const name = $('mtManualName').value.trim();
   if (!name) return;
-  await insertEntry({
+  const { error } = await insertEntry({
     name,
-    protein_g: Number($('mtManualProtein').value) || 0,
-    carb_g: Number($('mtManualCarb').value) || 0,
-    fat_g: Number($('mtManualFat').value) || 0,
-    calories: Number($('mtManualCalories').value) || 0,
+    protein_g: nonNegative($('mtManualProtein').value),
+    carb_g: nonNegative($('mtManualCarb').value),
+    fat_g: nonNegative($('mtManualFat').value),
+    calories: nonNegative($('mtManualCalories').value),
     source: 'manual',
     barcode: null,
   });
+  if (error) { showEntryError('Could not save entry — try again.'); return; }
   closeManualModal();
   refresh();
 });
@@ -954,48 +1014,114 @@ Add to the `<script>` block:
 ```js
 // ---- Barcode scan ----
 let html5QrCode = null;
-let scannedProduct = null; // { name, nutriments }
+let scannedProduct = null; // { name, servingSize, nutriments, barcode }
 let scanQuantity = 1;
+let scanGrams = 100;
+let scanDecodeInFlight = false; // guards against overlapping decode callbacks
+
+// Renders an element's text via textContent, never innerHTML — OFF is a
+// community-edited database and its product_name/serving_size fields are
+// untrusted input as far as this page is concerned.
+function setText(el, text) {
+  el.textContent = text;
+}
 
 async function lookupOpenFoodFacts(barcode) {
   try {
-    const res = await fetch('https://world.openfoodfacts.org/api/v2/product/' + barcode + '.json?fields=product_name,serving_size,nutriments');
+    const res = await fetch('https://world.openfoodfacts.org/api/v2/product/' + barcode + '.json?fields=product_name,serving_size,nutriments,status');
+    if (!res.ok) return null;
     const json = await res.json();
-    if (!json.product) return null;
-    return { name: json.product.product_name || ('Barcode ' + barcode), servingSize: json.product.serving_size || '', nutriments: json.product.nutriments || {}, barcode };
+    if (!json.product || json.status === 0) return null;
+    return {
+      name: json.product.product_name || ('Barcode ' + barcode),
+      servingSize: json.product.serving_size || '',
+      nutriments: json.product.nutriments || {},
+      barcode,
+    };
   } catch (e) { return null; }
 }
 
-function renderScanResult(product, quantity) {
-  const macros = window.MacroCalc.resolveServingMacros(product.nutriments, quantity, null);
+function renderScanResult(product, quantity, grams) {
+  const complete = window.MacroCalc.hasCompleteServingData(product.nutriments);
+  const macros = complete
+    ? window.MacroCalc.resolveServingMacros(product.nutriments, quantity, null)
+    : window.MacroCalc.resolveServingMacros(product.nutriments, null, grams);
+
   const resultEl = $('mtScanResult');
-  resultEl.innerHTML =
-    '<p style="font-weight:700;">' + product.name + '</p>' +
-    (product.servingSize ? '<p style="font-size:12px;color:rgba(255,255,255,0.5);">Serving: ' + product.servingSize + '</p>' : '') +
-    '<div class="mt-field"><label>Servings</label><input type="number" id="mtScanQty" value="' + quantity + '" min="0.25" step="0.25"></div>' +
-    '<p style="font-family:monospace;font-size:13px;">' + macros.protein_g + 'p / ' + macros.carb_g + 'c / ' + macros.fat_g + 'f — ' + macros.calories + 'cal</p>';
-  $('mtScanQty').addEventListener('input', (e) => {
-    scanQuantity = Number(e.target.value) || 1;
-    renderScanResult(product, scanQuantity);
-  });
+  resultEl.innerHTML = '';
+
+  const nameEl = document.createElement('p');
+  nameEl.style.fontWeight = '700';
+  setText(nameEl, product.name);
+  resultEl.appendChild(nameEl);
+
+  if (complete && product.servingSize) {
+    const servingEl = document.createElement('p');
+    servingEl.style.cssText = 'font-size:12px;color:rgba(255,255,255,0.5);';
+    setText(servingEl, 'Serving: ' + product.servingSize);
+    resultEl.appendChild(servingEl);
+  }
+
+  const quantityField = document.createElement('div');
+  quantityField.className = 'mt-field';
+  if (complete) {
+    quantityField.innerHTML = '<label>Servings</label><input type="number" id="mtScanQty" min="0.25" step="0.25">';
+  } else {
+    quantityField.innerHTML =
+      '<label>No per-serving data for this product — grams eaten</label>' +
+      '<input type="number" id="mtScanGrams" min="1" step="1">';
+  }
+  resultEl.appendChild(quantityField);
+
+  const macrosEl = document.createElement('p');
+  macrosEl.style.cssText = 'font-family:monospace;font-size:13px;';
+  setText(macrosEl, macros.protein_g + 'p / ' + macros.carb_g + 'c / ' + macros.fat_g + 'f — ' + macros.calories + 'cal');
+  resultEl.appendChild(macrosEl);
+
+  if (complete) {
+    const qtyInput = $('mtScanQty');
+    qtyInput.value = quantity;
+    qtyInput.addEventListener('input', (e) => {
+      scanQuantity = Number(e.target.value) || 1;
+      renderScanResult(product, scanQuantity, scanGrams);
+    });
+  } else {
+    const gramsInput = $('mtScanGrams');
+    gramsInput.value = grams;
+    gramsInput.addEventListener('input', (e) => {
+      scanGrams = Number(e.target.value) || 100;
+      renderScanResult(product, scanQuantity, scanGrams);
+    });
+  }
   $('mtScanConfirm').style.display = 'block';
 }
 
 async function onBarcodeDecoded(barcode) {
-  if (html5QrCode) { try { await html5QrCode.stop(); } catch (e) {} }
-  $('mtScanReader').innerHTML = '';
-  const product = await lookupOpenFoodFacts(barcode);
-  if (!product) {
-    $('mtScanResult').innerHTML = '<p>Not found. Try Manual entry instead.</p>';
-    return;
+  if (scanDecodeInFlight) return; // ignore decodes that arrive while one is already being resolved
+  scanDecodeInFlight = true;
+  try {
+    if (html5QrCode) { try { await html5QrCode.stop(); } catch (e) {} }
+    $('mtScanReader').innerHTML = '';
+    const product = await lookupOpenFoodFacts(barcode);
+    if (!product) {
+      const msg = document.createElement('p');
+      setText(msg, 'Not found. Try Manual entry instead.');
+      $('mtScanResult').innerHTML = '';
+      $('mtScanResult').appendChild(msg);
+      return;
+    }
+    scannedProduct = product;
+    scanQuantity = 1;
+    scanGrams = 100;
+    renderScanResult(product, 1, 100);
+  } finally {
+    scanDecodeInFlight = false;
   }
-  scannedProduct = product;
-  scanQuantity = 1;
-  renderScanResult(product, 1);
 }
 
 function openScanModal() {
   scannedProduct = null;
+  scanDecodeInFlight = false;
   $('mtScanResult').innerHTML = '';
   $('mtScanConfirm').style.display = 'none';
   $('mtScanModalBg').classList.add('show');
@@ -1006,11 +1132,15 @@ function openScanModal() {
     (decodedText) => onBarcodeDecoded(decodedText),
     () => {} // ignore per-frame decode failures
   ).catch(() => {
-    $('mtScanResult').innerHTML = '<p>Camera unavailable — use Manual entry instead.</p>';
+    const msg = document.createElement('p');
+    setText(msg, 'Camera unavailable — use Manual entry instead.');
+    $('mtScanResult').appendChild(msg);
   });
 }
 async function closeScanModal() {
   if (html5QrCode) { try { await html5QrCode.stop(); } catch (e) {} html5QrCode = null; }
+  scannedProduct = null;
+  scanDecodeInFlight = false;
   $('mtScanModalBg').classList.remove('show');
 }
 
@@ -1018,8 +1148,11 @@ $('mtScanBtn').addEventListener('click', openScanModal);
 $('mtScanCancel').addEventListener('click', closeScanModal);
 $('mtScanConfirm').addEventListener('click', async () => {
   if (!scannedProduct) return;
-  const macros = window.MacroCalc.resolveServingMacros(scannedProduct.nutriments, scanQuantity, null);
-  await insertEntry({
+  const complete = window.MacroCalc.hasCompleteServingData(scannedProduct.nutriments);
+  const macros = complete
+    ? window.MacroCalc.resolveServingMacros(scannedProduct.nutriments, scanQuantity, null)
+    : window.MacroCalc.resolveServingMacros(scannedProduct.nutriments, null, scanGrams);
+  const { error } = await insertEntry({
     name: scannedProduct.name,
     protein_g: macros.protein_g,
     carb_g: macros.carb_g,
@@ -1028,6 +1161,7 @@ $('mtScanConfirm').addEventListener('click', async () => {
     source: 'barcode',
     barcode: scannedProduct.barcode,
   });
+  if (error) { showEntryError('Could not save entry — try again.'); return; }
   await closeScanModal();
   refresh();
 });
@@ -1035,7 +1169,7 @@ $('mtScanConfirm').addEventListener('click', async () => {
 
 - [ ] **Step 3: Manually verify**
 
-Open `macros.html` on a phone (or a browser with camera access), click Scan, grant camera permission, scan a real packaged-food barcode. Confirm the product name, serving size, and macros appear, servings quantity adjusts the numbers live, and Add inserts it into the today list. Test the not-found path with a garbage barcode (e.g. type one in via browser devtools calling `onBarcodeDecoded('000000000000')`) and confirm it shows the "not found" message without crashing.
+Open `macros.html` on a phone (or a browser with camera access), click Scan, grant camera permission, scan a real packaged-food barcode. Confirm the product name, serving size, and macros appear, servings quantity adjusts the numbers live, and Add inserts it into the today list. Also scan (or call `onBarcodeDecoded()` directly with) a barcode for a product known to be missing per-serving data — confirm the UI switches to the "grams eaten" input instead of "Servings," and the math updates correctly as grams change. Test the not-found path with a garbage barcode (e.g. `onBarcodeDecoded('000000000000')` from devtools) and confirm it shows the "not found" message without crashing.
 
 - [ ] **Step 4: Commit**
 
@@ -1074,12 +1208,10 @@ async function renderHistory() {
   list.innerHTML = '';
   Object.keys(byDate).sort().reverse().forEach((date) => {
     const entries = byDate[date];
-    const totals = entries.reduce((acc, e) => ({
-      protein_g: acc.protein_g + (e.protein_g || 0),
-      carb_g: acc.carb_g + (e.carb_g || 0),
-      fat_g: acc.fat_g + (e.fat_g || 0),
-      calories: acc.calories + (e.calories || 0),
-    }), { protein_g: 0, carb_g: 0, fat_g: 0, calories: 0 });
+    // remainingBudget() already sums entries with the same num()-coercion
+    // used everywhere else (protects against a corrupt/non-numeric row);
+    // .consumed is the totals object, targets are irrelevant here.
+    const totals = window.MacroCalc.remainingBudget({ proteinG: 0, carbG: 0, fatG: 0, calories: 0 }, entries).consumed;
 
     const row = document.createElement('div');
     row.className = 'mt-history-day';
@@ -1111,5 +1243,20 @@ git commit -m "feat: History tab showing past days' macro totals"
 ## Self-Review Notes
 
 - **Spec coverage:** every section of the design spec maps to a task — `food_log` table (Task 1), targets/remaining budget (Task 5), barcode scan + manual entry (Tasks 6–7), history (Task 8), water removal from `topbar.js`/`health.html` (Tasks 3–4), reused `calculateMacros()` (Task 2), local-date handling to avoid Vessel's UTC bug (Task 5's `todayKey()`, matches `topbar.js`'s existing `calendarDateKey()` style), `console.assert`/self-check pattern (Task 2, using this repo's actual `require`/`node` convention from `gym-workout-events.selfcheck.js` rather than the in-browser `console.assert` style — closer fit to this repo, same spirit as the spec's testing section).
-- **Type/name consistency checked:** `macro_targets` (localStorage key), `food_log` (table + columns `log_date`/`protein_g`/`carb_g`/`fat_g`/`calories`/`source`/`barcode`), `window.MacroCalc.{calculateMacros,resolveServingMacros,remainingBudget}` — used identically across Tasks 2, 5, 6, 7, 8.
+- **Type/name consistency checked:** `macro_targets` (localStorage key), `food_log` (table + columns `log_date`/`protein_g`/`carb_g`/`fat_g`/`calories`/`source`/`barcode`), `window.MacroCalc.{calculateMacros,resolveServingMacros,remainingBudget,hasCompleteServingData}` — used identically across Tasks 2, 5, 6, 7, 8.
 - **Out of scope, confirmed not built:** topbar macro pill, barcode caching, `macro_leads` cross-reference — none appear in any task above.
+
+## Codex (terra) Second Opinion — Applied 2026-07-20
+
+Ran before execution per Carl's CLAUDE.md gate. Verified the `topbar.js`/`health.html` removal claims against the live files (all accurate, no changes needed there) and flagged real issues in the barcode/data-integrity logic, now fixed above:
+
+- **Fixed:** serving-completeness detection only checked `proteins_serving`, so a product missing e.g. `energy-kcal_serving` would silently report 0 calories instead of falling back to grams-mode. Now `hasCompleteServingData()` requires all four fields (Task 2), and the scan UI (Task 7) switches to a "grams eaten" input instead of "Servings" whenever data is incomplete — this was a real violation of the approved spec's serving-size fallback requirement, not just a nice-to-have.
+- **Fixed:** `insertEntry`/`deleteEntry` silently discarded write failures; UI would refresh/close as if the write succeeded. Now both return `{ error }` and callers surface a plain `alert()` on failure (Tasks 5–7).
+- **Fixed:** overlapping barcode decode callbacks could fire duplicate lookups. Added a `scanDecodeInFlight` guard (Task 7).
+- **Fixed:** Open Food Facts product name/serving text were being inserted via `innerHTML` — OFF is a community-edited database and that data is untrusted. Switched to `textContent` throughout the scan-result rendering (Task 7).
+- **Fixed:** the OFF fetch didn't check `res.ok` or the response's own `status` field, so a bad HTTP response or an OFF "product not found" payload could fall through weakly. Added both checks (Task 7).
+- **Fixed:** no validation against negative/non-numeric macro values, either client-side (manual entry, Task 6) or at the database level. Added `check (x >= 0)` constraints plus a barcode/source consistency constraint to the migration (Task 1), and `num()`/`nonNegative()` coercion helpers used in `macro-calc.js`, manual entry, and history totals (Tasks 2, 6, 8).
+- **Fixed:** a tab left open across local midnight would keep showing yesterday's budget until something happened to trigger a re-render. Added `focus`/`visibilitychange` listeners that call `refresh()` (Task 5) — the same pattern `topbar.js`'s old water-pill code used for the same reason.
+- **Fixed:** spec/plan naming mismatch — spec said `date`, plan said `log_date`. Kept `log_date` (avoids the reserved-word ambiguity) and updated the spec to match.
+- **Deliberately not changed — anonymous RLS on `food_log`:** matches the existing pattern already used by `app_state`, `workout_events`, `content_ideas`, and `coaching_clients` in this same repo — a single-user tool behind `topbar.js`'s passphrase gate. Codex flagged this as a real exposure (anyone with the public key can read/write/delete), which is true, but it's an existing Row-wide risk posture, not something newly introduced by this feature. Not building per-table auth for `food_log` alone while every other table stays anonymous — that would be an inconsistent security tier, not a fix. Flagging explicitly rather than silently accepting: if Carl wants real auth, that's a Row-wide change, not a macro-tracking-specific one.
+- **Open, not resolved:** backdating/editing existing entries (currently delete-and-recreate only) and cross-timezone travel behavior (calendar day is tied to the device's local clock) are both out of scope for v1 per the spec — noted as open questions by Codex, deliberately deferred rather than missed.
