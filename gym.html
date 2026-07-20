@@ -802,6 +802,10 @@ img, video, canvas, svg { max-width: 100%; }
   font-size: 9px; font-weight: 800; letter-spacing: 0.1em;
   color: var(--good); margin-bottom: 6px; text-transform: uppercase;
 }
+.po-coach-btn.hype {
+  border-color: rgba(224,51,47,0.35); background: rgba(224,51,47,0.10); color: #ff6b66;
+}
+.po-coach-btn.hype:active { background: rgba(224,51,47,0.2); }
 
 /* ----- Debrief modal ----- */
 #debriefModal {
@@ -2571,6 +2575,11 @@ img, video, canvas, svg { max-width: 100%; }
           <div class="po-coach-response-label" id="posingResponseLabel">Posing Coach</div>
           <div id="posingResponseText"></div>
         </div>
+      </div>
+
+      <!-- Hype Me Up -->
+      <div class="po-coach-section">
+        <button class="po-coach-btn hype" id="hypeMeUpBtn" type="button">🔥 Hype Me Up</button>
       </div>
 
       <div class="po-bw-banner" id="bwBanner">Bodyweight — log reps only</div>
@@ -5544,7 +5553,9 @@ img, video, canvas, svg { max-width: 100%; }
   // remote sync pull) and a stale copy would silently show old data.
   window.__gym = {
     get state() { return state; },
-    $, CONFIG, getChipDate, getActiveDate, fmtDateChipLabel, resetChipToToday, initDateChip
+    $, CONFIG, getChipDate, getActiveDate, fmtDateChipLabel, resetChipToToday, initDateChip,
+    hasActiveRestTimer: () => !!restTimerInterval,
+    refreshRestTimerDisplay: updateRestTimerDisplay,
   };
   // renderAll is called from the BOOT script below, which is now a
   // separate <script> tag (module split) and can't see this IIFE's scope.
@@ -5554,7 +5565,6 @@ img, video, canvas, svg { max-width: 100%; }
 <script src="gym-weight-photos.js"></script>
 <script src="gym-workout-events.js"></script>
 <script src="hype-audio.js"></script>
-<script src="hype-player-widget.js"></script>
 <script>
 // hype_audio gets its own independent app_state row via the plain
 // initCloudSync() helper (sync.js) — deliberately NOT bundled into
@@ -5568,6 +5578,14 @@ img, video, canvas, svg { max-width: 100%; }
 document.addEventListener('DOMContentLoaded', function () {
   if (window.initCloudSync) {
     window.initCloudSync({ appKey: 'hype-audio', syncedKeys: ['hype_audio'] });
+  }
+  const hypeBtn = document.getElementById('hypeMeUpBtn');
+  if (hypeBtn) {
+    hypeBtn.onclick = function () {
+      const clip = window.HypeAudio.pickRandom({ pillar: ['iron', 'mindset', 'carl'] });
+      if (!clip) { alert('No hype clips yet — add some from the hype-audio app.'); return; }
+      window.HypeAudio.playClip(clip);
+    };
   }
 });
 </script>
@@ -5982,7 +6000,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) pcFlushPushOnUnload();
-    else { pcPullRemote(); pcCheckForUpdate(); if (restTimerInterval) updateRestTimerDisplay(); }
+    else { pcPullRemote(); pcCheckForUpdate(); if (window.__gym.hasActiveRestTimer()) window.__gym.refreshRestTimerDisplay(); }
   });
   window.addEventListener('pageshow', (e) => {
     if (e.persisted) { pcPullRemote(); pcCheckForUpdate(); }
