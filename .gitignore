@@ -5,3 +5,4 @@
 *.swp
 .vercel
 .env*
+node_modules/
