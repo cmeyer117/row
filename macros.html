@@ -23,6 +23,7 @@ Contact: rowan.wisere@gmail.com
 <script src="sync.js" defer></script>
 <script src="topbar.js" defer></script>
 <script src="macro-calc.js"></script>
+<script src="staple-foods.js"></script>
 <style>
 * { box-sizing: border-box; }
 body {
@@ -51,11 +52,23 @@ body {
 .mt-budget-bar-fill { height: 100%; background: #6EE7B7; transition: width 0.2s; }
 .mt-budget-bar-fill.over { background: #ff8a8a; }
 .mt-budget-value { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 13px; width: 90px; text-align: right; }
-.mt-btn-row { display: flex; gap: 10px; margin-bottom: 16px; }
+.mt-btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
 .mt-action-btn {
-  flex: 1; padding: 14px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.12);
+  padding: 14px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.12);
   background: rgba(255,255,255,0.05); color: #FAFAFA; font-weight: 700; font-size: 14px;
   cursor: pointer;
+}
+.mt-calc-row { display: flex; gap: 8px; margin-bottom: 8px; align-items: center; }
+.mt-calc-row select, .mt-calc-row input {
+  padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.15);
+  background: rgba(255,255,255,0.05); color: #FAFAFA; font-size: 14px;
+}
+.mt-calc-row select { flex: 3; }
+.mt-calc-row input { flex: 1; min-width: 0; }
+.mt-calc-row button { flex: 0 0 auto; }
+.mt-calc-totals {
+  font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 13px;
+  margin: 12px 0; padding: 10px; border-radius: 8px; background: rgba(255,255,255,0.04);
 }
 .mt-entry {
   display: flex; justify-content: space-between; align-items: center;
@@ -125,6 +138,7 @@ body {
     <div class="mt-btn-row">
       <button class="mt-action-btn" id="mtScanBtn" type="button">📷 Scan</button>
       <button class="mt-action-btn" id="mtManualBtn" type="button">✏️ Manual</button>
+      <button class="mt-action-btn" id="mtCalcBtn" type="button">🧮 Calculator</button>
       <button class="mt-action-btn" id="mtTargetsBtn" type="button">🎯 Targets</button>
     </div>
 
@@ -203,6 +217,20 @@ body {
     <div class="mt-modal-actions">
       <button class="mt-btn-secondary" id="mtScanCancel" type="button">Cancel</button>
       <button class="mt-btn-primary" id="mtScanConfirm" type="button" style="display:none;">Add</button>
+    </div>
+  </div>
+</div>
+
+<!-- Calculator modal -->
+<div class="mt-modal-bg" id="mtCalcModalBg">
+  <div class="mt-modal">
+    <h3 style="margin-top:0;">Macro Calculator</h3>
+    <div id="mtCalcRows"></div>
+    <button class="mt-btn-secondary" id="mtCalcAddRow" type="button" style="width:100%;margin-bottom:12px;">+ Add ingredient</button>
+    <div class="mt-calc-totals" id="mtCalcTotals">0p / 0c / 0f — 0cal</div>
+    <div class="mt-modal-actions">
+      <button class="mt-btn-secondary" id="mtCalcCancel" type="button">Cancel</button>
+      <button class="mt-btn-primary" id="mtCalcAddToday" type="button">Add to Today</button>
     </div>
   </div>
 </div>
@@ -570,6 +598,104 @@ async function renderHistory() {
     list.appendChild(row);
   });
 }
+
+// ---- Macro calculator ----
+let calcRowCount = 0;
+
+// Built via the Option constructor (sets .textContent internally), not
+// innerHTML string concatenation — the dataset is static/trusted today,
+// but this matches the same untrusted-text-safety pattern already used
+// for Open Food Facts data elsewhere in this file, for free.
+function populateCalcFoodSelect(selectEl) {
+  const blank = new Option('Select food…', '');
+  selectEl.appendChild(blank);
+  window.StapleFoods.FOODS
+    .slice()
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .forEach((f) => selectEl.appendChild(new Option(f.name, f.name)));
+}
+
+function addCalcRow() {
+  const id = 'calcRow' + (calcRowCount++);
+  const row = document.createElement('div');
+  row.className = 'mt-calc-row';
+  row.dataset.rowId = id;
+
+  const select = document.createElement('select');
+  select.className = 'mt-calc-food';
+  populateCalcFoodSelect(select);
+
+  const input = document.createElement('input');
+  input.type = 'number';
+  input.className = 'mt-calc-grams';
+  input.placeholder = 'grams';
+  input.min = '0';
+
+  const delBtn = document.createElement('button');
+  delBtn.type = 'button';
+  delBtn.className = 'mt-entry-del';
+  delBtn.textContent = '✕';
+
+  row.appendChild(select);
+  row.appendChild(input);
+  row.appendChild(delBtn);
+
+  select.addEventListener('change', renderCalcTotals);
+  input.addEventListener('input', renderCalcTotals);
+  delBtn.addEventListener('click', () => { row.remove(); renderCalcTotals(); });
+  $('mtCalcRows').appendChild(row);
+}
+
+function collectCalcRows() {
+  return Array.from(document.querySelectorAll('.mt-calc-row')).map((row) => ({
+    foodName: row.querySelector('select').value,
+    grams: Number(row.querySelector('input').value) || 0,
+  }));
+}
+
+function renderCalcTotals() {
+  const totals = window.MacroCalc.sumIngredients(collectCalcRows(), window.StapleFoods.FOODS);
+  $('mtCalcTotals').textContent =
+    totals.protein_g + 'p / ' + totals.carb_g + 'c / ' + totals.fat_g + 'f — ' + totals.calories + 'cal';
+}
+
+function calcMealName() {
+  return collectCalcRows()
+    .filter((r) => r.foodName && r.grams > 0)
+    .map((r) => r.grams + 'g ' + r.foodName)
+    .join(', ');
+}
+
+function openCalcModal() {
+  $('mtCalcRows').innerHTML = '';
+  calcRowCount = 0;
+  addCalcRow();
+  addCalcRow();
+  renderCalcTotals();
+  $('mtCalcModalBg').classList.add('show');
+}
+function closeCalcModal() { $('mtCalcModalBg').classList.remove('show'); }
+
+$('mtCalcBtn').addEventListener('click', openCalcModal);
+$('mtCalcCancel').addEventListener('click', closeCalcModal);
+$('mtCalcAddRow').addEventListener('click', addCalcRow);
+$('mtCalcAddToday').addEventListener('click', async () => {
+  const name = calcMealName();
+  if (!name) { showEntryError('Select at least one food and enter grams before adding.'); return; }
+  const totals = window.MacroCalc.sumIngredients(collectCalcRows(), window.StapleFoods.FOODS);
+  const { error } = await insertEntry({
+    name,
+    protein_g: totals.protein_g,
+    carb_g: totals.carb_g,
+    fat_g: totals.fat_g,
+    calories: totals.calories,
+    source: 'manual',
+    barcode: null,
+  });
+  if (error) { showEntryError('Could not save entry — try again.'); return; }
+  closeCalcModal();
+  refresh();
+});
 
 // ---- Tabs ----
 $('mtTabLog').addEventListener('click', () => {
