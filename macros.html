@@ -194,6 +194,19 @@ body {
   </div>
 </div>
 
+<!-- Scan modal -->
+<div class="mt-modal-bg" id="mtScanModalBg">
+  <div class="mt-modal">
+    <h3 style="margin-top:0;" id="mtScanTitle">Scan Barcode</h3>
+    <div id="mtScanReader"></div>
+    <div id="mtScanResult"></div>
+    <div class="mt-modal-actions">
+      <button class="mt-btn-secondary" id="mtScanCancel" type="button">Cancel</button>
+      <button class="mt-btn-primary" id="mtScanConfirm" type="button" style="display:none;">Add</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const LS_KEY = 'macro_targets';
 const DEFAULT_TARGETS = { proteinG: 180, carbG: 200, fatG: 65, calories: 2200 };
@@ -364,6 +377,160 @@ $('mtManualSave').addEventListener('click', async () => {
   });
   if (error) { showEntryError('Could not save entry — try again.'); return; }
   closeManualModal();
+  refresh();
+});
+
+// ---- Barcode scan ----
+let html5QrCode = null;
+let scannedProduct = null; // { name, servingSize, nutriments, barcode }
+let scanQuantity = 1;
+let scanGrams = 100;
+let scanDecodeInFlight = false; // guards against overlapping decode callbacks
+
+// Renders an element's text via textContent, never innerHTML — OFF is a
+// community-edited database and its product_name/serving_size fields are
+// untrusted input as far as this page is concerned.
+function setText(el, text) {
+  el.textContent = text;
+}
+
+async function lookupOpenFoodFacts(barcode) {
+  try {
+    const res = await fetch('https://world.openfoodfacts.org/api/v2/product/' + barcode + '.json?fields=product_name,serving_size,nutriments,status');
+    if (!res.ok) return null;
+    const json = await res.json();
+    if (!json.product || json.status === 0) return null;
+    return {
+      name: json.product.product_name || ('Barcode ' + barcode),
+      servingSize: json.product.serving_size || '',
+      nutriments: json.product.nutriments || {},
+      barcode,
+    };
+  } catch (e) { return null; }
+}
+
+function renderScanResult(product, quantity, grams) {
+  const complete = window.MacroCalc.hasCompleteServingData(product.nutriments);
+  const macros = complete
+    ? window.MacroCalc.resolveServingMacros(product.nutriments, quantity, null)
+    : window.MacroCalc.resolveServingMacros(product.nutriments, null, grams);
+
+  const resultEl = $('mtScanResult');
+  resultEl.innerHTML = '';
+
+  const nameEl = document.createElement('p');
+  nameEl.style.fontWeight = '700';
+  setText(nameEl, product.name);
+  resultEl.appendChild(nameEl);
+
+  if (complete && product.servingSize) {
+    const servingEl = document.createElement('p');
+    servingEl.style.cssText = 'font-size:12px;color:rgba(255,255,255,0.5);';
+    setText(servingEl, 'Serving: ' + product.servingSize);
+    resultEl.appendChild(servingEl);
+  }
+
+  const quantityField = document.createElement('div');
+  quantityField.className = 'mt-field';
+  if (complete) {
+    quantityField.innerHTML = '<label>Servings</label><input type="number" id="mtScanQty" min="0.25" step="0.25">';
+  } else {
+    quantityField.innerHTML =
+      '<label>No per-serving data for this product — grams eaten</label>' +
+      '<input type="number" id="mtScanGrams" min="1" step="1">';
+  }
+  resultEl.appendChild(quantityField);
+
+  const macrosEl = document.createElement('p');
+  macrosEl.style.cssText = 'font-family:monospace;font-size:13px;';
+  setText(macrosEl, macros.protein_g + 'p / ' + macros.carb_g + 'c / ' + macros.fat_g + 'f — ' + macros.calories + 'cal');
+  resultEl.appendChild(macrosEl);
+
+  if (complete) {
+    const qtyInput = $('mtScanQty');
+    qtyInput.value = quantity;
+    qtyInput.addEventListener('input', (e) => {
+      scanQuantity = Number(e.target.value) || 1;
+      renderScanResult(product, scanQuantity, scanGrams);
+    });
+  } else {
+    const gramsInput = $('mtScanGrams');
+    gramsInput.value = grams;
+    gramsInput.addEventListener('input', (e) => {
+      scanGrams = Number(e.target.value) || 100;
+      renderScanResult(product, scanQuantity, scanGrams);
+    });
+  }
+  $('mtScanConfirm').style.display = 'block';
+}
+
+async function onBarcodeDecoded(barcode) {
+  if (scanDecodeInFlight) return; // ignore decodes that arrive while one is already being resolved
+  scanDecodeInFlight = true;
+  try {
+    if (html5QrCode) { try { await html5QrCode.stop(); } catch (e) {} }
+    $('mtScanReader').innerHTML = '';
+    const product = await lookupOpenFoodFacts(barcode);
+    if (!product) {
+      const msg = document.createElement('p');
+      setText(msg, 'Not found. Try Manual entry instead.');
+      $('mtScanResult').innerHTML = '';
+      $('mtScanResult').appendChild(msg);
+      return;
+    }
+    scannedProduct = product;
+    scanQuantity = 1;
+    scanGrams = 100;
+    renderScanResult(product, 1, 100);
+  } finally {
+    scanDecodeInFlight = false;
+  }
+}
+
+function openScanModal() {
+  scannedProduct = null;
+  scanDecodeInFlight = false;
+  $('mtScanResult').innerHTML = '';
+  $('mtScanConfirm').style.display = 'none';
+  $('mtScanModalBg').classList.add('show');
+  html5QrCode = new Html5Qrcode('mtScanReader');
+  html5QrCode.start(
+    { facingMode: 'environment' },
+    { fps: 10, qrbox: { width: 220, height: 220 } },
+    (decodedText) => onBarcodeDecoded(decodedText),
+    () => {} // ignore per-frame decode failures
+  ).catch(() => {
+    const msg = document.createElement('p');
+    setText(msg, 'Camera unavailable — use Manual entry instead.');
+    $('mtScanResult').appendChild(msg);
+  });
+}
+async function closeScanModal() {
+  if (html5QrCode) { try { await html5QrCode.stop(); } catch (e) {} html5QrCode = null; }
+  scannedProduct = null;
+  scanDecodeInFlight = false;
+  $('mtScanModalBg').classList.remove('show');
+}
+
+$('mtScanBtn').addEventListener('click', openScanModal);
+$('mtScanCancel').addEventListener('click', closeScanModal);
+$('mtScanConfirm').addEventListener('click', async () => {
+  if (!scannedProduct) return;
+  const complete = window.MacroCalc.hasCompleteServingData(scannedProduct.nutriments);
+  const macros = complete
+    ? window.MacroCalc.resolveServingMacros(scannedProduct.nutriments, scanQuantity, null)
+    : window.MacroCalc.resolveServingMacros(scannedProduct.nutriments, null, scanGrams);
+  const { error } = await insertEntry({
+    name: scannedProduct.name,
+    protein_g: macros.protein_g,
+    carb_g: macros.carb_g,
+    fat_g: macros.fat_g,
+    calories: macros.calories,
+    source: 'barcode',
+    barcode: scannedProduct.barcode,
+  });
+  if (error) { showEntryError('Could not save entry — try again.'); return; }
+  await closeScanModal();
   refresh();
 });
 
