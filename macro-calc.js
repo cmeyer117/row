@@ -104,7 +104,40 @@
     };
   }
 
-  const api = { calculateMacros, resolveServingMacros, remainingBudget, hasCompleteServingData };
+  // rows: [{ foodName, grams }]. foods: an array shaped like
+  // StapleFoods.FOODS ({ name, protein_100g, carb_100g, fat_100g,
+  // calories_100g }) — passed in rather than imported, keeping this file
+  // dependency-free like the rest of it. A row whose foodName doesn't
+  // match anything in foods, or whose grams isn't a valid positive
+  // number, contributes 0 rather than throwing or producing NaN.
+  function sumIngredients(rows, foods) {
+    const byName = {};
+    (foods || []).forEach((f) => { byName[f.name] = f; });
+
+    const raw = (rows || []).reduce((acc, row) => {
+      const food = row && byName[row.foodName];
+      const grams = row ? num(row.grams, 0) : 0;
+      if (!food || grams <= 0) return acc;
+      const factor = grams / 100;
+      return {
+        protein_g: acc.protein_g + num(food.protein_100g, 0) * factor,
+        carb_g: acc.carb_g + num(food.carb_100g, 0) * factor,
+        fat_g: acc.fat_g + num(food.fat_100g, 0) * factor,
+        calories: acc.calories + num(food.calories_100g, 0) * factor,
+      };
+    }, { protein_g: 0, carb_g: 0, fat_g: 0, calories: 0 });
+
+    // Round once at the end, not per-ingredient — avoids compounding
+    // rounding error across a longer ingredient list.
+    return {
+      protein_g: round1(raw.protein_g),
+      carb_g: round1(raw.carb_g),
+      fat_g: round1(raw.fat_g),
+      calories: round1(raw.calories),
+    };
+  }
+
+  const api = { calculateMacros, resolveServingMacros, remainingBudget, hasCompleteServingData, sumIngredients };
   if (typeof window !== 'undefined') window.MacroCalc = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })();

@@ -1,7 +1,8 @@
 // Run with: node macro-calc.selfcheck.js
 'use strict';
 
-const { calculateMacros, resolveServingMacros, remainingBudget, hasCompleteServingData } = require('./macro-calc.js');
+const { calculateMacros, resolveServingMacros, remainingBudget, hasCompleteServingData, sumIngredients } = require('./macro-calc.js');
+const { FOODS } = require('./staple-foods.js');
 
 function assertEqual(actual, expected, label) {
   if (actual !== expected) {
@@ -64,5 +65,47 @@ assertEqual(b2.protein_g, 180, 'remainingBudget with no entries returns full tar
 const b3 = remainingBudget(targets, [{ protein_g: 'not-a-number', carb_g: null, fat_g: undefined, calories: 100 }]);
 assertEqual(b3.protein_g, 180, 'remainingBudget treats non-numeric fields as 0 instead of propagating NaN');
 assertEqual(b3.calories, 2142, 'remainingBudget still counts the valid numeric field on the same row');
+
+// sumIngredients — Carl's own example: 200g White Rice + 200g Chicken
+// Breast + 50g Broccoli. Hand-computed expected total:
+//   protein: 200*2.7/100 + 200*31/100 + 50*2.8/100   = 5.4 + 62 + 1.4   = 68.8
+//   carb:    200*28/100  + 200*0/100  + 50*7/100     = 56 + 0 + 3.5     = 59.5
+//   fat:     200*0.3/100 + 200*3.6/100 + 50*0.4/100  = 0.6 + 7.2 + 0.2  = 8
+//   cal:     200*130/100 + 200*165/100 + 50*35/100   = 260 + 330 + 17.5 = 607.5
+const meal = sumIngredients([
+  { foodName: 'White Rice (cooked)', grams: 200 },
+  { foodName: 'Chicken Breast (cooked)', grams: 200 },
+  { foodName: 'Broccoli (cooked)', grams: 50 },
+], FOODS);
+assertEqual(meal.protein_g, 68.8, 'sumIngredients protein for Carl\'s example meal');
+assertEqual(meal.carb_g, 59.5, 'sumIngredients carb for Carl\'s example meal');
+assertEqual(meal.fat_g, 8, 'sumIngredients fat for Carl\'s example meal');
+assertEqual(meal.calories, 607.5, 'sumIngredients calories for Carl\'s example meal');
+
+// sumIngredients — an unmatched food name contributes 0, not NaN.
+const withUnknown = sumIngredients([
+  { foodName: 'White Rice (cooked)', grams: 100 },
+  { foodName: 'Nonexistent Food', grams: 999 },
+], FOODS);
+assertEqual(withUnknown.protein_g, 2.7, 'sumIngredients ignores an unmatched food name');
+
+// sumIngredients — a zero/negative grams row is skipped.
+const withZero = sumIngredients([
+  { foodName: 'White Rice (cooked)', grams: 100 },
+  { foodName: 'Chicken Breast (cooked)', grams: 0 },
+  { foodName: 'Broccoli (cooked)', grams: -10 },
+], FOODS);
+assertEqual(withZero.calories, 130, 'sumIngredients skips zero/negative-gram rows');
+
+// sumIngredients — null/undefined rows and an empty/undefined rows array
+// don't throw (a row can legitimately be malformed if a UI bug ever
+// slips one through).
+const withNullRow = sumIngredients([
+  { foodName: 'White Rice (cooked)', grams: 100 },
+  null,
+  undefined,
+], FOODS);
+assertEqual(withNullRow.calories, 130, 'sumIngredients tolerates null/undefined rows without throwing');
+assertEqual(sumIngredients(undefined, FOODS).calories, 0, 'sumIngredients(undefined, FOODS) returns a zeroed total, not a throw');
 
 console.log('macro-calc.selfcheck.js: all assertions passed');
