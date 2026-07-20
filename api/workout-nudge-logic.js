@@ -9,15 +9,23 @@ export function isRestDay(date = new Date()) {
   return weekday === 'Thursday' || weekday === 'Sunday';
 }
 
-// Matches gym.html's wtDateKey exactly: UTC ISO date, NOT Central-converted.
-// Row's own workout-done data is keyed this way (gym.html:5085,
-// doneDays[todayKey] = new Date().toISOString() at gym.html:4247) — this
-// function must produce the identical key format or the lookup always misses.
-export function todayUtcKey(date = new Date()) {
-  return date.toISOString().slice(0, 10);
+// Matches gym.html's wtDateKey exactly. wtDateKey (gym-weight-photos.js:31-33)
+// builds the key from LOCAL Date components (getFullYear/getMonth/getDate),
+// not UTC — and gym.html runs in Carl's own browser (Central time), so the
+// key is effectively a Central-time calendar date. doneDays[todayKey] at
+// gym.html:4242-4247 is keyed by wtDateKey(new Date()). This function must
+// reproduce that same Central-time date or the lookup misses near the
+// UTC/Central day boundary. Do not use date.toISOString() here — that's UTC.
+export function todayCentralKey(date = new Date()) {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Chicago',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date);
 }
 
 export function hasLoggedToday(workoutDone, date = new Date()) {
   if (!workoutDone) return false;
-  return Boolean(workoutDone[todayUtcKey(date)]);
+  return Boolean(workoutDone[todayCentralKey(date)]);
 }
