@@ -79,7 +79,7 @@
 | Butter | 0.9 | 0.1 | 81 | 717 |
 | Protein Bar (generic) | 20 | 25 | 8 | 220 |
 
-(59 entries — over Carl's "maybe go over 50" allowance, deliberately.)
+(58 entries — over Carl's "maybe go over 50" allowance, deliberately. Corrected from an initial miscount of 59 during Codex-luna's plan review.)
 
 ## Architecture
 

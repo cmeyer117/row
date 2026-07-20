@@ -4,7 +4,7 @@
 
 **Goal:** Add a multi-ingredient macro calculator to `macros.html` — pick foods from a curated staple-foods list, enter grams per ingredient, see live combined macros, and log the whole meal to today's tracker in one shot.
 
-**Architecture:** A new static data file (`staple-foods.js`, ~59 bodybuilding-diet staples with USDA-sourced per-100g macros) plus one new pure function in `macro-calc.js` (`sumIngredients`). `macros.html` gets a 4th action button and a new modal reusing the existing `insertEntry()`/error-handling path already proven by Manual entry and Scan.
+**Architecture:** A new static data file (`staple-foods.js`, 58 bodybuilding-diet staples with USDA-sourced per-100g macros) plus one new pure function in `macro-calc.js` (`sumIngredients`). `macros.html` gets a 4th action button and a new modal reusing the existing `insertEntry()`/error-handling path already proven by Manual entry and Scan.
 
 **Tech Stack:** Vanilla HTML/CSS/JS, no build step, no network calls for this feature (pure static lookup).
 
@@ -113,7 +113,7 @@ function assertEqual(actual, expected, label) {
   }
 }
 
-assertEqual(FOODS.length >= 59, true, 'staple-foods dataset has at least 59 entries');
+assertEqual(FOODS.length >= 58, true, 'staple-foods dataset has at least 58 entries');
 
 const chicken = FOODS.find((f) => f.name === 'Chicken Breast (cooked)');
 assertEqual(!!chicken, true, 'Chicken Breast (cooked) exists in the dataset');
@@ -170,18 +170,27 @@ Add this function inside the IIFE, after `remainingBudget` and before the `const
     const byName = {};
     (foods || []).forEach((f) => { byName[f.name] = f; });
 
-    return (rows || []).reduce((acc, row) => {
-      const food = byName[row.foodName];
-      const grams = num(row.grams, 0);
+    const raw = (rows || []).reduce((acc, row) => {
+      const food = row && byName[row.foodName];
+      const grams = row ? num(row.grams, 0) : 0;
       if (!food || grams <= 0) return acc;
       const factor = grams / 100;
       return {
-        protein_g: round1(acc.protein_g + num(food.protein_100g, 0) * factor),
-        carb_g: round1(acc.carb_g + num(food.carb_100g, 0) * factor),
-        fat_g: round1(acc.fat_g + num(food.fat_100g, 0) * factor),
-        calories: round1(acc.calories + num(food.calories_100g, 0) * factor),
+        protein_g: acc.protein_g + num(food.protein_100g, 0) * factor,
+        carb_g: acc.carb_g + num(food.carb_100g, 0) * factor,
+        fat_g: acc.fat_g + num(food.fat_100g, 0) * factor,
+        calories: acc.calories + num(food.calories_100g, 0) * factor,
       };
     }, { protein_g: 0, carb_g: 0, fat_g: 0, calories: 0 });
+
+    // Round once at the end, not per-ingredient — avoids compounding
+    // rounding error across a longer ingredient list.
+    return {
+      protein_g: round1(raw.protein_g),
+      carb_g: round1(raw.carb_g),
+      fat_g: round1(raw.fat_g),
+      calories: round1(raw.calories),
+    };
   }
 ```
 
@@ -247,6 +256,17 @@ const withZero = sumIngredients([
   { foodName: 'Broccoli (cooked)', grams: -10 },
 ], FOODS);
 assertEqual(withZero.calories, 130, 'sumIngredients skips zero/negative-gram rows');
+
+// sumIngredients — null/undefined rows and an empty/undefined rows array
+// don't throw (a row can legitimately be malformed if a UI bug ever
+// slips one through).
+const withNullRow = sumIngredients([
+  { foodName: 'White Rice (cooked)', grams: 100 },
+  null,
+  undefined,
+], FOODS);
+assertEqual(withNullRow.calories, 130, 'sumIngredients tolerates null/undefined rows without throwing');
+assertEqual(sumIngredients(undefined, FOODS).calories, 0, 'sumIngredients(undefined, FOODS) returns a zeroed total, not a throw');
 ```
 
 - [ ] **Step 4: Run both self-checks, verify they pass**
@@ -301,6 +321,10 @@ Add these two new rules right after `.mt-action-btn`'s existing block (after its
 
 ```css
 .mt-calc-row { display: flex; gap: 8px; margin-bottom: 8px; align-items: center; }
+.mt-calc-row select, .mt-calc-row input {
+  padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.15);
+  background: rgba(255,255,255,0.05); color: #FAFAFA; font-size: 14px;
+}
 .mt-calc-row select { flex: 3; }
 .mt-calc-row input { flex: 1; min-width: 0; }
 .mt-calc-row button { flex: 0 0 auto; }
@@ -361,12 +385,17 @@ Insert into the `<script>` block, immediately before the `// ---- Tabs ----` com
 // ---- Macro calculator ----
 let calcRowCount = 0;
 
-function calcFoodOptionsHtml() {
-  return window.StapleFoods.FOODS
+// Built via the Option constructor (sets .textContent internally), not
+// innerHTML string concatenation — the dataset is static/trusted today,
+// but this matches the same untrusted-text-safety pattern already used
+// for Open Food Facts data elsewhere in this file, for free.
+function populateCalcFoodSelect(selectEl) {
+  const blank = new Option('Select food…', '');
+  selectEl.appendChild(blank);
+  window.StapleFoods.FOODS
     .slice()
     .sort((a, b) => a.name.localeCompare(b.name))
-    .map((f) => '<option value="' + f.name + '">' + f.name + '</option>')
-    .join('');
+    .forEach((f) => selectEl.appendChild(new Option(f.name, f.name)));
 }
 
 function addCalcRow() {
@@ -374,13 +403,29 @@ function addCalcRow() {
   const row = document.createElement('div');
   row.className = 'mt-calc-row';
   row.dataset.rowId = id;
-  row.innerHTML =
-    '<select class="mt-calc-food"><option value="">Select food…</option>' + calcFoodOptionsHtml() + '</select>' +
-    '<input type="number" class="mt-calc-grams" placeholder="grams" min="0">' +
-    '<button type="button" class="mt-entry-del">✕</button>';
-  row.querySelector('select').addEventListener('change', renderCalcTotals);
-  row.querySelector('input').addEventListener('input', renderCalcTotals);
-  row.querySelector('button').addEventListener('click', () => { row.remove(); renderCalcTotals(); });
+
+  const select = document.createElement('select');
+  select.className = 'mt-calc-food';
+  populateCalcFoodSelect(select);
+
+  const input = document.createElement('input');
+  input.type = 'number';
+  input.className = 'mt-calc-grams';
+  input.placeholder = 'grams';
+  input.min = '0';
+
+  const delBtn = document.createElement('button');
+  delBtn.type = 'button';
+  delBtn.className = 'mt-entry-del';
+  delBtn.textContent = '✕';
+
+  row.appendChild(select);
+  row.appendChild(input);
+  row.appendChild(delBtn);
+
+  select.addEventListener('change', renderCalcTotals);
+  input.addEventListener('input', renderCalcTotals);
+  delBtn.addEventListener('click', () => { row.remove(); renderCalcTotals(); });
   $('mtCalcRows').appendChild(row);
 }
 
@@ -419,7 +464,7 @@ $('mtCalcCancel').addEventListener('click', closeCalcModal);
 $('mtCalcAddRow').addEventListener('click', addCalcRow);
 $('mtCalcAddToday').addEventListener('click', async () => {
   const name = calcMealName();
-  if (!name) return;
+  if (!name) { showEntryError('Select at least one food and enter grams before adding.'); return; }
   const totals = window.MacroCalc.sumIngredients(collectCalcRows(), window.StapleFoods.FOODS);
   const { error } = await insertEntry({
     name,
@@ -454,3 +499,15 @@ git commit -m "feat: multi-ingredient macro calculator in macros.html"
 - **Spec coverage:** curated dataset (Task 1) · `sumIngredients` pure function (Task 2) · repeatable rows/live totals/"Add to Today" reusing `insertEntry` (Task 3) · 2×2 button grid to fit the 4th button (Task 3, Step 2) · self-checks for both the dataset and the sum math, including Carl's own example meal and an unmatched-food/zero-grams case (Tasks 1-2).
 - **Type/name consistency checked:** `staple-foods.js` exports `{ FOODS }` (array), consumed identically in `macro-calc.selfcheck.js` and in `macros.html`'s `window.StapleFoods.FOODS`. `sumIngredients(rows, foods)` signature matches every call site (selfcheck and the two calculator functions that call it). `insertEntry()`/`showEntryError()`/`refresh()` reused unchanged from the existing Manual-entry path — no new write or error-handling logic invented.
 - **Out of scope, confirmed not built:** free-text parsing, in-UI dataset editing, coach-diet-sheet-exact matching — none appear in any task above.
+
+## Codex (luna) Second Opinion — Applied 2026-07-20
+
+Ran before execution per Carl's CLAUDE.md gate. Verified all cited line-number/content claims against the real `macros.html`/`macro-calc.js`/`macro-calc.selfcheck.js` (all accurate — button row, modal boundary, `insertEntry()`/`showEntryError()` locations, `// ---- Tabs ----` anchor). Flagged one real self-count error and several real hardening gaps, now fixed:
+
+- **Fixed:** dataset claimed 59 entries in both the spec and this plan's self-check threshold; actual count is 58 (my own arithmetic error while writing the spec, not a data problem). Corrected both to 58 — still comfortably over Carl's "maybe go over 50" ask.
+- **Fixed:** `sumIngredients()` would throw on a `null`/`undefined` row (`row.foodName` read unguarded) — added a `row &&` guard, plus a self-check case covering it.
+- **Fixed:** rounding happened per-ingredient inside the reduce, which can compound rounding error across a longer ingredient list — switched to accumulating raw (unrounded) totals and rounding once at the end.
+- **Fixed:** `<option>` elements were being built via `innerHTML` string concatenation of food names — switched to the `Option` constructor (DOM API, sets `.textContent` internally), matching the same untrusted-text-safety pattern already established for Open Food Facts data in this same file. The dataset is static/trusted today, but this costs nothing and stays consistent.
+- **Fixed:** the calculator's `<select>`/`<input>` had no explicit styling — would have rendered as an unstyled native white dropdown against this page's dark theme, a real visual bug, not cosmetic-only. Added the same input/select styling already used by `.mt-field` elsewhere in this file.
+- **Fixed:** "Add to Today" with no valid ingredients silently did nothing. Now shows the same `showEntryError()` alert used elsewhere instead of a silent no-op.
+- **Open, not resolved:** whether cooked-vs-raw weights should be made more visually prominent in the food-picker labels, and whether grams should be forced to whole numbers — both UX-polish questions, not correctness bugs; left for Carl to decide if they come up in real use.
