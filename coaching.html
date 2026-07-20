@@ -35,7 +35,10 @@ body { min-height: 100vh; padding: max(28px, env(safe-area-inset-top)) 20px 60px
 .checks { display: flex; flex-wrap: wrap; gap: 8px; }
 .chk { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-primary); }
 .btn { padding: 11px 20px; border: 0; border-radius: 12px; background: linear-gradient(135deg, #6EE7B7 0%, #34D399 100%); color: #052e16; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
-.client-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-radius: 12px; background: rgba(255,255,255,0.035); margin-bottom: 6px; text-decoration: none; }
+.client-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-radius: 12px; background: rgba(255,255,255,0.035); margin-bottom: 6px; }
+.client-link { display: flex; flex-direction: column; text-decoration: none; flex: 1; min-width: 0; }
+.archive-btn { border: 0; background: transparent; color: var(--text-tertiary); font-size: 11px; cursor: pointer; padding: 6px 8px; flex-shrink: 0; }
+.archive-btn:hover { color: var(--danger); }
 .client-name { color: var(--text-primary); font-weight: 600; }
 .client-meta { font-family: var(--font-mono); font-size: 11px; color: var(--text-tertiary); }
 .badge { font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; padding: 3px 8px; border-radius: 999px; }
@@ -95,24 +98,43 @@ body { min-height: 100vh; padding: max(28px, env(safe-area-inset-top)) 20px 60px
     return 'plan_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
   }
 
+  async function archiveClient(id, name) {
+    if (!confirm('Archive ' + name + '? This hides them from the list but keeps their record.')) return;
+    const { error } = await supa.from('coaching_clients').update({ status: 'archived' }).eq('id', id);
+    if (error) { alert('Archive failed: ' + error.message); return; }
+    loadClients();
+  }
+
   async function loadClients() {
-    const { data, error } = await supa.from('coaching_clients').select('*').order('created_at', { ascending: false });
+    const { data, error } = await supa.from('coaching_clients').select('*').neq('status', 'archived').order('created_at', { ascending: false });
     const listEl = document.getElementById('clientList');
     const emptyEl = document.getElementById('emptyClients');
     listEl.innerHTML = '';
     if (error || !data || data.length === 0) { emptyEl.style.display = 'block'; return; }
     emptyEl.style.display = 'none';
     data.forEach((c) => {
-      const a = document.createElement('a');
-      a.href = 'coaching-plan.html?id=' + encodeURIComponent(c.id);
-      a.className = 'client-row';
+      const row = document.createElement('div');
+      row.className = 'client-row';
       const badgeClass = c.status === 'issued' ? 'badge-issued' : (c.needs_review ? 'badge-review' : 'badge-draft');
       const badgeLabel = c.status === 'issued' ? 'ISSUED' : (c.needs_review ? 'NEEDS REVIEW' : 'DRAFT');
+      const a = document.createElement('a');
+      a.href = 'coaching-plan.html?id=' + encodeURIComponent(c.id);
+      a.className = 'client-link';
       a.innerHTML =
-        '<div><div class="client-name">' + window.CoachingTemplates.escapeHtml(c.name) + '</div>' +
-        '<div class="client-meta">' + window.CoachingTemplates.escapeHtml(c.stage) + ' · ' + window.CoachingTemplates.escapeHtml(c.goal) + ' · ' + window.CoachingTemplates.escapeHtml(c.plan_id) + '</div></div>' +
-        '<span class="badge ' + badgeClass + '">' + badgeLabel + '</span>';
-      listEl.appendChild(a);
+        '<div class="client-name">' + window.CoachingTemplates.escapeHtml(c.name) + '</div>' +
+        '<div class="client-meta">' + window.CoachingTemplates.escapeHtml(c.stage) + ' · ' + window.CoachingTemplates.escapeHtml(c.goal) + ' · ' + window.CoachingTemplates.escapeHtml(c.plan_id) + '</div>';
+      const badge = document.createElement('span');
+      badge.className = 'badge ' + badgeClass;
+      badge.textContent = badgeLabel;
+      const archiveBtn = document.createElement('button');
+      archiveBtn.type = 'button';
+      archiveBtn.className = 'archive-btn';
+      archiveBtn.textContent = 'Archive';
+      archiveBtn.addEventListener('click', () => archiveClient(c.id, c.name));
+      row.appendChild(a);
+      row.appendChild(badge);
+      row.appendChild(archiveBtn);
+      listEl.appendChild(row);
     });
   }
 
