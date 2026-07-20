@@ -2,79 +2,14 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## 🔄 Memory Sync Rule — MANDATORY
+## Continuity — corrected 2026-07-20
 
-**Update `carl-meyer-context-backup-v2.md` on Google Drive at:**
-- End of every session
-- After any major task (new feature built, project decision made, new info learned)
-- Any time Carl asks
+The Memory Sync Rule, Context Window Rule, Token Efficiency mandatory-skill-preload list, and `TASK_STATE.json` checkpoint pattern that used to live in this section were all stale: `carl-meyer-context-backup.md`/`-v2.md` was replaced by `HANDOFF.md` back on 2026-06-17, and this repo's own `PROJECT_REGISTRY.md`/`TASK_STATE.json` haven't had real content updates since 2026-06-16 (`TASK_STATE.json` describes an unrelated, already-finished "Second Brain" knowledge-base rebuild, not Row app work). None of it matched how sessions actually run in this workspace.
 
-File lives at: `G:/My Drive/Claude/carl-meyer-context-backup-v2.md` (Drive folder ID: `1GA5FlJpVUKEspYsGTe1y8xvGqt3RTWQd`)
-
-Update format: append a `## Session Notes — [date]` section with key decisions, what was built, anything Carl would need to know in a fresh session.
-
----
-
-## ⚠️ Context Window Rule — MANDATORY
-
-**At the start of EVERY session, check context usage immediately.**
-- If context is already at **50% or higher**: stop and tell Carl before doing any work.
-- Say exactly: "⚠️ Context is at X% — recommend starting a fresh session to avoid hitting limits mid-task."
-- Do not proceed until Carl confirms or starts a new session.
-
----
-
-## Token Efficiency — MANDATORY (Every Session)
-
-**These rules are non-negotiable. Apply before any other work.**
-
-### Session Start Checklist
-1. **Invoke `token-guardian` skill immediately** — before any tool calls or content generation
-2. **Read `TASK_STATE.json`** if it exists — this replaces all recap/summary
-3. **Warn if context is already >20%** from prior session summary before starting heavy work
-
-### Mid-Session Checkpoints
-After every major step (file written, domain processed, build completed), update TASK_STATE.json:
-```bash
-# Write checkpoint — do this silently, no user confirmation needed
-python3 -c "
-import json
-state = json.load(open('/sessions/.../mnt/Claude/TASK_STATE.json'))
-state['completed_steps'].append('step name')
-state['next_step'] = 'next step description'
-json.dump(state, open('/sessions/.../mnt/Claude/TASK_STATE.json','w'), indent=2)
-print('Checkpoint saved')
-"
-```
-
-### Core Rules (from token-guardian skill)
-- **Content lives on disk. Context holds only paths, counts, decisions.**
-- Never echo downloaded content — save to disk, confirm with count only
-- Never `cat` large files — use `head -5` or targeted python one-liners
-- Never load full file content when only metadata is needed
-- Process one domain/section per bash call — never batch all content at once
-- If context hits 80%: stop, write TASK_STATE.json, tell user to start fresh session
-
-## ⚡ SESSION START — REQUIRED (load before any work)
-
-These six skills are mandatory every session. Load them first, in order.
-
-1. **token-guardian** — content lives on disk; context holds paths/counts/decisions only. Enforce the 10 Laws. Run session start checklist silently. Hard stop at 80% context.
-2. **token-optimization** — every response lean and high-signal. Flag token-heavy tasks before executing. Offer lighter alternatives.
-3. **context-guardian** — silent below 75%. Warn at 75%. Present options at 85%. Auto-compact at 90%+. Background check every response once session gets long.
-4. **critical-thinking** — passively monitor Carl's statements. Challenge confident assertions with ⚡. Steelman, invert, second-order think. No sycophantic agreement.
-5. **second-brain** — surface cross-domain connections with 🧠. After major learning sessions, prompt Carl to save key insights to CLAUDE.md.
-6. **project-guardian** — check PROJECT_REGISTRY.md before any build. After anything is built, proactively initiate: "Session Snapshot — update PROJECT_REGISTRY.md?"
-7. **timeout-guard** — decompose any task >30s before running. Report immediately on timeout/error/stall. Never let Carl wait in silence.
-
----
-
-## On-Demand Skills (invoke only when needed)
-- **pre-task-clarifier** — before complex multi-step builds
-- **deep-research** — sourced expert-level answers
-- **knowledge-absorb** — learning from books/sources
-- **model-advisor** — before heavy tasks
-- **cc-mastery** — Claude Code sessions only
+**Current system, read this instead:**
+- **Session continuity:** `G:\My Drive\Claude\HANDOFF.md` (active focus, read at session start) and `SESSION_LOG.md` (full append-only history).
+- **Row-specific facts** (Supabase keys, page/module structure, standing rules like "never re-propose the gym-data wipe"): `project-row-dashboard.md` in `C:\Users\gregm\.claude\projects\G--My-Drive-Claude\memory\`.
+- **Behavioral rules / skill-loading:** the global `C:\Users\gregm\.claude\CLAUDE.md` — skills load on demand by judgment, not a mandatory per-session preload list.
 
 ---
 
