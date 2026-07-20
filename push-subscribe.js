@@ -2,7 +2,7 @@
 // to push on first visit after this ships. Safe to include on every page;
 // no-ops if already subscribed or permission already denied.
 (function () {
-  const VAPID_PUBLIC_KEY = 'BAocdqm4txQ42lzNMdQqv3NFuGkDQvElL1SyOtHXzbs80rDGLtACdwtPJ3_PQH9p0cErLpd2t0ITxvunuqofTZo';
+  const VAPID_PUBLIC_KEY = 'BHT84JUXPijgu58Wk3yNosqUZQXWEV2C7X-H3doe-YKK9TUQJdR-A0Z_WzwOG-Z1BQUyzh0lCxwRdrgp4LEFGfI';
 
   function urlBase64ToUint8Array(base64String) {
     const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
