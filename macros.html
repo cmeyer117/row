@@ -1,0 +1,339 @@
+<!--
+=====================================================
+© 2026 Rowan Thistlebrooke — All Rights Reserved
+
+Personal & Educational Use Only.
+You may view and run this code locally for learning.
+You may NOT use this code or data in a commercial
+product, redistribute it, or republish it as your own.
+
+Unauthorized use may be subject to copyright enforcement.
+Contact: rowan.wisere@gmail.com
+=====================================================
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0a0b">
+<title>Macro Tracker</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="sync.js" defer></script>
+<script src="topbar.js" defer></script>
+<script src="macro-calc.js"></script>
+<style>
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: #0a0a0b; color: #FAFAFA;
+  font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif;
+  padding: 16px; padding-bottom: 100px;
+}
+.mt-shell { max-width: 480px; margin: 0 auto; }
+.mt-tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+.mt-tab-btn {
+  flex: 1; padding: 10px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.04); color: #FAFAFA; font-weight: 600; font-size: 13px;
+  cursor: pointer;
+}
+.mt-tab-btn.active { background: rgba(110, 231, 183, 0.16); border-color: rgba(110, 231, 183, 0.4); }
+.mt-view-history .mt-log-view { display: none; }
+.mt-view-log .mt-history-view { display: none; }
+.mt-budget-card {
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 14px; padding: 16px; margin-bottom: 16px;
+}
+.mt-budget-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.mt-budget-row:last-child { margin-bottom: 0; }
+.mt-budget-label { font-size: 13px; color: rgba(255,255,255,0.7); width: 70px; }
+.mt-budget-bar-track { flex: 1; height: 8px; border-radius: 4px; background: rgba(255,255,255,0.08); margin: 0 10px; overflow: hidden; }
+.mt-budget-bar-fill { height: 100%; background: #6EE7B7; transition: width 0.2s; }
+.mt-budget-bar-fill.over { background: #ff8a8a; }
+.mt-budget-value { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 13px; width: 90px; text-align: right; }
+.mt-btn-row { display: flex; gap: 10px; margin-bottom: 16px; }
+.mt-action-btn {
+  flex: 1; padding: 14px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.05); color: #FAFAFA; font-weight: 700; font-size: 14px;
+  cursor: pointer;
+}
+.mt-entry {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 12px; border-radius: 10px; background: rgba(255,255,255,0.03); margin-bottom: 8px;
+}
+.mt-entry-name { font-size: 13px; }
+.mt-entry-macros { font-size: 11px; color: rgba(255,255,255,0.5); font-family: monospace; }
+.mt-entry-del { background: none; border: none; color: rgba(255,255,255,0.4); font-size: 16px; cursor: pointer; }
+.mt-modal-bg {
+  display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+  align-items: center; justify-content: center; padding: 20px; z-index: 100;
+}
+.mt-modal-bg.show { display: flex; }
+.mt-modal {
+  background: #141416; border-radius: 16px; padding: 20px; width: 100%; max-width: 400px;
+  max-height: 88vh; overflow-y: auto;
+}
+.mt-field { margin-bottom: 12px; }
+.mt-field label { display: block; font-size: 12px; color: rgba(255,255,255,0.6); margin-bottom: 4px; }
+.mt-field input, .mt-field select {
+  width: 100%; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.15);
+  background: rgba(255,255,255,0.05); color: #FAFAFA; font-size: 14px;
+}
+.mt-modal-actions { display: flex; gap: 10px; margin-top: 16px; }
+.mt-modal-actions button {
+  flex: 1; padding: 12px; border-radius: 10px; border: none; font-weight: 700; cursor: pointer;
+}
+.mt-btn-primary { background: #6EE7B7; color: #0a0a0b; }
+.mt-btn-secondary { background: rgba(255,255,255,0.08); color: #FAFAFA; }
+#mtScanReader { width: 100%; border-radius: 12px; overflow: hidden; margin-bottom: 12px; }
+.mt-history-day { padding: 12px; border-radius: 10px; background: rgba(255,255,255,0.03); margin-bottom: 8px; }
+.mt-history-date { font-size: 13px; font-weight: 700; margin-bottom: 4px; }
+.mt-history-totals { font-size: 12px; color: rgba(255,255,255,0.5); font-family: monospace; }
+</style>
+</head>
+<body>
+<div class="mt-shell mt-view-log" id="mtShell">
+  <div class="mt-tabs">
+    <button class="mt-tab-btn active" id="mtTabLog" type="button">Today</button>
+    <button class="mt-tab-btn" id="mtTabHistory" type="button">History</button>
+  </div>
+
+  <div class="mt-log-view">
+    <div class="mt-budget-card" id="mtBudgetCard">
+      <div class="mt-budget-row" data-macro="protein">
+        <span class="mt-budget-label">Protein</span>
+        <div class="mt-budget-bar-track"><div class="mt-budget-bar-fill"></div></div>
+        <span class="mt-budget-value">0 / 0g</span>
+      </div>
+      <div class="mt-budget-row" data-macro="carb">
+        <span class="mt-budget-label">Carbs</span>
+        <div class="mt-budget-bar-track"><div class="mt-budget-bar-fill"></div></div>
+        <span class="mt-budget-value">0 / 0g</span>
+      </div>
+      <div class="mt-budget-row" data-macro="fat">
+        <span class="mt-budget-label">Fat</span>
+        <div class="mt-budget-bar-track"><div class="mt-budget-bar-fill"></div></div>
+        <span class="mt-budget-value">0 / 0g</span>
+      </div>
+      <div class="mt-budget-row" data-macro="calories">
+        <span class="mt-budget-label">Calories</span>
+        <div class="mt-budget-bar-track"><div class="mt-budget-bar-fill"></div></div>
+        <span class="mt-budget-value">0 / 0</span>
+      </div>
+    </div>
+
+    <div class="mt-btn-row">
+      <button class="mt-action-btn" id="mtScanBtn" type="button">📷 Scan</button>
+      <button class="mt-action-btn" id="mtManualBtn" type="button">✏️ Manual</button>
+      <button class="mt-action-btn" id="mtTargetsBtn" type="button">🎯 Targets</button>
+    </div>
+
+    <div id="mtTodayList"></div>
+  </div>
+
+  <div class="mt-history-view">
+    <div id="mtHistoryList"></div>
+  </div>
+</div>
+
+<!-- Targets modal -->
+<div class="mt-modal-bg" id="mtTargetsModalBg">
+  <div class="mt-modal">
+    <h3 style="margin-top:0;">Daily Targets</h3>
+    <div class="mt-field">
+      <label>Protein (g)</label>
+      <input type="number" id="mtTargetProtein" inputmode="numeric">
+    </div>
+    <div class="mt-field">
+      <label>Carbs (g)</label>
+      <input type="number" id="mtTargetCarb" inputmode="numeric">
+    </div>
+    <div class="mt-field">
+      <label>Fat (g)</label>
+      <input type="number" id="mtTargetFat" inputmode="numeric">
+    </div>
+    <div class="mt-field">
+      <label>Calories</label>
+      <input type="number" id="mtTargetCalories" inputmode="numeric">
+    </div>
+    <div class="mt-modal-actions">
+      <button class="mt-btn-secondary" id="mtTargetsCancel" type="button">Cancel</button>
+      <button class="mt-btn-primary" id="mtTargetsSave" type="button">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const LS_KEY = 'macro_targets';
+const DEFAULT_TARGETS = { proteinG: 180, carbG: 200, fatG: 65, calories: 2200 };
+
+function $(id) { return document.getElementById(id); }
+
+function loadTargets() {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (!raw) return Object.assign({}, DEFAULT_TARGETS);
+    const parsed = JSON.parse(raw);
+    return Object.assign({}, DEFAULT_TARGETS, parsed);
+  } catch (e) { return Object.assign({}, DEFAULT_TARGETS); }
+}
+function saveTargets(targets) {
+  try { localStorage.setItem(LS_KEY, JSON.stringify(targets)); } catch (e) {}
+}
+
+function todayKey() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+const SUPABASE_URL = 'https://vikpcejlyxieguorwysf.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_EvWPtfW1FBW5Vf-H6w0yHw_PcXK4imv';
+let supa = null;
+function getSupa() {
+  if (!supa && window.supabase) supa = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  return supa;
+}
+
+async function fetchTodayEntries() {
+  const client = getSupa();
+  if (!client) return [];
+  const { data, error } = await client.from('food_log').select('*').eq('log_date', todayKey()).order('created_at', { ascending: true });
+  if (error) return [];
+  return data || [];
+}
+
+// Both return { error } (error === null on success) so callers can decide
+// whether to close a modal / refresh, or show the failure instead of
+// silently behaving as if the write succeeded.
+async function insertEntry(entry) {
+  const client = getSupa();
+  if (!client) return { error: new Error('Supabase not ready') };
+  const { error } = await client.from('food_log').insert(Object.assign({ log_date: todayKey() }, entry));
+  return { error };
+}
+
+async function deleteEntry(id) {
+  const client = getSupa();
+  if (!client) return { error: new Error('Supabase not ready') };
+  const { error } = await client.from('food_log').delete().eq('id', id);
+  return { error };
+}
+
+function showEntryError(message) {
+  // Minimal, dependency-free surfacing — no toast/notification library
+  // exists anywhere in this repo, so a plain alert is the lazy-correct
+  // choice rather than introducing one for a single error path.
+  window.alert(message);
+}
+
+function renderBudget(remaining, targets) {
+  const rows = [
+    { macro: 'protein', remaining: remaining.protein_g, target: targets.proteinG, unit: 'g' },
+    { macro: 'carb', remaining: remaining.carb_g, target: targets.carbG, unit: 'g' },
+    { macro: 'fat', remaining: remaining.fat_g, target: targets.fatG, unit: 'g' },
+    { macro: 'calories', remaining: remaining.calories, target: targets.calories, unit: '' },
+  ];
+  rows.forEach((r) => {
+    const rowEl = document.querySelector('.mt-budget-row[data-macro="' + r.macro + '"]');
+    if (!rowEl) return;
+    const consumed = r.target - r.remaining;
+    const pct = r.target > 0 ? Math.min(100, Math.max(0, (consumed / r.target) * 100)) : 0;
+    const fill = rowEl.querySelector('.mt-budget-bar-fill');
+    fill.style.width = pct + '%';
+    fill.classList.toggle('over', r.remaining < 0);
+    const valEl = rowEl.querySelector('.mt-budget-value');
+    valEl.textContent = Math.round(consumed) + ' / ' + Math.round(r.target) + r.unit;
+  });
+}
+
+function renderTodayList(entries) {
+  const list = $('mtTodayList');
+  list.innerHTML = '';
+  entries.forEach((e) => {
+    const row = document.createElement('div');
+    row.className = 'mt-entry';
+    row.innerHTML =
+      '<div><div class="mt-entry-name"></div><div class="mt-entry-macros"></div></div>' +
+      '<button class="mt-entry-del" type="button">✕</button>';
+    row.querySelector('.mt-entry-name').textContent = e.name;
+    row.querySelector('.mt-entry-macros').textContent =
+      Math.round(e.protein_g) + 'p / ' + Math.round(e.carb_g) + 'c / ' + Math.round(e.fat_g) + 'f — ' + Math.round(e.calories) + 'cal';
+    row.querySelector('.mt-entry-del').addEventListener('click', async () => {
+      const { error } = await deleteEntry(e.id);
+      if (error) { showEntryError('Could not delete entry — try again.'); return; }
+      refresh();
+    });
+    list.appendChild(row);
+  });
+}
+
+let currentTargets = loadTargets();
+
+async function refresh() {
+  currentTargets = loadTargets();
+  const entries = await fetchTodayEntries();
+  const remaining = window.MacroCalc.remainingBudget(currentTargets, entries);
+  renderBudget(remaining, currentTargets);
+  renderTodayList(entries);
+}
+
+// ---- Targets modal ----
+function openTargetsModal() {
+  $('mtTargetProtein').value = currentTargets.proteinG;
+  $('mtTargetCarb').value = currentTargets.carbG;
+  $('mtTargetFat').value = currentTargets.fatG;
+  $('mtTargetCalories').value = currentTargets.calories;
+  $('mtTargetsModalBg').classList.add('show');
+}
+function closeTargetsModal() { $('mtTargetsModalBg').classList.remove('show'); }
+
+$('mtTargetsBtn').addEventListener('click', openTargetsModal);
+$('mtTargetsCancel').addEventListener('click', closeTargetsModal);
+$('mtTargetsSave').addEventListener('click', () => {
+  const targets = {
+    proteinG: Number($('mtTargetProtein').value) || 0,
+    carbG: Number($('mtTargetCarb').value) || 0,
+    fatG: Number($('mtTargetFat').value) || 0,
+    calories: Number($('mtTargetCalories').value) || 0,
+  };
+  saveTargets(targets);
+  closeTargetsModal();
+  refresh();
+});
+
+// ---- Tabs ----
+$('mtTabLog').addEventListener('click', () => {
+  $('mtShell').classList.remove('mt-view-history');
+  $('mtShell').classList.add('mt-view-log');
+  $('mtTabLog').classList.add('active');
+  $('mtTabHistory').classList.remove('active');
+});
+$('mtTabHistory').addEventListener('click', () => {
+  $('mtShell').classList.remove('mt-view-log');
+  $('mtShell').classList.add('mt-view-history');
+  $('mtTabHistory').classList.add('active');
+  $('mtTabLog').classList.remove('active');
+  renderHistory();
+});
+
+refresh();
+
+// A tab left open across local midnight would otherwise keep showing
+// yesterday's budget/list until something happens to call refresh() —
+// re-run it whenever the tab regains focus/visibility, same pattern
+// topbar.js's old water-pill render() used for the same reason.
+window.addEventListener('focus', refresh);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
+
+document.addEventListener('DOMContentLoaded', function () {
+  try { if (window.self !== window.top) return; } catch (e) { return; }
+  if (typeof initCloudSync !== 'function') return;
+  initCloudSync({
+    appKey: 'health',
+    syncedKeys: ['macro_targets'],
+    onApplied: function () { refresh(); }
+  });
+});
+</script>
+</body>
+</html>
