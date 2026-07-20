@@ -1128,7 +1128,7 @@ function openScanModal() {
   html5QrCode = new Html5Qrcode('mtScanReader');
   html5QrCode.start(
     { facingMode: 'environment' },
-    { fps: 10, qrbox: 220 },
+    { fps: 10, qrbox: { width: 220, height: 220 } },
     (decodedText) => onBarcodeDecoded(decodedText),
     () => {} // ignore per-frame decode failures
   ).catch(() => {
