@@ -534,6 +534,43 @@ $('mtScanConfirm').addEventListener('click', async () => {
   refresh();
 });
 
+// ---- History ----
+async function renderHistory() {
+  const client = getSupa();
+  const list = $('mtHistoryList');
+  if (!client) { list.innerHTML = ''; return; }
+  const { data, error } = await client
+    .from('food_log')
+    .select('*')
+    .neq('log_date', todayKey())
+    .order('log_date', { ascending: false })
+    .limit(500);
+  if (error || !data) { list.innerHTML = ''; return; }
+
+  const byDate = {};
+  data.forEach((e) => { (byDate[e.log_date] = byDate[e.log_date] || []).push(e); });
+
+  list.innerHTML = '';
+  Object.keys(byDate).sort().reverse().forEach((date) => {
+    const entries = byDate[date];
+    // remainingBudget() already sums entries with the same num()-coercion
+    // used everywhere else (protects against a corrupt/non-numeric row);
+    // .consumed is the totals object, targets are irrelevant here.
+    const totals = window.MacroCalc.remainingBudget({ proteinG: 0, carbG: 0, fatG: 0, calories: 0 }, entries).consumed;
+
+    const row = document.createElement('div');
+    row.className = 'mt-history-day';
+    row.innerHTML =
+      '<div class="mt-history-date"></div>' +
+      '<div class="mt-history-totals"></div>';
+    row.querySelector('.mt-history-date').textContent = date;
+    row.querySelector('.mt-history-totals').textContent =
+      Math.round(totals.protein_g) + 'p / ' + Math.round(totals.carb_g) + 'c / ' + Math.round(totals.fat_g) + 'f — ' +
+      Math.round(totals.calories) + 'cal (' + entries.length + ' item' + (entries.length === 1 ? '' : 's') + ')';
+    list.appendChild(row);
+  });
+}
+
 // ---- Tabs ----
 $('mtTabLog').addEventListener('click', () => {
   $('mtShell').classList.remove('mt-view-history');
