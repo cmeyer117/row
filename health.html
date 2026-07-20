@@ -181,8 +181,8 @@ main {
 }
 .meal-modifier-btn.active + .meal-modifier-note { display: inline; }
 
-.water-embed { margin-top: 56px; }
-.water-iframe {
+.macro-embed { margin-top: 56px; }
+.macro-iframe {
   display: block;
   width: 100%;
   height: 880px;
@@ -193,8 +193,8 @@ main {
   color-scheme: dark;
 }
 @media (max-width: 480px) {
-  .water-embed { margin-top: 40px; }
-  .water-iframe { height: 780px; }
+  .macro-embed { margin-top: 40px; }
+  .macro-iframe { height: 780px; }
 }
 
 .stack-card {
@@ -647,9 +647,9 @@ main {
     </div>
   </div>
 
-  <section id="water" class="water-embed">
-    <div class="section-title">Water Tracker</div>
-    <iframe src="po-water.html" class="water-iframe" loading="lazy" title="Water Tracker"></iframe>
+  <section id="macros" class="macro-embed">
+    <div class="section-title">Macro Tracker</div>
+    <iframe src="macros.html" class="macro-iframe" loading="lazy" title="Macro Tracker"></iframe>
   </section>
 
   <div class="attribution">// editable template · all data stays in your browser</div>
@@ -1244,7 +1244,7 @@ document.addEventListener('DOMContentLoaded', function () {
   if (typeof initCloudSync !== 'function') return;
   initCloudSync({
     appKey: 'health',
-    syncedKeys: ['stack:items', 'stack:version', 'stack:low', 'po_water_v1'],
+    syncedKeys: ['stack:items', 'stack:version', 'stack:low', 'macro_targets'],
     syncedPrefixes: ['stack:taken:'],
     onApplied: function () { window.dispatchEvent(new Event('storage')); }
   });
