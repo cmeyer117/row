@@ -163,6 +163,37 @@ body {
   </div>
 </div>
 
+<!-- Manual entry modal -->
+<div class="mt-modal-bg" id="mtManualModalBg">
+  <div class="mt-modal">
+    <h3 style="margin-top:0;">Add Food</h3>
+    <div class="mt-field">
+      <label>Name</label>
+      <input type="text" id="mtManualName">
+    </div>
+    <div class="mt-field">
+      <label>Protein (g)</label>
+      <input type="number" id="mtManualProtein" inputmode="numeric">
+    </div>
+    <div class="mt-field">
+      <label>Carbs (g)</label>
+      <input type="number" id="mtManualCarb" inputmode="numeric">
+    </div>
+    <div class="mt-field">
+      <label>Fat (g)</label>
+      <input type="number" id="mtManualFat" inputmode="numeric">
+    </div>
+    <div class="mt-field">
+      <label>Calories</label>
+      <input type="number" id="mtManualCalories" inputmode="numeric">
+    </div>
+    <div class="mt-modal-actions">
+      <button class="mt-btn-secondary" id="mtManualCancel" type="button">Cancel</button>
+      <button class="mt-btn-primary" id="mtManualSave" type="button">Add</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const LS_KEY = 'macro_targets';
 const DEFAULT_TARGETS = { proteinG: 180, carbG: 200, fatG: 65, calories: 2200 };
@@ -298,6 +329,41 @@ $('mtTargetsSave').addEventListener('click', () => {
   };
   saveTargets(targets);
   closeTargetsModal();
+  refresh();
+});
+
+// ---- Manual entry modal ----
+function openManualModal() {
+  $('mtManualName').value = '';
+  $('mtManualProtein').value = '';
+  $('mtManualCarb').value = '';
+  $('mtManualFat').value = '';
+  $('mtManualCalories').value = '';
+  $('mtManualModalBg').classList.add('show');
+}
+function closeManualModal() { $('mtManualModalBg').classList.remove('show'); }
+
+function nonNegative(value) {
+  const n = Number(value);
+  return Number.isFinite(n) && n >= 0 ? n : 0;
+}
+
+$('mtManualBtn').addEventListener('click', openManualModal);
+$('mtManualCancel').addEventListener('click', closeManualModal);
+$('mtManualSave').addEventListener('click', async () => {
+  const name = $('mtManualName').value.trim();
+  if (!name) return;
+  const { error } = await insertEntry({
+    name,
+    protein_g: nonNegative($('mtManualProtein').value),
+    carb_g: nonNegative($('mtManualCarb').value),
+    fat_g: nonNegative($('mtManualFat').value),
+    calories: nonNegative($('mtManualCalories').value),
+    source: 'manual',
+    barcode: null,
+  });
+  if (error) { showEntryError('Could not save entry — try again.'); return; }
+  closeManualModal();
   refresh();
 });
 
