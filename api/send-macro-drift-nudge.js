@@ -45,20 +45,22 @@ async function deleteSubscription(endpoint) {
   }).catch(() => {});
 }
 
-export async function handleMacroDriftNudgeRequest() {
+export async function handleMacroDriftNudgeRequest(force = false) {
   const now = new Date();
 
-  const healthState = await fetchAppState('health');
-  const targets = healthState?.macro_targets;
-  if (!targets) {
-    return { status: 200, body: { message: 'No macro targets set, no push sent' } };
-  }
+  if (!force) {
+    const healthState = await fetchAppState('health');
+    const targets = healthState?.macro_targets;
+    if (!targets) {
+      return { status: 200, body: { message: 'No macro targets set, no push sent' } };
+    }
 
-  const dates = last3CentralDates(now);
-  const foodLogRows = await fetchFoodLog(dates);
+    const dates = last3CentralDates(now);
+    const foodLogRows = await fetchFoodLog(dates);
 
-  if (!isDrifting(foodLogRows, targets, now)) {
-    return { status: 200, body: { message: 'Not drifting, no push sent' } };
+    if (!isDrifting(foodLogRows, targets, now)) {
+      return { status: 200, body: { message: 'Not drifting, no push sent' } };
+    }
   }
 
   const subs = await fetchSubscriptions();
@@ -66,8 +68,12 @@ export async function handleMacroDriftNudgeRequest() {
     return { status: 200, body: { message: 'No subscriptions, no push sent' } };
   }
 
-  const payload = JSON.stringify({ title: 'Row', body: 'Macros have missed target 3 days straight' });
+  const payload = JSON.stringify({
+    title: 'Row',
+    body: force ? 'Diagnostic test push - root-cause check' : 'Macros have missed target 3 days straight',
+  });
   let sent = 0;
+  const failures = [];
   for (const sub of subs) {
     try {
       await webpush.sendNotification(
@@ -77,9 +83,10 @@ export async function handleMacroDriftNudgeRequest() {
       sent++;
     } catch (e) {
       if (e.statusCode === 410) await deleteSubscription(sub.endpoint);
+      failures.push({ endpointHost: new URL(sub.endpoint).host, statusCode: e.statusCode, message: e.body || e.message });
     }
   }
-  return { status: 200, body: { message: 'Pushed', sent, total: subs.length } };
+  return { status: 200, body: { message: 'Pushed', sent, total: subs.length, failures } };
 }
 
 export default async function handler(req, res) {
@@ -92,6 +99,7 @@ export default async function handler(req, res) {
     res.status(401).json({ error: 'Unauthorized' });
     return;
   }
-  const { status, body } = await handleMacroDriftNudgeRequest();
+  const force = req.query.force === 'true';
+  const { status, body } = await handleMacroDriftNudgeRequest(force);
   res.status(status).json(body);
 }
