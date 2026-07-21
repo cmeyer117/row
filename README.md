@@ -1,28 +1,26 @@
-# Personal Dashboard
+# Row
 
-A set of small, self-contained HTML apps that share a top bar.
+Carl Meyer's personal fitness/life dashboard — a set of vanilla HTML/JS pages, no build step, no framework. Deployed to Vercel at [row-sage.vercel.app](https://row-sage.vercel.app).
 
-## Deploy your own copy
-
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FRowanThistlebrooke%2FYTdashh1)
-
-One click → Vercel signs you in, copies the repo to your GitHub, and deploys it. ~30 seconds to a live URL.
-
-## How to use
-
-Open any `.html` file directly in your browser — no build step, no install.
+## Pages
 
 | File | What it is |
 |---|---|
-| [index.html](index.html) | Goals tracker (Day Ring, Goal Ticker, To Do list) — the home page |
-| [health.html](health.html) | Supplement / daily stack tracker |
-| [po-water.html](po-water.html) | Water intake tracker |
-| [finance.html](finance.html) | Finances |
-| [gym.html](gym.html) | Progressive overload gym tracker |
-| [topbar.js](topbar.js) | Shared top bar — auto-injected into pages that `<script src="topbar.js">` |
+| `index.html` | Home |
+| `main.html` | Main dashboard |
+| `gym.html` | Progressive-overload gym/workout tracker, posing coach, macro/barcode logging |
+| `health.html` | Supplement / daily stack tracker |
+| `mobility.html` | Mobility, warm-ups, joint care |
+| `macros.html` | Macro calculator |
+| `finance.html` | Finances |
+| `coaching.html` / `coaching-plan.html` | Coaching Dashboard — client management for Carl's online coaching brand |
+| `offline.html` | PWA offline fallback |
 
-Each app stores its own state in browser `localStorage`. No accounts, no server.
+## How it works
 
-## Building from scratch
+- **Persistence:** Supabase `app_state` key-value table via `sync.js` — no accounts, passphrase-gated (`topbar.js`, `AUTH_PASS`/`AUTH_KEY`).
+- **No framework, no build step:** plain HTML/CSS/JS per page, opened directly or served statically.
+- **Shared modules:** `topbar.js` (nav + auth), `sync.js` (cloud sync), `gym-weight-photos.js`/`gym-workout-events.js` (gym.html support modules), `hype-audio.js` (motivation-audio mini-player, byte-identical copy shared with the `hype-audio` repo).
+- **Web Push:** service worker + `web-push` for workout/macro-drift notifications.
 
-[BUILD_DASHBOARD.md](BUILD_DASHBOARD.md) is the prompt I gave Claude to generate `index.html` — paste it into Claude if you want to rebuild that page yourself.
+See this repo's `CLAUDE.md` for development rules (TypeScript strictness, TDD, architecture intentions) and `project-row-dashboard.md` (Claude memory) for Supabase keys, key functions, and standing rules.

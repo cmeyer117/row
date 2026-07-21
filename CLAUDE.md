@@ -35,76 +35,22 @@ Shared logic:
 
 Jarvis (AI assistant) lives in a separate repo, `cmeyer117/claude-workspace`, subfolder `jarvis/` — it is not part of this repo. `accounting-automation` and `content-system` are not built yet as of this writing.
 
-## TypeScript Rules
-
-Strict TypeScript is non-negotiable across all projects:
-
-- `strict: true` in all `tsconfig.json` files
-- **No `any` types** — use `unknown` and narrow, or define a proper type
-- No `@ts-ignore` or `@ts-expect-error` without an explicit comment explaining why
-- Prefer `type` over `interface` unless declaration merging is needed
-
 ## Development Approach
 
-**Write tests before code (TDD).** For every new feature or function:
-1. Write a failing test that describes the expected behavior
-2. Write the minimum code to make it pass
-3. Refactor
-
-This applies to utility functions, API handlers, and business logic. UI component tests use React Testing Library focused on user behavior, not implementation.
+This repo has zero TypeScript/React (plain vanilla JS) — the old "TypeScript Rules"/React Testing Library boilerplate here never applied, removed 2026-07-21. For new logic modules, write a `*.selfcheck.js` alongside the module (matching the existing pattern) before considering the feature done.
 
 ## Tech Stack
 
-- **Frontend:** React 18+, TypeScript
-- **Backend:** Node.js, TypeScript
-- **Testing:** Vitest (preferred) or Jest — check the project's `package.json` for which is configured
-- **Voice (Jarvis):** ElevenLabs Conversational AI (agent ID: `agent_2301ktr3gvw4fzf9qvkgp9epcz1x`, Oliver Silk voice)
-- **Memory (Jarvis):** Mem0, userId `default-user` shared across voice and text
-- **Orchestration (Jarvis):** n8n planned but not yet implemented
-- **AI:** Claude (Anthropic SDK) as the reasoning layer
+- **Frontend:** Vanilla HTML/CSS/JS, no framework, no build step
+- **Backend:** Supabase (`app_state` table) via `sync.js`
+- **Testing:** `*.selfcheck.js` files per module (e.g. `gym-workout-events.selfcheck.js`) — run directly with `node`, not a test runner
 
 ## Commands
 
-Commands will vary per sub-project. Always check the project's `package.json` first. Typical patterns:
-
-```bash
-# From within a project directory
-npm run dev       # start dev server
-npm run build     # production build
-npm run test      # run all tests
-npm run test -- path/to/file.test.ts  # run a single test file
-npm run lint      # lint
-npm run typecheck # tsc --noEmit (run this before committing)
-```
+No build step. Open any `.html` file directly, or serve statically for local dev. Run a module's self-check with `node path/to/file.selfcheck.js`.
 
 ## Architecture Intentions
 
-### row (this repo)
 No React, no state management library, no API layer — plain DOM/JS per page. Cross-page/session persistence goes through `sync.js` to the Supabase `app_state` table. Keep new pages consistent with the existing vanilla HTML/JS pattern; don't introduce a framework or build step for one feature.
 
-### accounting-automation
-AI workflows are triggered by events (document upload, scheduled job, etc.) and return structured outputs. All AI calls should be wrapped in typed functions with Zod-validated responses — never trust raw model output shapes.
-
-### jarvis
-
-**DEPLOYED INFRASTRUCTURE — read this before touching anything:**
-- Frontend: React 18 + Vite + Tailwind, deployed on **Vercel**, code at `jarvis/ui/`
-- Backend: Express + TypeScript, deployed on **Railway** at `https://claude-workspace-production-8460.up.railway.app`
-- `jarvis/ui/vercel.json` rewrites `/chat` and `/journal/*` to Railway — this is how the frontend talks to the backend without exposing env vars
-- Auth gate: `AuthGate.tsx`, passphrase via `VITE_PASSPHRASE` env var (default: `'jarvis'`), stored in sessionStorage
-
-**Sidebar tabs:** HOME (orb + voice), PROJECTS, JOURNAL (voice journal → Mem0), TASKS (placeholder), SETTINGS (placeholder)
-
-**Backend routes:**
-- `POST /chat` — Claude + tools + Mem0
-- `POST /llm` — ElevenLabs custom LLM route
-- `POST /webhook` — ElevenLabs post-conversation transcript → Mem0
-- `POST /journal/extract` — voice transcript → Claude extraction → mem0_memory written to Mem0
-- `GET /health`
-
-**Jarvis personality:** Calm authority, dry wit, Iron Man JARVIS. Addresses user as "sir." Never says "I'm an AI."
-
-**Do not build standalone versions of features.** Everything goes inside the existing `jarvis/ui/` React app as a new tab or component. The backend is the Railway Express server at `jarvis/src/`.
-
-### content-system
-Content moves through a lifecycle: `draft → scheduled → published → archived`. Keep platform-specific logic (TikTok vs Instagram vs YouTube) behind an adapter interface so shared pipeline logic stays clean.
+Jarvis, accounting-automation, and content-system are separate projects (Jarvis: `cmeyer117/claude-workspace`, `jarvis/` subfolder) — this repo used to carry full architecture write-ups for them too, which just meant their real specs (in their own repos/HANDOFF) could silently drift from a stale copy here. Removed 2026-07-21; check their own repos/HANDOFF.md Project Status for current state instead.
