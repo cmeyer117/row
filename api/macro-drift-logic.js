@@ -1,20 +1,20 @@
 // Pure functions (exported for testing) — no I/O, no Supabase/web-push
 // calls here. Mirrors workout-nudge-logic.js's split.
 
-import { todayCentralKey } from './workout-nudge-logic.js';
+import { todayEasternKey } from './workout-nudge-logic.js';
 
 const DRIFT_MARGIN = 0.15; // >15% miss on either macro counts as an off day
 const EPSILON = 1e-9; // guards the exact-15% boundary against float rounding
 
-// Returns the last 3 completed Central-calendar-days (yesterday, 2 days
+// Returns the last 3 completed Eastern-calendar-days (yesterday, 2 days
 // ago, 3 days ago) relative to `date` — today is excluded since it isn't
-// over yet. Subtracting whole days in UTC ms and re-deriving the Central
+// over yet. Subtracting whole days in UTC ms and re-deriving the Eastern
 // key is safe for calendar-date purposes even across a DST boundary day.
-export function last3CentralDates(date = new Date()) {
+export function last3EasternDates(date = new Date()) {
   const dates = [];
   for (let i = 1; i <= 3; i++) {
     const d = new Date(date.getTime() - i * 24 * 60 * 60 * 1000);
-    dates.push(todayCentralKey(d));
+    dates.push(todayEasternKey(d));
   }
   return dates;
 }
@@ -35,12 +35,12 @@ export function isOffDay(daySum, targets) {
   return proteinMiss > DRIFT_MARGIN + EPSILON || calorieMiss > DRIFT_MARGIN + EPSILON;
 }
 
-// True only if the last 3 Central-calendar-days were ALL logged (at
+// True only if the last 3 Eastern-calendar-days were ALL logged (at
 // least one food_log row each) AND all 3 were off-target. A day with no
 // rows doesn't count as off — it just fails to complete the streak, so
 // under-logging doesn't falsely trigger this nudge.
 export function isDrifting(foodLogRows, targets, date = new Date()) {
-  const dates = last3CentralDates(date);
+  const dates = last3EasternDates(date);
   const byDate = {};
   for (const row of foodLogRows) {
     if (!byDate[row.log_date]) byDate[row.log_date] = [];

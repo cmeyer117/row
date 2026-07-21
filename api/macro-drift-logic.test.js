@@ -1,13 +1,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { last3CentralDates, sumDay, isOffDay, isDrifting } from './macro-drift-logic.js';
+import { last3EasternDates, sumDay, isOffDay, isDrifting } from './macro-drift-logic.js';
 
 const TARGETS = { proteinG: 261, carbG: 338, fatG: 53, calories: 2930 };
 
-test('last3CentralDates: returns yesterday, 2 days ago, 3 days ago in Central time', () => {
-  // 2026-07-21T23:30:00Z is 2026-07-21 6:30pm Central (CDT, UTC-5).
+test('last3EasternDates: returns yesterday, 2 days ago, 3 days ago in Eastern time', () => {
+  // 2026-07-21T23:30:00Z is 2026-07-21 7:30pm Eastern (EDT, UTC-4).
   const now = new Date('2026-07-21T23:30:00Z');
-  assert.deepEqual(last3CentralDates(now), ['2026-07-20', '2026-07-19', '2026-07-18']);
+  assert.deepEqual(last3EasternDates(now), ['2026-07-20', '2026-07-19', '2026-07-18']);
 });
 
 test('sumDay: sums protein_g and calories across food_log rows for one day', () => {
