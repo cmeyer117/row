@@ -802,6 +802,10 @@ img, video, canvas, svg { max-width: 100%; }
   font-size: 9px; font-weight: 800; letter-spacing: 0.1em;
   color: var(--good); margin-bottom: 6px; text-transform: uppercase;
 }
+.po-coach-response-img {
+  width: 100%; max-width: 200px; height: auto;
+  display: block; margin: 0 auto 10px; border-radius: 8px;
+}
 .po-coach-btn.hype {
   border-color: rgba(224,51,47,0.35); background: rgba(224,51,47,0.10); color: #ff6b66;
 }
@@ -2573,6 +2577,7 @@ img, video, canvas, svg { max-width: 100%; }
         <button class="po-coach-btn" id="posingCoachBtn" type="button">🧍 Posing Coach</button>
         <div class="po-coach-response" id="posingResponse">
           <div class="po-coach-response-label" id="posingResponseLabel">Posing Coach</div>
+          <img class="po-coach-response-img" id="posingResponseImg" alt="" style="display:none">
           <div id="posingResponseText"></div>
         </div>
       </div>
@@ -4627,38 +4632,38 @@ img, video, canvas, svg { max-width: 100%; }
   // ponytail: static per-pose checklists, not live vision critique (backlogged, costs tokens).
   // Photo capture lives in the Progress Photos section, not here.
   const MANDATORY_POSES = [
-    { name: 'Front Relaxed', cues: [
+    { name: 'Front Relaxed', slug: 'front-relaxed', cues: [
       'Feet shoulder width, weight even, hands loose at sides.',
       'Chin level, neck long — don\'t tuck or crane.',
       'Quads and abs tight even though it reads as "relaxed."',
     ]},
-    { name: 'Front Double Biceps', cues: [
+    { name: 'Front Double Biceps', slug: 'front-double-biceps', cues: [
       'Lats spread and held, not just flared once.',
       'Elbows up and forward of the biceps peak, not out to the sides.',
       'Quads and glutes locked hard, no soft knee.',
       'Crunch the abs down, ribcage doesn\'t float up.',
     ]},
-    { name: 'Side Chest', cues: [
+    { name: 'Side Chest', slug: 'side-chest', cues: [
       'Pick your better side, front foot turned out toward judges.',
       'Chest driven up and out, near arm crushes into the far bicep.',
       'Rear leg quad flexed and visible — don\'t hide it behind the front leg.',
     ]},
-    { name: 'Back Double Biceps', cues: [
+    { name: 'Back Double Biceps', slug: 'back-double-biceps', cues: [
       'Spread the lats wide, hold — don\'t let them collapse after the first flare.',
       'Calves flexed, one heel raised slightly to peak the calf.',
       'Glutes and hamstrings locked, chin still level.',
     ]},
-    { name: 'Side Triceps', cues: [
+    { name: 'Side Triceps', slug: 'side-triceps', cues: [
       'Same side as your side chest, front foot turned out.',
       'Extend the rear arm straight down, triceps locked, not bent.',
       'Chest up, stomach pulled in, don\'t let the pose collapse forward.',
     ]},
-    { name: 'Abdominal & Thigh', cues: [
+    { name: 'Abdominal & Thigh', slug: 'abdominal-thigh', cues: [
       'Hands behind head, one leg forward, both quads flexed.',
       'Sharp exhale-crunch right before the shoot to pop the abs.',
       'Keep shoulders back — don\'t hunch to force the crunch.',
     ]},
-    { name: 'Most Muscular', cues: [
+    { name: 'Most Muscular', slug: 'most-muscular', cues: [
       'Crash the whole body inward — traps, delts, chest, quads all locked at once.',
       'Bend from the waist, don\'t just clench arms.',
       'Hold it, this is the pose most likely to look flat if you flinch early.',
@@ -4670,6 +4675,10 @@ img, video, canvas, svg { max-width: 100%; }
   $('posingCoachBtn').addEventListener('click', function() {
     const pose = MANDATORY_POSES[posingPoseIdx % MANDATORY_POSES.length];
     posingPoseIdx++;
+    const img = $('posingResponseImg');
+    img.onerror = function() { img.style.display = 'none'; };
+    img.onload = function() { img.style.display = 'block'; };
+    img.src = 'assets/mobility/' + pose.slug + '.png';
     $('posingResponseText').textContent = pose.name.toUpperCase() + '\n\n' + pose.cues.join('\n') + '\n\n' + POSING_FOOTER;
     $('posingResponse').classList.add('show');
   });
