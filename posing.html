@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0a0b">
+<link rel="manifest" href="/manifest.json" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Row" />
+<title>Posing — Row</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="topbar.js" defer></script>
+<style>
+:root {
+  --bg: #000000;
+  --bg-card: #111113;
+  --text-1: #F4F1EA;
+  --text-2: rgba(244,241,234,0.6);
+  --text-3: rgba(244,241,234,0.4);
+  --text-4: rgba(244,241,234,0.25);
+  --border: rgba(255,255,255,0.08);
+  --border-strong: rgba(255,255,255,0.16);
+  --accent: #6ee7b7;
+  --good: #6ee7b7;
+  --warn: #fbbf24;
+  --bad: #ff8a8a;
+  --font: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SF Mono, Menlo, Consolas, monospace;
+}
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; padding: 0;
+  background: radial-gradient(ellipse 80% 60% at 75% 0%, rgba(110,231,183,0.06) 0%, #0a0a0b 60%);
+  color: var(--text-1);
+  font-family: var(--font);
+  -webkit-font-smoothing: antialiased;
+  -webkit-text-size-adjust: 100%;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+.mob-shell {
+  width: 100%; max-width: min(720px, 100vw);
+  margin: 0 auto;
+  padding: 24px 16px calc(120px + env(safe-area-inset-bottom));
+  box-sizing: border-box;
+}
+.mob-shell * { min-width: 0; }
+
+/* ── Page header ── */
+.mob-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 20px;
+}
+.mob-title {
+  font-size: 22px; font-weight: 700; letter-spacing: -0.015em; margin: 0;
+}
+.mob-subtitle {
+  font-size: 12px; color: var(--text-3); margin: 2px 0 0;
+}
+
+/* ── Block headings ── */
+.mob-block-title {
+  font-family: var(--font-mono); font-size: 10px; font-weight: 800;
+  letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--accent); margin: 18px 0 8px;
+}
+.mob-block-title:first-child { margin-top: 0; }
+
+/* ── Cards ── */
+.mob-card {
+  background: rgba(255,255,255,0.025); border: 1px solid var(--border);
+  border-radius: 16px; padding: 16px 18px; margin-bottom: 10px;
+}
+.mob-card-body {
+  font-size: 13px; color: var(--text-2); line-height: 1.55;
+}
+.mob-card-body strong { color: var(--text-1); font-weight: 600; }
+
+/* ── Exercise row (compact) ── */
+.mob-exercise-list { display: flex; flex-direction: column; gap: 6px; }
+.mob-ex-row {
+  padding: 10px 14px; background: rgba(255,255,255,0.025);
+  border: 1px solid var(--border); border-radius: 10px;
+}
+.mob-ex-name { font-size: 13px; font-weight: 600; color: var(--text-1); margin-bottom: 2px; }
+.mob-ex-detail { font-size: 12px; color: var(--text-2); line-height: 1.4; }
+.mob-ex-note { font-size: 11px; color: var(--text-3); font-style: italic; margin-top: 3px; line-height: 1.4; }
+
+/* ── Expandable exercise row ── */
+.mob-ex-head {
+  display: flex; align-items: center; justify-content: space-between;
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.mob-ex-chevron {
+  color: var(--text-3); flex-shrink: 0; margin-left: 10px;
+  transition: transform 0.15s;
+}
+.mob-ex-row.expanded .mob-ex-chevron { transform: rotate(180deg); }
+.mob-ex-panel { display: none; margin-top: 10px; }
+.mob-ex-row.expanded .mob-ex-panel { display: block; }
+.mob-ex-diagram, .mob-ex-photo {
+  width: 100%; max-width: 200px; height: auto;
+  display: block; margin: 0 auto 8px; border-radius: 8px;
+}
+
+/* ── Rule banner ── */
+.mob-rule {
+  background: rgba(110,231,183,0.06); border: 1px solid rgba(110,231,183,0.18);
+  border-radius: 12px; padding: 12px 14px;
+  font-size: 13px; color: var(--text-2); line-height: 1.5;
+  margin-bottom: 16px;
+}
+.mob-rule strong { color: var(--accent); }
+
+/* ── Divider ── */
+.mob-divider {
+  height: 1px; background: var(--border); margin: 20px 0;
+}
+
+/* ── Gym tab bar (same as gym.html) ── */
+.gym-tabbar {
+  position: fixed; left: 0; right: 0; bottom: calc(72px + env(safe-area-inset-bottom)); z-index: 60;
+  display: flex; justify-content: center;
+  padding: 10px max(16px, env(safe-area-inset-right)) 10px max(16px, env(safe-area-inset-left));
+  background: linear-gradient(180deg, rgba(5,5,6,0) 0%, rgba(5,5,6,0.82) 40%, rgba(5,5,6,0.96) 100%);
+  backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+  pointer-events: none;
+}
+.gym-tabbar-inner {
+  pointer-events: auto;
+  display: flex; width: 100%; max-width: 400px; gap: 6px;
+  padding: 6px; background: rgba(20,20,22,0.72);
+  border: 1px solid rgba(255,255,255,0.08); border-radius: 18px;
+  box-shadow: 0 12px 36px rgba(0,0,0,0.55);
+}
+.gym-tab {
+  flex: 1 1 0; display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  padding: 11px 14px; border-radius: 13px; font-size: 14px; font-weight: 600;
+  letter-spacing: 0.01em; color: var(--text-3); background: transparent;
+  border: 1px solid transparent; cursor: pointer; text-decoration: none;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
+  -webkit-tap-highlight-color: transparent; font-family: var(--font);
+}
+.gym-tab:hover { color: var(--text-1); }
+.gym-tab.active {
+  color: var(--text-1); background: rgba(255,255,255,0.07);
+  border-color: rgba(255,255,255,0.10);
+}
+
+@media (max-width: 400px) {
+  .gym-tab { padding: 11px 10px; font-size: 13px; }
+}
+</style>
+</head>
+<body>
+<div class="mob-shell">
+  <div class="mob-header">
+    <div>
+      <h1 class="mob-title">Posing</h1>
+      <div class="mob-subtitle">Mandatory pose practice</div>
+    </div>
+  </div>
+
+  <div class="mob-rule">
+    <strong>When:</strong> Right after your daily mobility session, while ROM is at its maximum (within 30 min of active stretching). For the right lat spread specifically: pose right after overhead lat stretch and T-spine work, while that tissue is open.<br>
+    <strong>Tip:</strong> Film it weekly — you will notice a difference.
+  </div>
+
+  <div class="mob-block-title">Mandatory Poses</div>
+  <div class="mob-exercise-list">
+    <div class="mob-ex-row">
+      <div class="mob-ex-head">
+        <div class="mob-ex-name">1. Front Double Biceps</div>
+        <svg class="mob-ex-chevron" viewBox="0 0 16 16" width="12" height="12"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="mob-ex-detail">Facing forward, both arms raised and flexed, fists near shoulder height, legs braced.</div>
+      <div class="mob-ex-panel">
+        <img class="mob-ex-photo" data-slug="front-double-biceps" alt="Front Double Biceps" style="display:none">
+        <svg class="mob-ex-diagram" viewBox="0 0 100 100" stroke="var(--text-2)" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="50" cy="14" r="6"/>
+          <line x1="50" y1="20" x2="50" y2="55"/>
+          <line x1="50" y1="55" x2="42" y2="90"/>
+          <line x1="50" y1="55" x2="58" y2="90"/>
+          <line x1="40" y1="25" x2="25" y2="34"/>
+          <line x1="25" y1="34" x2="35" y2="18"/>
+          <line x1="60" y1="25" x2="75" y2="34"/>
+          <line x1="75" y1="34" x2="65" y2="18"/>
+        </svg>
+        <div class="mob-ex-note">Brace legs and flex quads, don't just flex arms — judges score the whole physique.</div>
+      </div>
+    </div>
+    <div class="mob-ex-row">
+      <div class="mob-ex-head">
+        <div class="mob-ex-name">2. Front Lat Spread</div>
+        <svg class="mob-ex-chevron" viewBox="0 0 16 16" width="12" height="12"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="mob-ex-detail">Hands on waist, elbows driven wide and forward to spread the lats, chest up.</div>
+      <div class="mob-ex-panel">
+        <img class="mob-ex-photo" data-slug="front-lat-spread" alt="Front Lat Spread" style="display:none">
+        <svg class="mob-ex-diagram" viewBox="0 0 100 100" stroke="var(--text-2)" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="50" cy="14" r="6"/>
+          <line x1="50" y1="20" x2="50" y2="55"/>
+          <line x1="50" y1="55" x2="42" y2="90"/>
+          <line x1="50" y1="55" x2="58" y2="90"/>
+          <line x1="40" y1="24" x2="20" y2="46"/>
+          <line x1="20" y1="46" x2="40" y2="55"/>
+          <line x1="60" y1="24" x2="80" y2="46"/>
+          <line x1="80" y1="46" x2="60" y2="55"/>
+        </svg>
+        <div class="mob-ex-note">Right-side lat spread is limited by the shoulder — practice this one right after overhead lat stretch.</div>
+      </div>
+    </div>
+    <div class="mob-ex-row">
+      <div class="mob-ex-head">
+        <div class="mob-ex-name">3. Side Chest</div>
+        <svg class="mob-ex-chevron" viewBox="0 0 16 16" width="12" height="12"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="mob-ex-detail">Turn to your best side, front leg bent and flexed, grip opposite wrist in front of chest, crush the pecs.</div>
+      <div class="mob-ex-panel">
+        <img class="mob-ex-photo" data-slug="side-chest" alt="Side Chest" style="display:none">
+        <svg class="mob-ex-diagram" viewBox="0 0 100 100" stroke="var(--text-2)" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="50" cy="14" r="6"/>
+          <line x1="50" y1="20" x2="50" y2="55"/>
+          <line x1="50" y1="55" x2="40" y2="70"/>
+          <line x1="40" y1="70" x2="45" y2="90"/>
+          <line x1="50" y1="55" x2="60" y2="90"/>
+          <line x1="40" y1="35" x2="60" y2="35"/>
+          <circle cx="50" cy="35" r="2"/>
+        </svg>
+      </div>
+    </div>
+    <div class="mob-ex-row">
+      <div class="mob-ex-head">
+        <div class="mob-ex-name">4. Side Triceps</div>
+        <svg class="mob-ex-chevron" viewBox="0 0 16 16" width="12" height="12"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="mob-ex-detail">Turn to your side, near arm extended straight down and back to show triceps horseshoe, far hand grips the wrist.</div>
+      <div class="mob-ex-panel">
+        <img class="mob-ex-photo" data-slug="side-triceps" alt="Side Triceps" style="display:none">
+        <svg class="mob-ex-diagram" viewBox="0 0 100 100" stroke="var(--text-2)" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="50" cy="14" r="6"/>
+          <line x1="50" y1="20" x2="50" y2="55"/>
+          <line x1="50" y1="55" x2="45" y2="90"/>
+          <line x1="50" y1="55" x2="60" y2="85"/>
+          <line x1="48" y1="25" x2="60" y2="40"/>
+          <line x1="60" y1="40" x2="65" y2="55"/>
+          <line x1="65" y1="58" x2="58" y2="52"/>
+        </svg>
+      </div>
+    </div>
+    <div class="mob-ex-row">
+      <div class="mob-ex-head">
+        <div class="mob-ex-name">5. Back Double Biceps</div>
+        <svg class="mob-ex-chevron" viewBox="0 0 16 16" width="12" height="12"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="mob-ex-detail">Back to the mirror, same arm flex as front double biceps, stagger the legs to show calves.</div>
+      <div class="mob-ex-panel">
+        <img class="mob-ex-photo" data-slug="back-double-biceps" alt="Back Double Biceps" style="display:none">
+        <svg class="mob-ex-diagram" viewBox="0 0 100 100" stroke="var(--text-2)" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="50" cy="14" r="6"/>
+          <line x1="38" y1="22" x2="62" y2="22"/>
+          <line x1="50" y1="22" x2="50" y2="55"/>
+          <line x1="50" y1="55" x2="43" y2="90"/>
+          <line x1="50" y1="55" x2="58" y2="88"/>
+          <line x1="40" y1="25" x2="25" y2="34"/>
+          <line x1="25" y1="34" x2="35" y2="18"/>
+          <line x1="60" y1="25" x2="75" y2="34"/>
+          <line x1="75" y1="34" x2="65" y2="18"/>
+        </svg>
+      </div>
+    </div>
+    <div class="mob-ex-row">
+      <div class="mob-ex-head">
+        <div class="mob-ex-name">6. Back Lat Spread</div>
+        <svg class="mob-ex-chevron" viewBox="0 0 16 16" width="12" height="12"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="mob-ex-detail">Back to the mirror, hands on waist, drive elbows wide to show full back width.</div>
+      <div class="mob-ex-panel">
+        <img class="mob-ex-photo" data-slug="back-lat-spread" alt="Back Lat Spread" style="display:none">
+        <svg class="mob-ex-diagram" viewBox="0 0 100 100" stroke="var(--text-2)" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="50" cy="14" r="6"/>
+          <path d="M35,22 L50,20 L65,22 L60,55 L40,55 Z"/>
+          <line x1="50" y1="55" x2="42" y2="90"/>
+          <line x1="50" y1="55" x2="58" y2="90"/>
+          <line x1="40" y1="24" x2="20" y2="46"/>
+          <line x1="20" y1="46" x2="40" y2="55"/>
+          <line x1="60" y1="24" x2="80" y2="46"/>
+          <line x1="80" y1="46" x2="60" y2="55"/>
+        </svg>
+      </div>
+    </div>
+    <div class="mob-ex-row">
+      <div class="mob-ex-head">
+        <div class="mob-ex-name">7. Abdominal &amp; Thigh</div>
+        <svg class="mob-ex-chevron" viewBox="0 0 16 16" width="12" height="12"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="mob-ex-detail">Hands behind head, crunch forward slightly, one leg extended and flexed to show quad separation.</div>
+      <div class="mob-ex-panel">
+        <img class="mob-ex-photo" data-slug="abdominal-thigh" alt="Abdominal & Thigh" style="display:none">
+        <svg class="mob-ex-diagram" viewBox="0 0 100 100" stroke="var(--text-2)" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="50" cy="14" r="6"/>
+          <line x1="50" y1="20" x2="52" y2="50"/>
+          <line x1="40" y1="14" x2="50" y2="11"/>
+          <line x1="60" y1="14" x2="50" y2="11"/>
+          <line x1="52" y1="50" x2="48" y2="90"/>
+          <line x1="52" y1="50" x2="70" y2="55"/>
+          <line x1="70" y1="55" x2="82" y2="45"/>
+        </svg>
+      </div>
+    </div>
+  </div>
+
+  <div class="mob-divider"></div>
+  <div class="mob-block-title">Posing Tip</div>
+  <div class="mob-card">
+    <div class="mob-card-body">Do your mobility session first, then practice posing immediately after. ROM is at its maximum within 30 min of active stretching. For the right lat spread: practice after overhead lat stretch and T-spine work while the tissue is open. Film it weekly — you will notice a difference.</div>
+  </div>
+</div>
+
+<!-- Gym tab bar — Posing active -->
+<nav class="gym-tabbar">
+  <div class="gym-tabbar-inner">
+    <a class="gym-tab" href="gym.html">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="3" width="12" height="2" rx="1" fill="currentColor"/><rect x="2" y="7" width="8" height="2" rx="1" fill="currentColor"/><rect x="2" y="11" width="10" height="2" rx="1" fill="currentColor"/></svg>
+      Log
+    </a>
+    <a class="gym-tab" href="gym.html#progress">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><polyline points="2,12 6,7 9,9 14,3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
+      Progress
+    </a>
+    <a class="gym-tab" href="mobility.html">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="8" cy="3.5" r="1.5" fill="currentColor"/><path d="M5 7c0-1.1.9-2 2-2h2c1.1 0 2 .9 2 2v2.5l1.5 3.5h-1.5L10 11H6l-1 2H3.5L5 9.5V7z" fill="currentColor"/></svg>
+      Mobility
+    </a>
+    <a class="gym-tab active" href="posing.html">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="8" cy="2.5" r="1.5" fill="currentColor"/><path d="M8 4v4M8 8l-2-3M6 5l-1.5-.5M8 8l2-3M10 5l1.5-.5M8 8l-1.5 5M8 8l1.5 5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
+      Posing
+    </a>
+  </div>
+</nav>
+
+<script>
+(function() {
+  // ── Expandable exercise rows ──
+  document.addEventListener('click', function(e) {
+    var head = e.target.closest('.mob-ex-head');
+    if (!head) return;
+    head.closest('.mob-ex-row').classList.toggle('expanded');
+  });
+
+  // ── Swap in real photos where present, fall back to SVG diagram ──
+  document.querySelectorAll('.mob-ex-photo').forEach(function(img) {
+    img.onload = function() {
+      img.style.display = 'block';
+      var svg = img.parentElement.querySelector('.mob-ex-diagram');
+      if (svg) svg.style.display = 'none';
+    };
+    img.src = 'assets/mobility/' + img.dataset.slug + '.png';
+  });
+})();
+</script>
+</body>
+</html>
