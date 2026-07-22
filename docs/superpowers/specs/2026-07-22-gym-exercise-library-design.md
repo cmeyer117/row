@@ -1,23 +1,23 @@
 # gym.html: per-exercise coaching posters (Exercise Library)
 
 ## Problem
-`gym.html` already has rich per-exercise text coaching: `DEFAULT_CUES` (4 lines per exercise — setup, common mistake, ROM/stretch, tempo+breathing) and `MUSCLE_PRIMARY`, covering all 41 primaries and all 34 substitution alternates, resolved by `getCues(exId)` per the currently-active variant and rendered into `#cuesSection` inside `logFormWrap`. What's missing is a visual reference. `posing.html` already proved a premium image pattern for this (dense coaching-poster images, tap-to-expand, lightbox) for its poses. This adds the same poster treatment as a visual companion to the cues gym.html already shows — not a new cue-content system.
+`gym.html` already has rich per-exercise text coaching: `DEFAULT_CUES` (4 lines per exercise — setup, common mistake, ROM/stretch, tempo+breathing) and `MUSCLE_PRIMARY`, covering all 34 primaries and 66 additional substitute-only names, resolved by `getCues(exId)` per the currently-active variant and rendered into `#cuesSection` inside `logFormWrap`. What's missing is a visual reference. `posing.html` already proved a premium image pattern for this (dense coaching-poster images, tap-to-expand, lightbox) for its poses. This adds the same poster treatment as a visual companion to the cues gym.html already shows — not a new cue-content system.
 
 ## Scope (this pass)
-All 41 primary exercises across the 5 existing training days (Push 7, Pull 7, Legs A 6, Upper 8, Legs B 6) **plus** their 34 substitution alternates — 75 posters total, matching 1:1 with the exercise names already keyed in `DEFAULT_CUES`.
+All 34 primary exercises in the `defaultExercises` seed, across the 5 training days (Push 7, Pull 7, Legs A 6, Upper 8, Legs B 6), **plus** the 66 substitute-only names also keyed in `DEFAULT_CUES` — **100 posters total**, one per `DEFAULT_CUES` key. (Earlier drafts of this spec said 41 primaries / 34 subs / 75 total — that was wrong, based on a bad grep match; verified directly against the `defaultExercises` array and a precise count of `DEFAULT_CUES` keys.)
 
 ## Data model
-One new lookup object, `EXERCISE_SLUGS`, placed next to `DEFAULT_CUES`/`MUSCLE_PRIMARY` (same file, same convention — a plain object keyed by exercise/variant name, not fields bolted onto the `EXERCISES` array or `subs[]` entries):
+One new lookup object, `EXERCISE_SLUGS`, placed next to `DEFAULT_CUES`/`MUSCLE_PRIMARY` (same file, same convention — a plain object keyed by exercise/variant name, not fields bolted onto `defaultExercises` or `subs[]` entries):
 
 ```javascript
 const EXERCISE_SLUGS = {
   'Hack Squat': 'hack-squat',
   'Pendulum Squat': 'pendulum-squat',
-  // ... one entry per DEFAULT_CUES key, same 41 primary + 34 variant names
+  // ... one entry per DEFAULT_CUES key — all 100 (34 primary + 66 substitute)
 };
 ```
 
-No `note` field, no per-exercise JSON, no changes to `EXERCISES`/`subs[]` at all. The poster image carries setup/mistakes/muscle-emphasis/tip; the existing `DEFAULT_CUES` text carries the rest. Two lookup tables that both key off exercise name (`DEFAULT_CUES`, `EXERCISE_SLUGS`) is the established pattern here, not a new one.
+No `note` field, no per-exercise JSON, no changes to `defaultExercises`/`subs[]` at all. The poster image carries setup/mistakes/muscle-emphasis/tip; the existing `DEFAULT_CUES` text carries the rest. Two lookup tables that both key off exercise name (`DEFAULT_CUES`, `EXERCISE_SLUGS`) is the established pattern here, not a new one.
 
 ## UI
 One image slot inside `logFormWrap`, next to the existing `#cuesSection` — rendered once per currently-selected exercise, not per list row (there is no per-row detail panel in `renderWorkoutList()` today; rows are plain click-to-select).
@@ -33,7 +33,7 @@ This replaces the earlier "collapsible per-row card" and "sub-picker peek icon" 
 `assets/gym/<slug>.png`, following the `assets/mobility/<slug>.png` convention already established. One flat folder — subs and primaries share it.
 
 ## Image generation (batched by day)
-Order: Push → Pull → Legs A → Upper → Legs B. Each batch covers that day's primaries **and** their subs together. Review the Push batch's quality bar before generating the rest — cheaper to fix a style problem after one day's batch than after all 75.
+Order: Push → Pull → Legs A → Upper → Legs B, using each day's primaries and the `subs[]` names listed under them in `defaultExercises`. A handful of substitute names are shared across two days' sub lists (e.g. "Smith Incline Machine Chest Press" is a sub under both a Push and an Upper primary) or are themselves another day's primary — generate each unique name's poster once, whichever batch reaches it first, and skip it if a later batch's list includes a name already covered. Review the Push batch's quality bar before generating the rest — cheaper to fix a style problem after one day's batch than after all 100.
 
 **Poster content** (per image, matching posing.html's density):
 - Exercise name
