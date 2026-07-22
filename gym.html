@@ -4639,6 +4639,13 @@ img, video, canvas, svg { max-width: 100%; }
     saveState();
   }
 
+  function getPoster(exId) {
+    const ex = (state.exercises || []).find(function(e) { return e.id === exId; });
+    if (!ex) return null;
+    const variant = getSession(exId).activeVariant;
+    return (variant && EXERCISE_SLUGS[variant]) || EXERCISE_SLUGS[ex.name] || null;
+  }
+
   let restTimerInterval = null;
   let restTimerEndAt = 0; // wall-clock ms — survives setInterval throttling/suspension in background
 
