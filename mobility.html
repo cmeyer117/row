@@ -167,6 +167,19 @@ html, body {
   width: 100%; max-width: 200px; height: auto;
   display: block; margin: 0 auto 8px; border-radius: 8px;
 }
+.mob-ex-photo { cursor: zoom-in; }
+
+/* ── Lightbox (full-size poster view) ── */
+.mob-lightbox {
+  position: fixed; inset: 0; z-index: 200;
+  background: rgba(0,0,0,0.9);
+  display: none; align-items: center; justify-content: center;
+  padding: 20px; cursor: zoom-out;
+}
+.mob-lightbox.show { display: flex; }
+.mob-lightbox img {
+  max-width: 100%; max-height: 100%; border-radius: 8px;
+}
 
 /* ── Rule banner ── */
 .mob-rule {
@@ -871,6 +884,10 @@ html, body {
   </div>
 </nav>
 
+<div class="mob-lightbox" id="mobLightbox">
+  <img id="mobLightboxImg" src="" alt="">
+</div>
+
 <script>
 (function() {
   // ── Section tab switching ──
@@ -926,6 +943,7 @@ html, body {
     'vacuum-practice': '<svg class="mob-ex-diagram" viewBox="0 0 100 100" stroke="var(--text-2)" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="50" cy="14" r="6"/><line x1="50" y1="20" x2="50" y2="55"/><line x1="50" y1="55" x2="44" y2="90"/><line x1="50" y1="55" x2="56" y2="90"/><line x1="46" y1="28" x2="42" y2="48"/><line x1="54" y1="28" x2="58" y2="48"/><path d="M40,48 Q50,44 60,48" stroke-dasharray="2,3"/></svg>',
     'deep-squat-hold': '<svg class="mob-ex-diagram" viewBox="0 0 100 100" stroke="var(--text-2)" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="50" cy="30" r="6"/><line x1="50" y1="36" x2="50" y2="55"/><line x1="50" y1="55" x2="35" y2="70"/><line x1="35" y1="70" x2="30" y2="60"/><line x1="50" y1="55" x2="65" y2="70"/><line x1="65" y1="70" x2="70" y2="60"/><line x1="50" y1="55" x2="38" y2="72"/><line x1="38" y1="72" x2="38" y2="88"/><line x1="50" y1="55" x2="62" y2="72"/><line x1="62" y1="72" x2="62" y2="88"/></svg>',
     'ankle-knee-to-wall': '<svg class="mob-ex-diagram" viewBox="0 0 100 100" stroke="var(--text-2)" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="85" y1="5" x2="85" y2="95"/><circle cx="45" cy="20" r="6"/><line x1="45" y1="26" x2="50" y2="50"/><line x1="50" y1="50" x2="65" y2="55"/><line x1="65" y1="55" x2="80" y2="60"/><line x1="50" y1="50" x2="42" y2="70"/><line x1="42" y1="70" x2="42" y2="88"/></svg>',
+    'doorway-chest-stretch': '<svg class="mob-ex-diagram" viewBox="0 0 100 100" stroke="var(--text-2)" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="72" y1="6" x2="72" y2="94"/><circle cx="42" cy="18" r="6"/><line x1="42" y1="24" x2="46" y2="52"/><line x1="46" y1="52" x2="40" y2="80"/><line x1="46" y1="52" x2="56" y2="80"/><line x1="44" y1="28" x2="62" y2="18"/><line x1="62" y1="18" x2="72" y2="14"/></svg>',
     '90-90-hip-stretch': '<svg class="mob-ex-diagram" viewBox="0 0 100 100" stroke="var(--text-2)" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="52" cy="20" r="6"/><line x1="52" y1="26" x2="50" y2="58"/><line x1="50" y1="58" x2="28" y2="58"/><line x1="28" y1="58" x2="28" y2="76"/><line x1="50" y1="58" x2="66" y2="68"/><line x1="66" y1="68" x2="82" y2="55"/><line x1="51" y1="32" x2="34" y2="40"/></svg>'
   };
 
@@ -933,7 +951,11 @@ html, body {
     var h = '<div class="mob-ex-row"><div class="mob-ex-head"><div class="mob-ex-name">' + item.name + '</div>' +
       '<svg class="mob-ex-chevron" viewBox="0 0 16 16" width="12" height="12"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>';
     if (item.detail) h += '<div class="mob-ex-detail">' + item.detail + '</div>';
-    if (item.svgKey && SVG_LIB[item.svgKey]) h += '<div class="mob-ex-panel">' + SVG_LIB[item.svgKey] + '</div>';
+    if (item.svgKey && SVG_LIB[item.svgKey]) {
+      h += '<div class="mob-ex-panel">' +
+        '<img class="mob-ex-photo" data-slug="' + item.svgKey + '" alt="' + item.name + '" style="display:none">' +
+        SVG_LIB[item.svgKey] + '</div>';
+    }
     h += '</div>';
     return h;
   }
@@ -951,7 +973,7 @@ html, body {
         { name: 'Scapular Push-ups', detail: '12 reps', svgKey: 'scapular-pushups' },
       ],
       post: [
-        { name: 'Doorway Pec Stretch', detail: '60 sec/side', svgKey: 'doorway-chest-lat-stretch' },
+        { name: 'Doorway Pec Stretch', detail: '60 sec/side', svgKey: 'doorway-chest-stretch' },
         { name: 'Couch Stretch', detail: '60 sec/side', svgKey: 'couch-stretch' },
         { name: 'Overhead Triceps Stretch', detail: '45 sec/side', svgKey: 'overhead-tricep-stretch' },
         { name: 'Biceps Wall Stretch', detail: '45 sec/side', svgKey: 'bicep-wall-stretch' },
@@ -1039,7 +1061,7 @@ html, body {
         { name: 'Scapular Push-ups', detail: '12 reps', svgKey: 'scapular-pushups' },
       ],
       post: [
-        { name: 'Doorway Pec Stretch', detail: '60 sec/side', svgKey: 'doorway-chest-lat-stretch' },
+        { name: 'Doorway Pec Stretch', detail: '60 sec/side', svgKey: 'doorway-chest-stretch' },
         { name: 'Couch Stretch', detail: '60 sec/side', svgKey: 'couch-stretch' },
         { name: 'Overhead Triceps Stretch', detail: '45 sec/side', svgKey: 'overhead-tricep-stretch' },
         { name: 'Biceps Wall Stretch', detail: '45 sec/side', svgKey: 'bicep-wall-stretch' },
@@ -1072,6 +1094,7 @@ html, body {
     html += '</div>';
 
     document.getElementById('ppContent').innerHTML = html;
+    swapPhotos(document.getElementById('ppContent'));
   }
 
   renderPP('push');
@@ -1092,15 +1115,31 @@ html, body {
     head.closest('.mob-ex-row').classList.toggle('expanded');
   });
 
-  // ── Swap in real photos where present, fall back to SVG diagram ──
-  document.querySelectorAll('.mob-ex-photo').forEach(function(img) {
-    img.onload = function() {
-      img.style.display = 'block';
-      var svg = img.parentElement.querySelector('.mob-ex-diagram');
-      if (svg) svg.style.display = 'none';
-    };
-    img.src = 'assets/mobility/' + img.dataset.slug + '.png';
+  // ── Lightbox: tap a photo to view it full-size ──
+  var lightbox = document.getElementById('mobLightbox');
+  var lightboxImg = document.getElementById('mobLightboxImg');
+  document.addEventListener('click', function(e) {
+    var photo = e.target.closest('.mob-ex-photo');
+    if (photo && photo.style.display !== 'none') {
+      lightboxImg.src = photo.src;
+      lightbox.classList.add('show');
+      return;
+    }
+    if (e.target.closest('#mobLightbox')) lightbox.classList.remove('show');
   });
+
+  // ── Swap in real photos where present, fall back to SVG diagram ──
+  function swapPhotos(root) {
+    (root || document).querySelectorAll('.mob-ex-photo').forEach(function(img) {
+      img.onload = function() {
+        img.style.display = 'block';
+        var svg = img.parentElement.querySelector('.mob-ex-diagram');
+        if (svg) svg.style.display = 'none';
+      };
+      img.src = 'assets/mobility/' + img.dataset.slug + '.png';
+    });
+  }
+  swapPhotos(document);
 })();
 </script>
 </body>
