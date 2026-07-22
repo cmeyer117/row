@@ -3553,6 +3553,7 @@ img, video, canvas, svg { max-width: 100%; }
     const ex = getCurrentEx();
     renderWarmup();
     renderCues(ex);
+    renderPoster(ex);
     // Reset coach panel when switching exercises
     $('coachResponse').classList.remove('show');
     $('coachResponseText').textContent = '';
@@ -4757,6 +4758,18 @@ img, video, canvas, svg { max-width: 100%; }
     textarea.value = cues.join('\n');
   }
 
+  function renderPoster(ex) {
+    const section = $('posterSection');
+    const img = $('posterImg');
+    if (!ex) { section.style.display = 'none'; return; }
+    const slug = getPoster(ex.id);
+    if (!slug) { section.style.display = 'none'; return; }
+    section.classList.remove('expanded');
+    img.onload = function() { section.style.display = ''; };
+    img.onerror = function() { section.style.display = 'none'; };
+    img.src = 'assets/gym/' + slug + '.png';
+  }
+
   $('warmupToggle').addEventListener('click', function() {
     warmupOpen = !warmupOpen;
     renderWarmup();
@@ -4775,6 +4788,21 @@ img, video, canvas, svg { max-width: 100%; }
     const lines = $('cuesTextarea').value.split('\n').map(s => s.trim()).filter(Boolean);
     saveCues(ex.id, lines);
     renderCues(ex);
+  });
+
+  // ── Poster: expand/collapse + lightbox ──
+  document.addEventListener('click', function(e) {
+    if (e.target.closest('#posterHeader')) {
+      $('posterSection').classList.toggle('expanded');
+      return;
+    }
+    const photo = e.target.closest('#posterImg');
+    if (photo && $('posterSection').classList.contains('expanded')) {
+      $('gymLightboxImg').src = photo.src;
+      $('gymLightbox').classList.add('show');
+      return;
+    }
+    if (e.target.closest('#gymLightbox')) $('gymLightbox').classList.remove('show');
   });
 
   // ── Jarvis fetch helper (one retry, 12s timeout — Railway cold starts) ──
