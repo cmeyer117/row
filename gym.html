@@ -2613,6 +2613,17 @@ img, video, canvas, svg { max-width: 100%; }
         </div>
       </div>
 
+      <!-- Poster -->
+      <div class="poster-section" id="posterSection" style="display:none">
+        <div class="poster-header" id="posterHeader">
+          <span class="poster-label">Form Reference</span>
+          <svg class="poster-chevron" viewBox="0 0 16 16" width="12" height="12"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <div class="poster-panel">
+          <img class="poster-img" id="posterImg" alt="">
+        </div>
+      </div>
+
       <!-- Coach -->
       <div class="po-coach-section">
         <button class="po-coach-btn" id="coachBtn" type="button">⚡ Ask Coach</button>
@@ -2771,6 +2782,11 @@ img, video, canvas, svg { max-width: 100%; }
         <button class="sub-cancel" id="progModalClose">Close</button>
       </div>
     </div>
+  </div>
+
+  <!-- POSTER LIGHTBOX -->
+  <div class="gym-lightbox" id="gymLightbox">
+    <img id="gymLightboxImg" src="" alt="">
   </div>
 
   <!-- PROGRESS VIEW -->
