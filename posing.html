@@ -62,6 +62,28 @@ html, body {
   font-size: 12px; color: var(--text-3); margin: 2px 0 0;
 }
 
+/* ── Section tabs (top of page) ── */
+.mob-tabs {
+  display: flex; gap: 6px; margin-bottom: 20px;
+  overflow-x: auto; scrollbar-width: none;
+}
+.mob-tabs::-webkit-scrollbar { display: none; }
+.mob-tab-btn {
+  flex-shrink: 0; padding: 8px 16px; border-radius: 999px;
+  font-size: 13px; font-weight: 600; letter-spacing: 0.01em;
+  color: var(--text-3); background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08); cursor: pointer;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
+  -webkit-tap-highlight-color: transparent; font-family: inherit;
+}
+.mob-tab-btn:hover { color: var(--text-1); }
+.mob-tab-btn.active {
+  color: var(--text-1); background: rgba(110,231,183,0.10);
+  border-color: rgba(110,231,183,0.30);
+}
+.mob-section { display: none; }
+.mob-section.active { display: block; }
+
 /* ── Block headings ── */
 .mob-block-title {
   font-family: var(--font-mono); font-size: 10px; font-weight: 800;
@@ -178,6 +200,12 @@ html, body {
     </div>
   </div>
 
+  <div class="mob-tabs">
+    <button class="mob-tab-btn active" data-section="competition" type="button">Competition</button>
+    <button class="mob-tab-btn" data-section="content" type="button">Content</button>
+  </div>
+
+  <div class="mob-section active" id="section-competition">
   <div class="mob-rule">
     <strong>When:</strong> Right after your daily mobility session, while ROM is at its maximum (within 30 min of active stretching). For the right lat spread specifically: pose right after overhead lat stretch and T-spine work, while that tissue is open.<br>
     <strong>Tip:</strong> Film it weekly — you will notice a difference.
@@ -332,6 +360,183 @@ html, body {
   <div class="mob-card">
     <div class="mob-card-body">Do your mobility session first, then practice posing immediately after. ROM is at its maximum within 30 min of active stretching. For the right lat spread: practice after overhead lat stretch and T-spine work while the tissue is open. Film it weekly — you will notice a difference.</div>
   </div>
+  </div>
+
+  <div class="mob-section" id="section-content">
+  <div class="mob-rule">
+    <strong>Use:</strong> Content/photoshoot poses, not competition-judged poses. Pick a few that fit the shot, don't run through all 14 every time.
+  </div>
+
+  <div class="mob-block-title">Content Poses</div>
+  <div class="mob-exercise-list">
+    <div class="mob-ex-row">
+      <div class="mob-ex-head">
+        <div class="mob-ex-name">Archer Pose</div>
+        <svg class="mob-ex-chevron" viewBox="0 0 16 16" width="12" height="12"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="mob-ex-detail">Step one leg out wide. Turn torso and extend front arm straight. Pull rear arm back as if drawing a bow. Chest open and lifted. Look over front arm.</div>
+      <div class="mob-ex-panel">
+        <img class="mob-ex-photo" data-slug="archer-pose" alt="Archer Pose" style="display:none">
+        <div class="mob-ex-note">Focus: chest, arms, lats, obliques, V-taper. Best angle: 3/4. Best lighting: side light to rear or 45° front.</div>
+      </div>
+    </div>
+    <div class="mob-ex-row">
+      <div class="mob-ex-head">
+        <div class="mob-ex-name">Icarus / Winged Kneeling</div>
+        <svg class="mob-ex-chevron" viewBox="0 0 16 16" width="12" height="12"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="mob-ex-detail">Kneel on one knee with the other leg extended out. Open arms wide and slightly back. Spread chest and lift chin. Look to the side or slightly up.</div>
+      <div class="mob-ex-panel">
+        <img class="mob-ex-photo" data-slug="icarus-winged-kneeling" alt="Icarus / Winged Kneeling" style="display:none">
+        <div class="mob-ex-note">Focus: lats, chest, shoulders, abs, overall aesthetic. Best angle: slightly low. Best lighting: top or side for dramatic shadows.</div>
+      </div>
+    </div>
+    <div class="mob-ex-row">
+      <div class="mob-ex-head">
+        <div class="mob-ex-name">Arnold Classic (Double Biceps)</div>
+        <svg class="mob-ex-chevron" viewBox="0 0 16 16" width="12" height="12"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="mob-ex-detail">Stand tall, feet shoulder width. Raise both arms and flex biceps. Elbows slightly forward. Chest up, abs tight. Look to the side.</div>
+      <div class="mob-ex-panel">
+        <img class="mob-ex-photo" data-slug="arnold-classic-double-biceps" alt="Arnold Classic (Double Biceps)" style="display:none">
+        <div class="mob-ex-note">Focus: biceps, shoulders, chest, V-taper, overall width. Best angle: straight on. Best lighting: top/front to bring out detail.</div>
+      </div>
+    </div>
+    <div class="mob-ex-row">
+      <div class="mob-ex-head">
+        <div class="mob-ex-name">Classical Statue Pose (Frank Zane Style)</div>
+        <svg class="mob-ex-chevron" viewBox="0 0 16 16" width="12" height="12"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="mob-ex-detail">Stand tall. Raise one arm high with hand open. Flex opposite arm at side. Slightly turn torso and look up. Point fingers for aesthetic effect.</div>
+      <div class="mob-ex-panel">
+        <img class="mob-ex-photo" data-slug="classical-statue-frank-zane" alt="Classical Statue Pose (Frank Zane Style)" style="display:none">
+        <div class="mob-ex-note">Focus: aesthetics, flow, chest, abs, arms, overall symmetry. Best angle: 3/4. Best lighting: top spotlight or soft overhead.</div>
+      </div>
+    </div>
+    <div class="mob-ex-row">
+      <div class="mob-ex-head">
+        <div class="mob-ex-name">Classic Statue Pose (Bodybuilding Art Pose)</div>
+        <svg class="mob-ex-chevron" viewBox="0 0 16 16" width="12" height="12"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="mob-ex-detail">Shift weight to one leg. Raise one arm with hand open. Other arm extended or flexed. Twist torso slightly and look up. Point toes and engage legs.</div>
+      <div class="mob-ex-panel">
+        <img class="mob-ex-photo" data-slug="classic-statue-bodybuilding-art" alt="Classic Statue Pose (Bodybuilding Art Pose)" style="display:none">
+        <div class="mob-ex-note">Focus: aesthetics, flow, full body balance, classic physique. Best angle: 3/4. Best lighting: top spotlight for sculpted look.</div>
+      </div>
+    </div>
+    <div class="mob-ex-row">
+      <div class="mob-ex-head">
+        <div class="mob-ex-name">Flexed Side Triceps</div>
+        <svg class="mob-ex-chevron" viewBox="0 0 16 16" width="12" height="12"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="mob-ex-detail">Turn to the side. Step one leg back for balance. Flex triceps by keeping arm straight and pulling back. Keep chest up and abs tight. Look forward or slightly down.</div>
+      <div class="mob-ex-panel">
+        <img class="mob-ex-photo" data-slug="flexed-side-triceps" alt="Flexed Side Triceps" style="display:none">
+        <div class="mob-ex-note">Focus: triceps, shoulders, chest, obliques. Best angle: side. Best lighting: side lighting to highlight triceps.</div>
+      </div>
+    </div>
+    <div class="mob-ex-row">
+      <div class="mob-ex-head">
+        <div class="mob-ex-name">Twisting Rear Biceps</div>
+        <svg class="mob-ex-chevron" viewBox="0 0 16 16" width="12" height="12"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="mob-ex-detail">Turn back toward camera at 3/4 angle. Look over shoulder. Flex rear bicep and forearm. Squeeze back and rear delt. Keep waist tight.</div>
+      <div class="mob-ex-panel">
+        <img class="mob-ex-photo" data-slug="twisting-rear-biceps" alt="Twisting Rear Biceps" style="display:none">
+        <div class="mob-ex-note">Focus: back, rear delts, biceps, obliques, detail & thickness. Best angle: 3/4 back. Best lighting: side lighting for separation.</div>
+      </div>
+    </div>
+    <div class="mob-ex-row">
+      <div class="mob-ex-head">
+        <div class="mob-ex-name">Low Hero Pose</div>
+        <svg class="mob-ex-chevron" viewBox="0 0 16 16" width="12" height="12"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="mob-ex-detail">Stand with one foot forward and knee slightly bent. Flex arms (any style) and puff chest. Lean slightly forward for dominance. Keep jaw tight and look up/forward.</div>
+      <div class="mob-ex-panel">
+        <img class="mob-ex-photo" data-slug="low-hero-pose" alt="Low Hero Pose" style="display:none">
+        <div class="mob-ex-note">Focus: chest, arms, shoulders, presence, overall impact. Best angle: low. Best lighting: top/back for hero effect.</div>
+      </div>
+    </div>
+    <div class="mob-ex-row">
+      <div class="mob-ex-head">
+        <div class="mob-ex-name">Cross-Body Side Chest</div>
+        <svg class="mob-ex-chevron" viewBox="0 0 16 16" width="12" height="12"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="mob-ex-detail">Turn sideways. Bring front arm across body and grip wrist. Squeeze chest and bicep. Pull shoulder back and up. Tighten abs and legs.</div>
+      <div class="mob-ex-panel">
+        <img class="mob-ex-photo" data-slug="cross-body-side-chest" alt="Cross-Body Side Chest" style="display:none">
+        <div class="mob-ex-note">Focus: chest, biceps, shoulders, obliques, legs. Best angle: side. Best lighting: side lighting to add depth.</div>
+      </div>
+    </div>
+    <div class="mob-ex-row">
+      <div class="mob-ex-head">
+        <div class="mob-ex-name">Greek God Hands-on-Hips</div>
+        <svg class="mob-ex-chevron" viewBox="0 0 16 16" width="12" height="12"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="mob-ex-detail">Place hands on hips. Elbows flared out. Chest up and wide. Abs tight. Look up and to the side.</div>
+      <div class="mob-ex-panel">
+        <img class="mob-ex-photo" data-slug="greek-god-hands-on-hips" alt="Greek God Hands-on-Hips" style="display:none">
+        <div class="mob-ex-note">Focus: V-taper, chest, abs, shoulders, overall aesthetics. Best angle: 3/4. Best lighting: top/front for classic look.</div>
+      </div>
+    </div>
+    <div class="mob-ex-row">
+      <div class="mob-ex-head">
+        <div class="mob-ex-name">One-Knee Classical Pose</div>
+        <svg class="mob-ex-chevron" viewBox="0 0 16 16" width="12" height="12"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="mob-ex-detail">Kneel on one knee, front foot flat, other knee down. One arm behind head, other arm flexed or resting on leg. Twist torso slightly and look up. Keep abs tight.</div>
+      <div class="mob-ex-panel">
+        <img class="mob-ex-photo" data-slug="one-knee-classical-pose" alt="One-Knee Classical Pose" style="display:none">
+        <div class="mob-ex-note">Focus: abs, obliques, chest, arms, legs, flow. Best angle: 3/4. Best lighting: top/side for depth.</div>
+      </div>
+    </div>
+    <div class="mob-ex-row">
+      <div class="mob-ex-head">
+        <div class="mob-ex-name">Arms Overhead Abdominal Stretch</div>
+        <svg class="mob-ex-chevron" viewBox="0 0 16 16" width="12" height="12"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="mob-ex-detail">Interlock fingers and extend arms overhead. Stretch up and slightly lean to one side. Keep abs tight and ribcage down. Look down or to the side.</div>
+      <div class="mob-ex-panel">
+        <img class="mob-ex-photo" data-slug="arms-overhead-abdominal-stretch" alt="Arms Overhead Abdominal Stretch" style="display:none">
+        <div class="mob-ex-note">Focus: abs, serratus, obliques, length, lines. Best angle: 3/4. Best lighting: soft top light to show abs.</div>
+      </div>
+    </div>
+    <div class="mob-ex-row">
+      <div class="mob-ex-head">
+        <div class="mob-ex-name">Arms-Down Lat Flare</div>
+        <svg class="mob-ex-chevron" viewBox="0 0 16 16" width="12" height="12"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="mob-ex-detail">Stand tall. Keep arms straight and slightly away from body. Flare lats by pushing elbows forward slightly. Chest up, abs tight. Fists clenched.</div>
+      <div class="mob-ex-panel">
+        <img class="mob-ex-photo" data-slug="arms-down-lat-flare" alt="Arms-Down Lat Flare" style="display:none">
+        <div class="mob-ex-note">Focus: lats, shoulders, chest, V-taper, overall width. Best angle: straight on. Best lighting: top or front to enhance width.</div>
+      </div>
+    </div>
+    <div class="mob-ex-row">
+      <div class="mob-ex-head">
+        <div class="mob-ex-name">Victory / Freedom Pose</div>
+        <svg class="mob-ex-chevron" viewBox="0 0 16 16" width="12" height="12"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="mob-ex-detail">Stand tall and open. Raise one arm up in victory. Other arm flexed at side. Chest lifted. Look up toward hand.</div>
+      <div class="mob-ex-panel">
+        <img class="mob-ex-photo" data-slug="victory-freedom-pose" alt="Victory / Freedom Pose" style="display:none">
+        <div class="mob-ex-note">Focus: arms, chest, abs, lats, presence. Best angle: low. Best lighting: top or back for silhouette effect.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="mob-divider"></div>
+  <div class="mob-block-title">General Photo Tips</div>
+  <div class="mob-card">
+    <div class="mob-card-body">
+      <strong>Lighting:</strong> Natural light or strong side light works best.<br>
+      <strong>Angles:</strong> Lower angles = more power. 3/4 angles = more depth.<br>
+      <strong>Background:</strong> Clean, simple backgrounds keep the focus on you.<br>
+      <strong>Pump:</strong> Get a good pump before shooting for maximum detail.<br>
+      <strong>Confidence:</strong> Relax, breathe, and own every shot.
+    </div>
+  </div>
+  </div>
 </div>
 
 <!-- Gym tab bar — Posing active -->
@@ -362,6 +567,17 @@ html, body {
 
 <script>
 (function() {
+  // ── Section tab switching (Competition / Content) ──
+  var tabs = document.querySelectorAll('.mob-tab-btn');
+  tabs.forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      tabs.forEach(function(b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      document.querySelectorAll('.mob-section').forEach(function(s) { s.classList.remove('active'); });
+      document.getElementById('section-' + btn.dataset.section).classList.add('active');
+    });
+  });
+
   // ── Expandable exercise rows ──
   document.addEventListener('click', function(e) {
     var head = e.target.closest('.mob-ex-head');
