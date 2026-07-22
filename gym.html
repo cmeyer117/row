@@ -805,6 +805,17 @@ img, video, canvas, svg { max-width: 100%; }
 .po-coach-response-img {
   width: 100%; max-width: 200px; height: auto;
   display: block; margin: 0 auto 10px; border-radius: 8px;
+  cursor: zoom-in;
+}
+.po-lightbox {
+  position: fixed; inset: 0; z-index: 200;
+  background: rgba(0,0,0,0.9);
+  display: none; align-items: center; justify-content: center;
+  padding: 20px; cursor: zoom-out;
+}
+.po-lightbox.show { display: flex; }
+.po-lightbox img {
+  max-width: 100%; max-height: 100%; border-radius: 8px;
 }
 .po-coach-btn.hype {
   border-color: rgba(224,51,47,0.35); background: rgba(224,51,47,0.10); color: #ff6b66;
@@ -2756,6 +2767,10 @@ img, video, canvas, svg { max-width: 100%; }
   </nav>
 </div>
 
+<div class="po-lightbox" id="poLightbox">
+  <img id="poLightboxImg" src="" alt="">
+</div>
+
 <!-- Add / Edit Exercise Modal -->
 <div class="po-modal-bg" id="exModalBg">
   <div class="po-modal">
@@ -4685,6 +4700,18 @@ img, video, canvas, svg { max-width: 100%; }
     img.src = 'assets/mobility/' + pose.slug + '.png';
     $('posingResponseText').textContent = pose.name.toUpperCase() + '\n\n' + pose.cues.join('\n') + '\n\n' + POSING_FOOTER;
     $('posingResponse').classList.add('show');
+  });
+
+  // ── Posing Coach image lightbox ──
+  const poLightbox = $('poLightbox');
+  document.addEventListener('click', function(e) {
+    const img = e.target.closest('#posingResponseImg');
+    if (img && img.style.display !== 'none') {
+      $('poLightboxImg').src = img.src;
+      poLightbox.classList.add('show');
+      return;
+    }
+    if (e.target.closest('#poLightbox')) poLightbox.classList.remove('show');
   });
 
   // ── Post-workout debrief ──────────────────────────────────────

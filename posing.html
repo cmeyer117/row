@@ -106,6 +106,19 @@ html, body {
   width: 100%; max-width: 200px; height: auto;
   display: block; margin: 0 auto 8px; border-radius: 8px;
 }
+.mob-ex-photo { cursor: zoom-in; }
+
+/* ── Lightbox (full-size poster view) ── */
+.mob-lightbox {
+  position: fixed; inset: 0; z-index: 200;
+  background: rgba(0,0,0,0.9);
+  display: none; align-items: center; justify-content: center;
+  padding: 20px; cursor: zoom-out;
+}
+.mob-lightbox.show { display: flex; }
+.mob-lightbox img {
+  max-width: 100%; max-height: 100%; border-radius: 8px;
+}
 
 /* ── Rule banner ── */
 .mob-rule {
@@ -343,6 +356,10 @@ html, body {
   </div>
 </nav>
 
+<div class="mob-lightbox" id="mobLightbox">
+  <img id="mobLightboxImg" src="" alt="">
+</div>
+
 <script>
 (function() {
   // ── Expandable exercise rows ──
@@ -360,6 +377,19 @@ html, body {
       if (svg) svg.style.display = 'none';
     };
     img.src = 'assets/mobility/' + img.dataset.slug + '.png';
+  });
+
+  // ── Lightbox: tap a photo to view it full-size ──
+  var lightbox = document.getElementById('mobLightbox');
+  var lightboxImg = document.getElementById('mobLightboxImg');
+  document.addEventListener('click', function(e) {
+    var photo = e.target.closest('.mob-ex-photo');
+    if (photo && photo.style.display !== 'none') {
+      lightboxImg.src = photo.src;
+      lightbox.classList.add('show');
+      return;
+    }
+    if (e.target.closest('#mobLightbox')) lightbox.classList.remove('show');
   });
 })();
 </script>
