@@ -228,6 +228,7 @@ body { min-height: 100vh; padding: max(28px, env(safe-area-inset-top)) 20px 60px
     const statusEl = document.getElementById('addStatus');
     const name = document.getElementById('cName').value.trim();
     if (!name) { statusEl.textContent = 'Client name required.'; btn.disabled = false; return; }
+    const email = document.getElementById('cEmail').value.trim();
     const intake = {
       stage: document.getElementById('cStage').value,
       goal: document.getElementById('cGoal').value,
@@ -255,6 +256,7 @@ body { min-height: 100vh; padding: max(28px, env(safe-area-inset-top)) 20px 60px
       training_days_per_week: intake.trainingDaysPerWeek,
       session_length: intake.sessionLength,
       injury_flags: intake.injuryFlags,
+      email: email,
       sex: intake.sex,
       age: intake.age,
       height_in: intake.heightIn,
@@ -263,6 +265,12 @@ body { min-height: 100vh; padding: max(28px, env(safe-area-inset-top)) 20px 60px
       status: 'draft'
     }).select().single();
     if (error) { statusEl.textContent = 'Save failed: ' + error.message; btn.disabled = false; return; }
+    if (pendingApprovalInquiryId) {
+      // Never blocks or rolls back client creation — the client already exists and is usable
+      // even if this specific update fails; the inquiry would just stay visible as "new".
+      await supa.from('coaching_inquiries').update({ status: 'converted' }).eq('id', pendingApprovalInquiryId);
+      pendingApprovalInquiryId = null;
+    }
     window.location.href = 'coaching-plan.html?id=' + encodeURIComponent(data.id);
   });
 
