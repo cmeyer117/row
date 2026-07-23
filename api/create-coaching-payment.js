@@ -5,7 +5,7 @@
 // subscribe-push.js — this dashboard has no client login, single-coach
 // tool behind topbar.js's passphrase gate.
 import Stripe from 'stripe';
-import { validateBillingInput, dollarsToCents, buildClientLookupRequest, buildClientUpdateRequest } from './stripe-billing-logic.js';
+import { validateBillingInput, dollarsToCents, buildClientLookupRequest, buildClientUpdateRequest } from './_lib/stripe-billing-logic.js';
 
 const SUPABASE_URL = 'https://vikpcejlyxieguorwysf.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_EvWPtfW1FBW5Vf-H6w0yHw_PcXK4imv';

@@ -3,7 +3,7 @@
 // Timezone-sensitive logic lives in workout-nudge-logic.js (unit tested);
 // this file is just I/O wiring to Supabase + web-push.
 import webpush from 'web-push';
-import { isRestDay, hasLoggedToday } from './workout-nudge-logic.js';
+import { isRestDay, hasLoggedToday } from './_lib/workout-nudge-logic.js';
 
 const SUPABASE_URL = 'https://vikpcejlyxieguorwysf.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_EvWPtfW1FBW5Vf-H6w0yHw_PcXK4imv';

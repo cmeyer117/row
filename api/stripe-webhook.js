@@ -3,7 +3,7 @@
 // unverified payload on a money path), maps the event to a billing_status,
 // and updates the matching coaching_clients row by stripe_customer_id.
 import Stripe from 'stripe';
-import { billingStatusForEvent, buildClientUpdateByCustomerRequest } from './stripe-billing-logic.js';
+import { billingStatusForEvent, buildClientUpdateByCustomerRequest } from './_lib/stripe-billing-logic.js';
 
 const SUPABASE_URL = 'https://vikpcejlyxieguorwysf.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_EvWPtfW1FBW5Vf-H6w0yHw_PcXK4imv';

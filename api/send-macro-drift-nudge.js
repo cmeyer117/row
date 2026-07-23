@@ -3,7 +3,7 @@
 // lives in macro-drift-logic.js (unit tested); this file is just I/O
 // wiring to Supabase + web-push. Mirrors send-workout-nudge.js.
 import webpush from 'web-push';
-import { last3EasternDates, isDrifting } from './macro-drift-logic.js';
+import { last3EasternDates, isDrifting } from './_lib/macro-drift-logic.js';
 
 const SUPABASE_URL = 'https://vikpcejlyxieguorwysf.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_EvWPtfW1FBW5Vf-H6w0yHw_PcXK4imv';

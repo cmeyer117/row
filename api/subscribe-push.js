@@ -2,7 +2,7 @@
 // send-workout-nudge.js can push to it later. Uses the same publishable
 // key + open-anon-RLS pattern as the rest of Row (see gym.html, food_log
 // migration) — this is a single-user tool behind topbar.js's passphrase gate.
-import { buildSubscribeUpsertRequest } from './subscribe-push-logic.js';
+import { buildSubscribeUpsertRequest } from './_lib/subscribe-push-logic.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
