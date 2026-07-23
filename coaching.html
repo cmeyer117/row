@@ -45,6 +45,14 @@ body { min-height: 100vh; padding: max(28px, env(safe-area-inset-top)) 20px 60px
 .badge-draft { background: rgba(255,255,255,0.08); color: var(--text-tertiary); }
 .badge-review { background: rgba(255,107,107,0.15); color: var(--danger); }
 .badge-issued { background: rgba(110,231,183,0.15); color: var(--accent); }
+.badge-paid { background: rgba(110,231,183,0.15); color: var(--accent); }
+.badge-pending { background: rgba(255,255,255,0.08); color: var(--text-tertiary); }
+.badge-past_due { background: rgba(255,107,107,0.15); color: var(--danger); }
+.badge-cancelled { background: rgba(255,255,255,0.08); color: var(--text-tertiary); }
+.bill-btn { border: 1px solid rgba(110,231,183,0.3); background: transparent; color: var(--accent); border-radius: 10px; font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer; padding: 6px 10px; flex-shrink: 0; margin-right: 6px; }
+.bill-form { background: rgba(255,255,255,0.03); border-radius: 12px; padding: 12px; margin: 8px 0; }
+.bill-form .row2 { margin-bottom: 10px; }
+.bill-link { font-size: 12px; word-break: break-all; color: var(--text-primary); background: rgba(0,0,0,0.3); padding: 8px 10px; border-radius: 8px; margin-top: 8px; }
 .inquiry-row { padding: 12px 14px; border-radius: 12px; background: rgba(255,255,255,0.035); margin-bottom: 8px; }
 .inquiry-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; gap: 8px; }
 .inquiry-name { color: var(--text-primary); font-weight: 600; }
@@ -189,6 +197,60 @@ body { min-height: 100vh; padding: max(28px, env(safe-area-inset-top)) 20px 60px
     });
   }
 
+  async function toggleBillForm(clientId) {
+    const holder = document.getElementById('billForm-' + clientId);
+    if (!holder) return;
+    if (holder.style.display === 'block') { holder.style.display = 'none'; holder.innerHTML = ''; return; }
+    holder.style.display = 'block';
+    holder.className = 'bill-form';
+    holder.innerHTML =
+      '<div class="row2">' +
+      '<div class="field"><label>Amount ($)</label><input type="number" min="1" step="0.01" class="billAmount"></div>' +
+      '<div class="field"><label>Frequency</label><select class="billFreq"><option value="one_time">One-time</option><option value="monthly">Monthly</option></select></div>' +
+      '</div>' +
+      '<button type="button" class="btn billSubmit">Send bill</button>' +
+      '<div class="billStatus" style="font-size:12px;color:var(--text-tertiary);margin-top:8px;"></div>';
+    holder.querySelector('.billSubmit').addEventListener('click', () => submitBill(clientId, holder));
+  }
+
+  async function submitBill(clientId, holder) {
+    const amountInput = holder.querySelector('.billAmount');
+    const freqSelect = holder.querySelector('.billFreq');
+    const statusEl = holder.querySelector('.billStatus');
+    const amountDollars = parseFloat(amountInput.value);
+    if (isNaN(amountDollars) || amountDollars <= 0) { statusEl.textContent = 'Enter a valid amount.'; return; }
+    const submitBtn = holder.querySelector('.billSubmit');
+    submitBtn.disabled = true;
+    statusEl.textContent = 'Creating payment link...';
+    try {
+      const r = await fetch('/api/create-coaching-payment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clientId, amountDollars, frequency: freqSelect.value }),
+      });
+      const data = await r.json();
+      if (!r.ok) { statusEl.textContent = 'Failed: ' + (data.error || r.status); submitBtn.disabled = false; return; }
+      statusEl.innerHTML = '';
+      const linkEl = document.createElement('div');
+      linkEl.className = 'bill-link';
+      linkEl.textContent = data.url;
+      statusEl.appendChild(linkEl);
+      const copyBtn = document.createElement('button');
+      copyBtn.type = 'button';
+      copyBtn.className = 'btn';
+      copyBtn.style.marginTop = '8px';
+      copyBtn.textContent = 'Copy link';
+      copyBtn.addEventListener('click', () => { navigator.clipboard.writeText(data.url); copyBtn.textContent = 'Copied!'; });
+      statusEl.appendChild(copyBtn);
+      // Don't reload the client list here — it would wipe this very link
+      // and Copy button out from under Carl before he can use them. The
+      // PENDING badge shows up next time the page loads/refreshes.
+    } catch (e) {
+      statusEl.textContent = 'Request failed: ' + e.message;
+      submitBtn.disabled = false;
+    }
+  }
+
   async function loadClients() {
     const { data, error } = await supa.from('coaching_clients').select('*').neq('status', 'archived').order('created_at', { ascending: false });
     const listEl = document.getElementById('clientList');
@@ -201,6 +263,11 @@ body { min-height: 100vh; padding: max(28px, env(safe-area-inset-top)) 20px 60px
       row.className = 'client-row';
       const badgeClass = c.status === 'issued' ? 'badge-issued' : (c.needs_review ? 'badge-review' : 'badge-draft');
       const badgeLabel = c.status === 'issued' ? 'ISSUED' : (c.needs_review ? 'NEEDS REVIEW' : 'DRAFT');
+      const billingBadge = document.createElement('span');
+      if (c.billing_status && c.billing_status !== 'none') {
+        billingBadge.className = 'badge badge-' + c.billing_status;
+        billingBadge.textContent = c.billing_status.toUpperCase().replace('_', ' ');
+      }
       const a = document.createElement('a');
       a.href = 'coaching-plan.html?id=' + encodeURIComponent(c.id);
       a.className = 'client-link';
@@ -215,10 +282,21 @@ body { min-height: 100vh; padding: max(28px, env(safe-area-inset-top)) 20px 60px
       archiveBtn.className = 'archive-btn';
       archiveBtn.textContent = 'Archive';
       archiveBtn.addEventListener('click', () => archiveClient(c.id, c.name));
+      const billBtn = document.createElement('button');
+      billBtn.type = 'button';
+      billBtn.className = 'bill-btn';
+      billBtn.textContent = 'Bill';
+      billBtn.addEventListener('click', () => toggleBillForm(c.id));
       row.appendChild(a);
+      if (c.billing_status && c.billing_status !== 'none') row.appendChild(billingBadge);
       row.appendChild(badge);
+      row.appendChild(billBtn);
       row.appendChild(archiveBtn);
       listEl.appendChild(row);
+      const formHolder = document.createElement('div');
+      formHolder.id = 'billForm-' + c.id;
+      formHolder.style.display = 'none';
+      listEl.appendChild(formHolder);
     });
   }
 
