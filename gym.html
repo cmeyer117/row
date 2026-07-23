@@ -2130,7 +2130,7 @@ img, video, canvas, svg { max-width: 100%; }
 
 /* ===== Progress View ===== */
 #progressView { display: none; padding-bottom: 100px; }
-.po-shell.view-progress > *:not(#progressView):not(.gym-tabbar) { display: none !important; }
+.po-shell.view-progress > *:not(#progressView):not(.gym-tabbar):not(#logProgressToggle) { display: none !important; }
 .po-shell.view-progress #progressView { display: block; }
 
 .prog-header {
@@ -2319,6 +2319,10 @@ img, video, canvas, svg { max-width: 100%; }
 <body>
 
 <div class="po-shell">
+  <div class="po-seg-control" id="logProgressToggle" style="margin-bottom:10px">
+    <button class="po-seg-btn active" id="gymTabLog" type="button">Log</button>
+    <button class="po-seg-btn" id="gymTabProgress" type="button">Progress</button>
+  </div>
   <div class="po-toprow">
     <button class="po-day-pill" type="button" id="dayPill" title="Tap to switch the day filter to today's split">
       <span class="po-day-date" id="dayPillDate">—</span>
@@ -2802,13 +2806,9 @@ img, video, canvas, svg { max-width: 100%; }
   <!-- TAB BAR -->
   <nav class="gym-tabbar">
     <div class="gym-tabbar-inner">
-      <button class="gym-tab active" id="gymTabLog" type="button">
+      <button class="gym-tab active" id="gymTabFitness" type="button">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="3" width="12" height="2" rx="1" fill="currentColor"/><rect x="2" y="7" width="8" height="2" rx="1" fill="currentColor"/><rect x="2" y="11" width="10" height="2" rx="1" fill="currentColor"/></svg>
-        Log
-      </button>
-      <button class="gym-tab" id="gymTabProgress" type="button">
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><polyline points="2,12 6,7 9,9 14,3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
-        Progress
+        Fitness
       </button>
       <a class="gym-tab" href="mobility.html">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="8" cy="3.5" r="1.5" fill="currentColor"/><path d="M5 7c0-1.1.9-2 2-2h2c1.1 0 2 .9 2 2v2.5l1.5 3.5h-1.5L10 11H6l-1 2H3.5L5 9.5V7z" fill="currentColor"/></svg>
@@ -4119,6 +4119,7 @@ img, video, canvas, svg { max-width: 100%; }
 
   $('gymTabLog').addEventListener('click', function() { switchTab('log'); });
   $('gymTabProgress').addEventListener('click', function() { switchTab('progress'); });
+  $('gymTabFitness').addEventListener('click', function() { switchTab('log'); });
 
   // ============================================================
   // TODAY'S WORKOUT + PAST WORKOUTS
@@ -4885,10 +4886,20 @@ img, video, canvas, svg { max-width: 100%; }
     ]},
   ];
   const POSING_FOOTER = 'Check left/right symmetry in the mirror before you shoot. Breathe out, hold the flex, then shoot — don\'t shoot mid-inhale. Hold 5-8 sec minimum, judges see the settled version, not the flinch.';
+  // ponytail: which mandatory poses best showcase each training day's target muscles.
+  const DAY_POSE_SLUGS = {
+    push: ['side-chest', 'most-muscular', 'side-triceps', 'front-double-biceps'],
+    pull: ['back-double-biceps', 'front-double-biceps'],
+    legsA: ['abdominal-thigh', 'side-chest', 'front-relaxed'],
+    legsB: ['abdominal-thigh', 'side-chest', 'front-relaxed'],
+    upper: ['front-double-biceps', 'side-chest', 'most-muscular', 'side-triceps'],
+  };
   let posingPoseIdx = 0;
 
   $('posingCoachBtn').addEventListener('click', function() {
-    const pose = MANDATORY_POSES[posingPoseIdx % MANDATORY_POSES.length];
+    const slugs = DAY_POSE_SLUGS[state.filterDay];
+    const pool = slugs ? MANDATORY_POSES.filter(p => slugs.includes(p.slug)) : MANDATORY_POSES;
+    const pose = pool[posingPoseIdx % pool.length];
     posingPoseIdx++;
     const img = $('posingResponseImg');
     img.onerror = function() { img.style.display = 'none'; };
