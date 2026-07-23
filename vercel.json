@@ -1,11 +1,11 @@
 {
   "functions": {
-    "api/create-coaching-payment.js": {},
-    "api/polish.js": {},
-    "api/send-coaching-inquiry-nudge.js": {},
-    "api/send-macro-drift-nudge.js": {},
-    "api/send-workout-nudge.js": {},
-    "api/stripe-webhook.js": {},
-    "api/subscribe-push.js": {}
+    "api/create-coaching-payment.js": { "maxDuration": 10 },
+    "api/polish.js": { "maxDuration": 10 },
+    "api/send-coaching-inquiry-nudge.js": { "maxDuration": 10 },
+    "api/send-macro-drift-nudge.js": { "maxDuration": 10 },
+    "api/send-workout-nudge.js": { "maxDuration": 10 },
+    "api/stripe-webhook.js": { "maxDuration": 10 },
+    "api/subscribe-push.js": { "maxDuration": 10 }
   }
 }
