@@ -1,0 +1,11 @@
+{
+  "functions": {
+    "api/create-coaching-payment.js": {},
+    "api/polish.js": {},
+    "api/send-coaching-inquiry-nudge.js": {},
+    "api/send-macro-drift-nudge.js": {},
+    "api/send-workout-nudge.js": {},
+    "api/stripe-webhook.js": {},
+    "api/subscribe-push.js": {}
+  }
+}
