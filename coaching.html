@@ -45,14 +45,27 @@ body { min-height: 100vh; padding: max(28px, env(safe-area-inset-top)) 20px 60px
 .badge-draft { background: rgba(255,255,255,0.08); color: var(--text-tertiary); }
 .badge-review { background: rgba(255,107,107,0.15); color: var(--danger); }
 .badge-issued { background: rgba(110,231,183,0.15); color: var(--accent); }
+.inquiry-row { padding: 12px 14px; border-radius: 12px; background: rgba(255,255,255,0.035); margin-bottom: 8px; }
+.inquiry-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; gap: 8px; }
+.inquiry-name { color: var(--text-primary); font-weight: 600; }
+.inquiry-meta { font-family: var(--font-mono); font-size: 11px; color: var(--text-tertiary); margin-bottom: 6px; }
+.inquiry-message { font-size: 13px; color: var(--text-secondary); margin-bottom: 10px; }
+.inquiry-actions { display: flex; gap: 8px; }
+.btn-decline { padding: 8px 14px; border: 1px solid rgba(255,107,107,0.3); background: transparent; color: var(--danger); border-radius: 10px; font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
 </style>
 </head>
 <body>
 <div class="page">
   <h1 class="dash-title">Coaching</h1>
 
+  <div class="card" id="inquiriesCard" style="display:none;">
+    <h2 style="margin:0 0 12px;font-size:14px;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-tertiary);">Pending Applications</h2>
+    <div id="inquiryList"></div>
+  </div>
+
   <div class="card">
     <div class="field"><label>Client name</label><input id="cName" type="text" placeholder="Client name"></div>
+    <div class="field"><label>Email</label><input id="cEmail" type="email" placeholder="client@email.com"></div>
     <div class="row2">
       <div class="field"><label>Stage</label>
         <select id="cStage"><option value="beginner">Beginner</option><option value="intermediate">Intermediate</option><option value="advanced">Advanced</option></select>
