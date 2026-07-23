@@ -128,6 +128,67 @@ body { min-height: 100vh; padding: max(28px, env(safe-area-inset-top)) 20px 60px
     loadClients();
   }
 
+  let pendingApprovalInquiryId = null;
+
+  async function declineInquiry(id, name) {
+    if (!confirm('Decline ' + name + '\'s application? This can\'t be easily undone from here.')) return;
+    const { error } = await supa.from('coaching_inquiries').update({ status: 'declined' }).eq('id', id);
+    if (error) { alert('Decline failed: ' + error.message); return; }
+    loadInquiries();
+  }
+
+  function approveInquiry(inquiry) {
+    pendingApprovalInquiryId = inquiry.id;
+    document.getElementById('cName').value = inquiry.name || '';
+    document.getElementById('cEmail').value = inquiry.email || '';
+    if (inquiry.stage) document.getElementById('cStage').value = inquiry.stage;
+    if (inquiry.goal) document.getElementById('cGoal').value = inquiry.goal;
+    document.getElementById('cName').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  async function loadInquiries() {
+    const { data, error } = await supa.from('coaching_inquiries').select('*').eq('status', 'new').order('created_at', { ascending: false });
+    const cardEl = document.getElementById('inquiriesCard');
+    const listEl = document.getElementById('inquiryList');
+    listEl.innerHTML = '';
+    if (error || !data || data.length === 0) { cardEl.style.display = 'none'; return; }
+    cardEl.style.display = 'block';
+    data.forEach((inq) => {
+      const row = document.createElement('div');
+      row.className = 'inquiry-row';
+      const top = document.createElement('div');
+      top.className = 'inquiry-top';
+      top.innerHTML = '<span class="inquiry-name">' + window.CoachingTemplates.escapeHtml(inq.name) + '</span>';
+      const meta = document.createElement('div');
+      meta.className = 'inquiry-meta';
+      meta.textContent = (inq.stage || '?') + ' · ' + (inq.goal || '?') + ' · ' + inq.email;
+      row.appendChild(top);
+      row.appendChild(meta);
+      if (inq.message) {
+        const msg = document.createElement('div');
+        msg.className = 'inquiry-message';
+        msg.textContent = inq.message;
+        row.appendChild(msg);
+      }
+      const actions = document.createElement('div');
+      actions.className = 'inquiry-actions';
+      const approveBtn = document.createElement('button');
+      approveBtn.type = 'button';
+      approveBtn.className = 'btn';
+      approveBtn.textContent = 'Approve';
+      approveBtn.addEventListener('click', () => approveInquiry(inq));
+      const declineBtn = document.createElement('button');
+      declineBtn.type = 'button';
+      declineBtn.className = 'btn-decline';
+      declineBtn.textContent = 'Decline';
+      declineBtn.addEventListener('click', () => declineInquiry(inq.id, inq.name));
+      actions.appendChild(approveBtn);
+      actions.appendChild(declineBtn);
+      row.appendChild(actions);
+      listEl.appendChild(row);
+    });
+  }
+
   async function loadClients() {
     const { data, error } = await supa.from('coaching_clients').select('*').neq('status', 'archived').order('created_at', { ascending: false });
     const listEl = document.getElementById('clientList');
@@ -206,6 +267,7 @@ body { min-height: 100vh; padding: max(28px, env(safe-area-inset-top)) 20px 60px
   });
 
   loadClients();
+  loadInquiries();
 })();
 </script>
 </body>
