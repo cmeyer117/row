@@ -1,0 +1,41 @@
+name: Coaching Inquiry Nudge
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Force a real test push regardless of whether a new inquiry exists (diagnostic use only)'
+        type: boolean
+        default: false
+
+jobs:
+  nudge:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send coaching inquiry nudge
+        run: |
+          url="https://row-sage.vercel.app/api/send-coaching-inquiry-nudge"
+          if [ "${{ inputs.force }}" = "true" ]; then
+            url="${url}?force=true"
+          fi
+          response=$(curl -s -w "\n%{http_code}" -X POST "$url" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}")
+          code=$(echo "$response" | tail -n1)
+          body=$(echo "$response" | sed '$d')
+          echo "Response code: $code"
+          echo "Response body: $body"
+          if [ "$code" != "200" ]; then
+            echo "Error: unexpected response $code"
+            exit 1
+          fi
+          message=$(echo "$body" | jq -r '.message')
+          if [ "$message" = "Pushed" ]; then
+            sent=$(echo "$body" | jq -r '.sent')
+            total=$(echo "$body" | jq -r '.total')
+            if [ "$sent" != "$total" ]; then
+              echo "Error: only $sent/$total pushes actually succeeded"
+              exit 1
+            fi
+          fi
