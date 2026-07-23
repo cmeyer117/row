@@ -67,6 +67,16 @@ body { min-height: 100vh; padding: max(28px, env(safe-area-inset-top)) 20px 60px
       </div>
       <div class="field"><label>Training days/week</label><input id="cDays" type="number" min="1" max="7" value="4"></div>
     </div>
+    <div class="row2">
+      <div class="field"><label>Sex</label>
+        <select id="cSex"><option value="male">Male</option><option value="female">Female</option></select>
+      </div>
+      <div class="field"><label>Age</label><input id="cAge" type="number" min="13" max="100" value="30"></div>
+    </div>
+    <div class="row2">
+      <div class="field"><label>Height (inches)</label><input id="cHeight" type="number" min="48" max="96" value="68"></div>
+      <div class="field"><label>Weight (lb)</label><input id="cWeight" type="number" min="60" max="600" value="180"></div>
+    </div>
     <div class="field"><label>Session length (minutes)</label><input id="cLength" type="number" min="15" value="60"></div>
     <div class="field">
       <label>Injury flags</label>
@@ -152,8 +162,15 @@ body { min-height: 100vh; padding: max(28px, env(safe-area-inset-top)) 20px 60px
       sessionLength: parseInt(document.getElementById('cLength').value, 10),
       injuryFlags: Array.from(document.querySelectorAll('.injFlag:checked')).map((el) => el.value)
     };
+    intake.sex = document.getElementById('cSex').value;
+    intake.age = parseInt(document.getElementById('cAge').value, 10);
+    intake.heightIn = parseInt(document.getElementById('cHeight').value, 10);
+    intake.weightLb = parseInt(document.getElementById('cWeight').value, 10);
     if (isNaN(intake.trainingDaysPerWeek) || intake.trainingDaysPerWeek < 1 || intake.trainingDaysPerWeek > 7) { statusEl.textContent = 'Training days must be 1-7.'; btn.disabled = false; return; }
     if (isNaN(intake.sessionLength) || intake.sessionLength <= 0) { statusEl.textContent = 'Session length must be greater than 0.'; btn.disabled = false; return; }
+    if (isNaN(intake.age) || intake.age < 13 || intake.age > 100) { statusEl.textContent = 'Age must be 13-100.'; btn.disabled = false; return; }
+    if (isNaN(intake.heightIn) || intake.heightIn <= 0) { statusEl.textContent = 'Height must be greater than 0.'; btn.disabled = false; return; }
+    if (isNaN(intake.weightLb) || intake.weightLb <= 0) { statusEl.textContent = 'Weight must be greater than 0.'; btn.disabled = false; return; }
     const needsReview = window.CoachingTemplates.needsReview(intake);
     const { data, error } = await supa.from('coaching_clients').insert({
       plan_id: genPlanId(),
@@ -164,6 +181,10 @@ body { min-height: 100vh; padding: max(28px, env(safe-area-inset-top)) 20px 60px
       training_days_per_week: intake.trainingDaysPerWeek,
       session_length: intake.sessionLength,
       injury_flags: intake.injuryFlags,
+      sex: intake.sex,
+      age: intake.age,
+      height_in: intake.heightIn,
+      weight_lb: intake.weightLb,
       needs_review: needsReview,
       status: 'draft'
     }).select().single();
