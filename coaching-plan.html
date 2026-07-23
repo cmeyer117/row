@@ -8,6 +8,9 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="topbar.js" defer></script>
 <script src="coaching-templates.js"></script>
+<script src="coaching-exercise-meta.js"></script>
+<script src="macro-calc.js"></script>
+<script src="coaching-diet-trend.js"></script>
 <style>
 :root { --text-primary: #F4F1EA; --text-secondary: #B8B6B0; --text-tertiary: #76746E; --accent: #6EE7B7; --danger: #FF6B6B; --font: -apple-system, BlinkMacSystemFont, "Inter", sans-serif; --font-serif: 'Instrument Serif', Georgia, serif; }
 * { box-sizing: border-box; }
@@ -91,7 +94,47 @@ textarea { width: 100%; min-height: 90px; padding: 10px; border-radius: 10px; bo
   const clientId = new URLSearchParams(window.location.search).get('id');
   let currentClient = null;
 
-  function renderPlan(client, plan) {
+  function estimate1RM(w, r) { if (r < 2) return w; return w * (1 + r / 30); }
+  function roundToStep(v, s) { return Math.round(v / s) * s; }
+
+  function getRx(ex, logs) {
+    if (!logs.length) return null;
+    const last = logs[logs.length - 1];
+    const { weight, reps } = last;
+    const { repMin, repMax, step, bw } = ex;
+    const upgradeAt = Math.min(8, repMax);
+    let stuck = 0;
+    for (let i = logs.length - 1; i >= 0; i--) {
+      if (logs[i].weight === weight) stuck++; else break;
+    }
+    if (bw) {
+      if (reps >= upgradeAt) return { type: 'up', weight: 0, reps: reps + 1, tag: 'Push for more', reason: reps + ' reps — strong. Push for ' + (reps + 1) + ' next time.', bw: true };
+      if (reps >= repMin) return { type: 'hold', weight: 0, reps: reps + 1, tag: 'Add a rep', reason: reps + ' reps. Push for ' + (reps + 1) + ' next session.', bw: true };
+      return { type: 'hold', weight: 0, reps: repMin, tag: 'Repeat', reason: reps + ' reps fell short. Repeat until you hit ' + repMin + '+.', bw: true };
+    }
+    if (stuck >= 3 && reps < repMin) {
+      const dl = roundToStep(weight * 0.9, step);
+      return { type: 'down', weight: dl, reps: repMax, tag: 'Deload', reason: 'Stuck at ' + weight + 'lb for ' + stuck + ' sessions. Drop 10%, reset, build back cleaner.' };
+    }
+    if (reps >= upgradeAt) return { type: 'up', weight: weight + step, reps: repMin, tag: 'Add weight', reason: 'Hit ' + reps + ' reps — time to add ' + step + 'lb. Expect ' + repMin + '-' + (repMin + 1) + ' next session.' };
+    if (reps >= repMin && reps < upgradeAt) return { type: 'hold', weight: weight, reps: reps + 1, tag: 'Add a rep', reason: reps + ' reps in target. Stay at ' + weight + 'lb, push for ' + (reps + 1) + '.' };
+    return { type: 'hold', weight: weight, reps: repMin, tag: 'Repeat', reason: reps + ' reps short of ' + repMin + '-' + upgradeAt + '. Repeat ' + weight + 'lb until you hit ' + repMin + '+ clean.' };
+  }
+
+  async function getClientLogs(clientIdArg, exerciseName) {
+    const { data, error } = await supa.from('coaching_client_logs')
+      .select('weight, reps').eq('client_id', clientIdArg).eq('exercise_name', exerciseName)
+      .order('created_at', { ascending: true });
+    return (error || !data) ? [] : data;
+  }
+
+  function activityLevelFor(daysPerWeek) {
+    if (daysPerWeek <= 2) return 2;
+    if (daysPerWeek <= 4) return 3;
+    return 4;
+  }
+
+  function renderPlan(client, plan, realMacros, trendSuggestion) {
     document.getElementById('planName').textContent = client.name;
     document.getElementById('planIdLabel').textContent = client.plan_id;
     document.getElementById('noteClientName').textContent = client.name;
@@ -105,14 +148,32 @@ textarea { width: 100%; min-height: 90px; padding: 10px; border-radius: 10px; bo
     plan.training.days.forEach((d) => {
       const div = document.createElement('div');
       div.className = 'day-block';
-      div.innerHTML = '<h3>' + d.name + '</h3><ul>' + d.exercises.map((e) => '<li>' + e + '</li>').join('') + '</ul>';
+      div.innerHTML = '<h3>' + d.name + '</h3><ul>' + d.exercises.map((e) =>
+        '<li>' + e + ' <span class="rx" data-ex="' + window.CoachingTemplates.escapeHtml(e) + '" style="color:var(--accent);font-size:12px;"></span></li>'
+      ).join('') + '</ul>';
       daysEl.appendChild(div);
+    });
+    daysEl.querySelectorAll('.rx').forEach(async (span) => {
+      const exName = span.dataset.ex;
+      if (!window.CoachingExerciseMeta.isLoggable(exName)) return;
+      const logs = await getClientLogs(client.id, exName);
+      if (!logs.length) return;
+      const rx = getRx(window.CoachingExerciseMeta.getMeta(exName), logs);
+      if (rx) span.textContent = ' — NEXT: ' + (rx.bw ? rx.reps + ' reps' : rx.weight + 'lb x ' + rx.reps) + ' (' + rx.tag + ')';
     });
     document.getElementById('equipmentNote').textContent = plan.equipmentNote || '';
 
-    document.getElementById('dietSummary').textContent = plan.diet.summary;
-    document.getElementById('dietApproach').textContent = plan.diet.approach;
-    document.getElementById('dietFood').textContent = plan.diet.foodGuidance;
+    if (realMacros) {
+      document.getElementById('dietSummary').textContent =
+        realMacros.calories + ' cal · ' + realMacros.proteinG + 'g protein · ' + realMacros.fatG + 'g fat · ' + realMacros.carbG + 'g carb';
+      document.getElementById('dietApproach').textContent = plan.diet.approach;
+      document.getElementById('dietFood').textContent = plan.diet.foodGuidance +
+        (trendSuggestion ? ' — ' + trendSuggestion.reason : '');
+    } else {
+      document.getElementById('dietSummary').textContent = plan.diet.summary;
+      document.getElementById('dietApproach').textContent = plan.diet.approach;
+      document.getElementById('dietFood').textContent = plan.diet.foodGuidance;
+    }
 
     document.getElementById('adviceText').textContent = plan.advice;
     document.getElementById('personalizationNote').value = client.personalization_note || '';
@@ -135,7 +196,20 @@ textarea { width: 100%; min-height: 90px; padding: 10px; border-radius: 10px; bo
     const plan = (data.status === 'issued' && data.issued_snapshot)
       ? data.issued_snapshot.plan
       : window.CoachingTemplates.assemblePlan(intake);
-    renderPlan(data, plan);
+    const { data: weightRows } = await supa.from('coaching_client_weights')
+      .select('weight, logged_at').eq('client_id', clientId).order('logged_at', { ascending: true });
+    const latestWeight = (weightRows && weightRows.length) ? weightRows[weightRows.length - 1].weight : data.weight_lb;
+    let realMacros = null;
+    if (data.sex && data.age && data.height_in && latestWeight) {
+      realMacros = window.MacroCalc.calculateMacros({
+        sex: data.sex, age: data.age, heightIn: data.height_in, weightLb: latestWeight,
+        activityLevel: activityLevelFor(data.training_days_per_week), goal: data.goal
+      });
+    }
+    const trendSuggestion = (weightRows && weightRows.length >= 2)
+      ? window.CoachingDietTrend.suggestCalorieAdjustment(data.goal, weightRows)
+      : null;
+    renderPlan(data, plan, realMacros, trendSuggestion);
   }
 
   document.getElementById('confirmReviewBtn').addEventListener('click', async () => {
