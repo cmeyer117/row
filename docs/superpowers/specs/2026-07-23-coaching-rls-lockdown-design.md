@@ -77,12 +77,12 @@ drop policy if exists "anon full access to coaching_clients" on coaching_clients
 create policy "owner full access to coaching_clients"
   on coaching_clients for all to authenticated using (coaching_is_owner()) with check (coaching_is_owner());
 
--- ---- coaching_inquiries ----
--- Drop the anon SELECT-all policy. NOTE: confirm its exact name live before applying
--- (placeholder name below). Keep the public form able to submit; no reads for anon.
-drop policy if exists "anon read coaching_inquiries" on coaching_inquiries;
-create policy "anon can submit inquiries"
-  on coaching_inquiries for insert to anon with check (status = 'new');
+-- ---- coaching_inquiries ---- (RLS already ON live; policy names verified live)
+-- Keep the existing "anon insert-only on coaching_inquiries" policy untouched —
+-- the external public form uses it. Drop only the two anon read/write leaks.
+alter table coaching_inquiries enable row level security;  -- idempotent / explicit
+drop policy if exists "anon select coaching_inquiries" on coaching_inquiries;  -- the dump path
+drop policy if exists "anon update coaching_inquiries" on coaching_inquiries;  -- anon must not mutate leads
 create policy "owner full access to coaching_inquiries"
   on coaching_inquiries for all to authenticated using (coaching_is_owner()) with check (coaching_is_owner());
 
@@ -143,12 +143,25 @@ $$;
 revoke all on function get_coaching_plan(uuid) from public;
 revoke all on function log_coaching_exercise(uuid, text, numeric, integer, boolean) from public;
 revoke all on function upsert_coaching_weight(uuid, numeric) from public;
-grant execute on function get_coaching_plan(uuid) to anon, authenticated;
-grant execute on function log_coaching_exercise(uuid, text, numeric, integer, boolean) to anon, authenticated;
-grant execute on function upsert_coaching_weight(uuid, numeric) to anon, authenticated;
+-- anon only: the client log page is the sole caller; the owner dashboard reads tables directly.
+grant execute on function get_coaching_plan(uuid) to anon;
+grant execute on function log_coaching_exercise(uuid, text, numeric, integer, boolean) to anon;
+grant execute on function upsert_coaching_weight(uuid, numeric) to anon;
 ```
 
 `ponytail:` week bucket is UTC-Monday, not the client's local Monday — a weekly weigh-in tolerates the edge-of-week drift; pass a client week-start param only if it ever matters.
+
+### 5.1 Codex security-review corrections (2026-07-24, applied in the plan's migration/code)
+
+Live verification via Supabase MCP + a Codex terra review changed several things above:
+
+- **`create-coaching-payment.js` needs owner-JWT auth (HIGH).** It has no caller authentication today (`create-coaching-payment.js:14` only checks the HTTP method). Once it moves to the service-role key it becomes an unauthenticated god-mode endpoint — anyone POSTing a known `clientId` can mint Stripe sessions and overwrite that client's billing. Fix: the dashboard sends the logged-in owner's `access_token` as `Authorization: Bearer …`; the function verifies it (`GET {SUPABASE_URL}/auth/v1/user`) and confirms the email is the owner before any Stripe/DB action, else 401. `stripe-webhook.js` (Stripe signature) and `send-coaching-inquiry-nudge.js` (`CRON_SECRET`) are already authenticated — service-role is safe there.
+- **Exact live policy names (HIGH — silent-failure fix).** `coaching_inquiries` leaks are named `anon select coaching_inquiries` and `anon update coaching_inquiries` (not the earlier guess). A wrong `drop policy if exists` silently no-ops and leaves the leak — so the migration ends with a `pg_policies` assertion that fails loudly if any anon `SELECT/UPDATE/DELETE` remains on a coaching table.
+- **SECURITY DEFINER hardening (MEDIUM).** All four functions use `set search_path = ''` with schema-qualified names (`public.coaching_clients`, `auth.jwt()`, …), not `search_path = public` — removes any `pg_temp`/search-path precedence risk. (Project is PG17, where PUBLIC already lacks CREATE on `public`; this is defense-in-depth.)
+- **RPCs granted to `anon` only (MEDIUM).** Not `authenticated` — the owner dashboard reads the tables directly and never calls the RPCs, so a future non-owner Row auth user can't invoke them.
+- **Accepted risk — bearer-link discloses one client's `name` + `injury_flags` (Carl's call).** The client's own no-login link necessarily renders their own plan, which needs their name (page title) and injury flags (plan assembly). This is the magic-link trust model; if a link is forwarded/screenshotted, that one client's data is visible. **Confirm you accept this**, or we move plan assembly server-side so the RPC returns only rendered exercises (more work).
+- **Deferred (out of scope):** inquiry-form spam/rate-limiting (Turnstile + a server-side form endpoint) — separate anti-abuse work; length CHECK constraints already exist on the table.
+- **Live confirmed:** logs/weights have FKs to `coaching_clients(id)` (the RPC exists-check is belt-and-suspenders); `coaching_client_logs`/`coaching_client_weights` RLS is genuinely OFF (get_advisors flags both as ERROR `rls_disabled_in_public`).
 
 ## 6. Cross-repo deliverable #2 — wire `get_advisors` into `audit-projects`
 
@@ -175,7 +188,7 @@ Also add "ran section 3c: supabase advisors" to the write-run-logs steps line wh
 
 ## 9. Done vs deferred
 
-The Auth choice collapses the writeup's "productization-correct follow-up" into this pass — after this, **no anon direct table access exists** and the dashboard has real auth. Genuinely deferred (YAGNI): multi-coach scoping (policies key on the single owner email via `coaching_is_owner()`; add a `coach_id` column + predicate only when a second coach exists); retiring the now-redundant topbar passphrase.
+The Auth choice collapses the writeup's "productization-correct follow-up" into this pass — after this, **no anon direct table access exists for the coaching tables** and the dashboard has real auth. (Scope correction: ~13 other tables — `push_subscriptions`, `app_state`, `food_log`, etc. — keep the blanket-anon pattern; they hold Carl's own data, not third-party PII, so they're out of this task's scope. The newly-wired `get_advisors` audit check (§6) surfaces that whole class going forward.) Genuinely deferred (YAGNI): multi-coach scoping (policies key on the single owner email via `coaching_is_owner()`; add a `coach_id` column + predicate only when a second coach exists); retiring the now-redundant topbar passphrase.
 
 ## 10. Files touched
 
