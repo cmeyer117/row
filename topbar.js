@@ -14,6 +14,11 @@
 
   function authGate() {
     if (window.self !== window.top) return; // skip iframes
+    // coaching.html/coaching-plan.html have real Supabase Auth login (coaching-auth.js)
+    // enforced at the DB layer since the 2026-07-24 RLS lockdown — this passphrase is
+    // redundant there now, not a security control on those two pages anymore.
+    var path = (window.location.pathname || '').toLowerCase();
+    if (path.endsWith('coaching.html') || path.endsWith('coaching-plan.html')) return;
     if (sessionStorage.getItem(AUTH_KEY) === '1') return; // already authed this session
 
     // Hide page content immediately
