@@ -6,14 +6,24 @@
 // tool behind topbar.js's passphrase gate.
 import Stripe from 'stripe';
 import { validateBillingInput, dollarsToCents, buildClientLookupRequest, buildClientUpdateRequest } from './_lib/stripe-billing-logic.js';
+import { verifyOwner } from './_lib/verify-owner.js';
 
 const SUPABASE_URL = 'https://vikpcejlyxieguorwysf.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_EvWPtfW1FBW5Vf-H6w0yHw_PcXK4imv';
+// Anon key: only for verifying the caller's owner JWT (auth/v1/user).
+const SUPABASE_ANON_KEY = 'sb_publishable_EvWPtfW1FBW5Vf-H6w0yHw_PcXK4imv';
+// Service-role key: the DB lookup/update below (RLS now denies anon).
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed' });
+    return;
+  }
+  // Owner-only: this endpoint now wields the service-role key, so it must never
+  // run for an unauthenticated caller. The dashboard sends the owner's session token.
+  if (!(await verifyOwner(req.headers['authorization'], SUPABASE_URL, SUPABASE_ANON_KEY))) {
+    res.status(401).json({ error: 'Unauthorized' });
     return;
   }
   const { clientId, amountDollars, frequency } = req.body || {};

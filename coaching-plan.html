@@ -6,6 +6,7 @@
 <title>Plan — Carl's Dashboard</title>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="coaching-auth.js"></script>
 <script src="topbar.js" defer></script>
 <script src="coaching-templates.js"></script>
 <script src="coaching-exercise-meta.js"></script>
@@ -257,7 +258,7 @@ textarea { width: 100%; min-height: 90px; padding: 10px; border-radius: 10px; bo
     window.print();
   });
 
-  load();
+  window.CoachingAuth.ensure(supa).then(load);
 })();
 </script>
 </body>
