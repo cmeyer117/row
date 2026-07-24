@@ -1,9 +1,9 @@
 // Vercel serverless function — called directly from coaching.html when
 // Carl bills a client. Creates/reuses a Stripe Customer, an on-the-fly
 // Price for the custom amount, and a Checkout Session; returns the hosted
-// URL for Carl to send the client. Same anon-key Supabase REST pattern as
-// subscribe-push.js — this dashboard has no client login, single-coach
-// tool behind topbar.js's passphrase gate.
+// URL for Carl to send the client. Gated by verifyOwner() below — the
+// dashboard now requires real Supabase Auth login, not topbar.js's
+// passphrase (cosmetic only, no DB-layer enforcement).
 import Stripe from 'stripe';
 import { validateBillingInput, dollarsToCents, buildClientLookupRequest, buildClientUpdateRequest } from './_lib/stripe-billing-logic.js';
 import { verifyOwner } from './_lib/verify-owner.js';
