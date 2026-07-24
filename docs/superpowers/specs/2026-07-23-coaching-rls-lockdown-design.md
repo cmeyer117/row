@@ -65,10 +65,17 @@ Enable RLS. `authenticated` full access; anon reaches them only through the 4b R
 -- authenticated (Carl): full access.  service_role (Vercel fns): bypasses RLS.
 -- ============================================================
 
+-- Owner predicate — scopes "authenticated" to Carl by JWT email, so a future
+-- Row auth user on this same project does NOT inherit coaching access.
+create or replace function coaching_is_owner()
+returns boolean language sql stable set search_path = public as $$
+  select (auth.jwt() ->> 'email') = 'carl.meyer.business@gmail.com';
+$$;
+
 -- ---- coaching_clients ----
 drop policy if exists "anon full access to coaching_clients" on coaching_clients;
-create policy "authenticated full access to coaching_clients"
-  on coaching_clients for all to authenticated using (true) with check (true);
+create policy "owner full access to coaching_clients"
+  on coaching_clients for all to authenticated using (coaching_is_owner()) with check (coaching_is_owner());
 
 -- ---- coaching_inquiries ----
 -- Drop the anon SELECT-all policy. NOTE: confirm its exact name live before applying
@@ -76,18 +83,18 @@ create policy "authenticated full access to coaching_clients"
 drop policy if exists "anon read coaching_inquiries" on coaching_inquiries;
 create policy "anon can submit inquiries"
   on coaching_inquiries for insert to anon with check (status = 'new');
-create policy "authenticated full access to coaching_inquiries"
-  on coaching_inquiries for all to authenticated using (true) with check (true);
+create policy "owner full access to coaching_inquiries"
+  on coaching_inquiries for all to authenticated using (coaching_is_owner()) with check (coaching_is_owner());
 
 -- ---- coaching_client_logs ----
 alter table coaching_client_logs enable row level security;
-create policy "authenticated full access to coaching_client_logs"
-  on coaching_client_logs for all to authenticated using (true) with check (true);
+create policy "owner full access to coaching_client_logs"
+  on coaching_client_logs for all to authenticated using (coaching_is_owner()) with check (coaching_is_owner());
 
 -- ---- coaching_client_weights ----
 alter table coaching_client_weights enable row level security;
-create policy "authenticated full access to coaching_client_weights"
-  on coaching_client_weights for all to authenticated using (true) with check (true);
+create policy "owner full access to coaching_client_weights"
+  on coaching_client_weights for all to authenticated using (coaching_is_owner()) with check (coaching_is_owner());
 
 -- ============================================================
 -- SECURITY DEFINER RPCs for the client log page (anon, scoped by ?id=)
@@ -168,7 +175,7 @@ Also add "ran section 3c: supabase advisors" to the write-run-logs steps line wh
 
 ## 9. Done vs deferred
 
-The Auth choice collapses the writeup's "productization-correct follow-up" into this pass — after this, **no anon direct table access exists** and the dashboard has real auth. Genuinely deferred (YAGNI): multi-coach scoping (policies stay `using(true)` for the single-coach reality; add a `coach_id` predicate only when a second coach exists); retiring the now-redundant topbar passphrase.
+The Auth choice collapses the writeup's "productization-correct follow-up" into this pass — after this, **no anon direct table access exists** and the dashboard has real auth. Genuinely deferred (YAGNI): multi-coach scoping (policies key on the single owner email via `coaching_is_owner()`; add a `coach_id` column + predicate only when a second coach exists); retiring the now-redundant topbar passphrase.
 
 ## 10. Files touched
 
