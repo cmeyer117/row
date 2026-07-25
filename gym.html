@@ -5908,6 +5908,7 @@ img, video, canvas, svg { max-width: 100%; }
 <script src="gym-weight-photos.js"></script>
 <script src="gym-workout-events.js"></script>
 <script src="gym-season-logic.js"></script>
+<script src="gym-state-merge-logic.js"></script>
 <script src="hype-audio.js"></script>
 <script>
 // hype_audio gets its own independent app_state row via the plain
@@ -6125,6 +6126,25 @@ document.addEventListener('DOMContentLoaded', function () {
           }
           continue;
         }
+        if (k === 'po_coach_v1') {
+          // logs is the one irreplaceable part of this blob (historical lift
+          // data) -- everything else here (exercises, days, gyms, settings)
+          // is current config, fine to let the remote value win outright
+          // like every other non-special key. Without this, any client that
+          // pushes a stale/reduced local copy of logs permanently wipes real
+          // history for every other device, same failure mode already fixed
+          // above for po_coach_weights/po_coach_photos.
+          let localObj = {};
+          try { localObj = JSON.parse(localStorage.getItem(k) || '{}'); } catch {}
+          const remoteObj = (remote[k] && typeof remote[k] === 'object') ? remote[k] : {};
+          const mergedLogs = window.GymStateMergeLogic.mergeLogs(remoteObj.logs, localObj.logs);
+          const merged = Object.assign({}, remoteObj, { logs: mergedLogs });
+          const incoming = JSON.stringify(merged);
+          if (localStorage.getItem(k) !== incoming) {
+            try { _pcOrigSet(k, incoming); changed = true; } catch {}
+          }
+          continue;
+        }
         if (k in remote) {
           const incoming = JSON.stringify(remote[k]);
           const local = localStorage.getItem(k);
@@ -6165,6 +6185,11 @@ document.addEventListener('DOMContentLoaded', function () {
       const nextLen = Array.isArray(nextState.po_coach_weights) ? nextState.po_coach_weights.length : 0;
       if (nextLen < prevLen) {
         console.warn('[sync] pushing a shorter po_coach_weights (' + nextLen + ' vs ' + prevLen + ' synced) — expected only if you just deleted an entry.');
+      }
+      const prevLogCount = window.GymStateMergeLogic.totalLogCount(prev.po_coach_v1 && prev.po_coach_v1.logs);
+      const nextLogCount = window.GymStateMergeLogic.totalLogCount(nextState.po_coach_v1 && nextState.po_coach_v1.logs);
+      if (nextLogCount < prevLogCount) {
+        console.warn('[sync] pushing fewer logged sets (' + nextLogCount + ' vs ' + prevLogCount + ' synced) — expected only if you just deleted an entry.');
       }
     } catch (_) {}
   }
