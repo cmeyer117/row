@@ -3371,7 +3371,9 @@ img, video, canvas, svg { max-width: 100%; }
     if (!state.sessionTags) state.sessionTags = {};
     const dk = getActiveDate();
     const current = state.sessionTags[dk] || '';
-    const input = (prompt('Tag today\'s session (e.g. "Shoulders & Arms"). Leave blank to clear:', current) || '').trim();
+    const raw = prompt('Tag today\'s session (e.g. "Shoulders & Arms"). Leave blank to clear:', current);
+    if (raw === null) return; // cancelled — leave the existing tag untouched
+    const input = raw.trim();
     if (input) state.sessionTags[dk] = input;
     else delete state.sessionTags[dk];
     saveState();
