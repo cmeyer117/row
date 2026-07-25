@@ -846,6 +846,19 @@ img, video, canvas, svg { max-width: 100%; }
   display: block; margin: 0 auto 10px; border-radius: 8px;
   cursor: zoom-in;
 }
+.po-pose-card { padding: 10px 0; border-top: 1px solid rgba(255,255,255,0.08); }
+.po-pose-card:first-child { border-top: none; padding-top: 0; }
+.po-pose-card-name { font-weight: 700; margin-bottom: 6px; }
+.po-pose-card-img {
+  width: 100%; max-width: 200px; height: auto;
+  display: block; margin: 0 auto 8px; border-radius: 8px;
+  cursor: zoom-in;
+}
+.po-pose-card-cues { color: var(--text-2); font-size: 12px; line-height: 1.5; }
+.po-pose-card-footer {
+  margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.08);
+  color: var(--text-2); font-size: 12px;
+}
 .po-lightbox {
   position: fixed; inset: 0; z-index: 200;
   background: rgba(0,0,0,0.9);
@@ -2562,6 +2575,10 @@ img, video, canvas, svg { max-width: 100%; }
         <span class="po-seg-label">Day</span>
         <div class="po-seg-control" id="daySeg"></div>
       </div>
+      <div class="po-seg-row">
+        <span class="po-seg-label">Tag</span>
+        <button class="po-seg-btn" id="sessionTagBtn" type="button">+ Tag session</button>
+      </div>
     </div>
 
     <!-- WORKOUT LIST -->
@@ -2641,9 +2658,8 @@ img, video, canvas, svg { max-width: 100%; }
       <div class="po-coach-section">
         <button class="po-coach-btn" id="posingCoachBtn" type="button">🧍 Posing Coach</button>
         <div class="po-coach-response" id="posingResponse">
-          <div class="po-coach-response-label" id="posingResponseLabel">Posing Coach</div>
-          <img class="po-coach-response-img" id="posingResponseImg" alt="" style="display:none">
-          <div id="posingResponseText"></div>
+          <div class="po-coach-response-label">Posing Coach — <span id="posingResponseDayName"></span></div>
+          <div id="posingResponseList"></div>
         </div>
       </div>
 
@@ -3075,6 +3091,18 @@ img, video, canvas, svg { max-width: 100%; }
     return Object.values(sess).filter(v => v.isAdhoc);
   }
 
+  // Same as getAdhocExercises() but across every date, not just today —
+  // for aggregate views (logsByDay) that summarize history, not just today.
+  function getAllAdhocExercises() {
+    const all = [];
+    Object.keys(state.sessions || {}).forEach(function(dk) {
+      Object.values(state.sessions[dk]).forEach(function(v) {
+        if (v.isAdhoc) all.push(v);
+      });
+    });
+    return all;
+  }
+
   function saveState() {
     try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch (e) {}
   }
@@ -3336,7 +3364,19 @@ img, video, canvas, svg { max-width: 100%; }
         saveState(); renderAll();
       });
     });
+    const tag = (state.sessionTags || {})[getActiveDate()];
+    $('sessionTagBtn').textContent = tag ? ('🏷 ' + tag) : '+ Tag session';
   }
+  $('sessionTagBtn').addEventListener('click', function() {
+    if (!state.sessionTags) state.sessionTags = {};
+    const dk = getActiveDate();
+    const current = state.sessionTags[dk] || '';
+    const input = (prompt('Tag today\'s session (e.g. "Shoulders & Arms"). Leave blank to clear:', current) || '').trim();
+    if (input) state.sessionTags[dk] = input;
+    else delete state.sessionTags[dk];
+    saveState();
+    renderFilters();
+  });
   function renderWorkoutList() {
     const listEl = document.getElementById('wlList');
     if (!listEl) return;
@@ -4146,7 +4186,7 @@ img, video, canvas, svg { max-width: 100%; }
 
   function logsByDay() {
     const byDay = {};
-    state.exercises.forEach(ex => {
+    state.exercises.concat(getAllAdhocExercises()).forEach(ex => {
       (state.logs[ex.id] || []).forEach(l => {
         const dk = l.date.slice(0, 10);
         if (!byDay[dk]) byDay[dk] = [];
@@ -4826,7 +4866,7 @@ img, video, canvas, svg { max-width: 100%; }
     }
   }
 
-  // ── Ask Coach (local — cue + progression read, zero network) ───
+  // ── Ask Coach (local — cues + progression read + PR context, zero network) ───
   $('coachBtn').addEventListener('click', function() {
     const ex = getCurrentEx();
     if (!ex) return;
@@ -4834,11 +4874,21 @@ img, video, canvas, svg { max-width: 100%; }
     const responseText = $('coachResponseText');
 
     const cues = getCues(ex.id);
-    const cue = cues.length ? cues[0] : 'No cue saved for this one yet.';
-    const rx = getRx(ex, state.logs[ex.id] || []);
+    const cueText = cues.length ? cues.join(' ') : 'No cue saved for this one yet.';
+    const logs = state.logs[ex.id] || [];
+    const rx = getRx(ex, logs);
     const reason = rx ? rx.reason : 'Log a set to get a progression read.';
 
-    responseText.textContent = cue + ' ' + reason;
+    let prLine = '';
+    if (!ex.bw && logs.length) {
+      const best = logs.reduce(function(m, l) { return l.weight > m.weight ? l : m; }, logs[0]);
+      const last = logs[logs.length - 1];
+      prLine = last.weight >= best.weight
+        ? ' This ties or beats your PR (' + best.weight + unit() + ').'
+        : ' ' + (best.weight - last.weight) + unit() + ' off your PR (' + best.weight + unit() + ').';
+    }
+
+    responseText.textContent = cueText + ' ' + reason + prLine;
     responseEl.classList.add('show');
   });
 
@@ -4892,25 +4942,35 @@ img, video, canvas, svg { max-width: 100%; }
     legsB: ['abdominal-thigh', 'side-chest', 'front-relaxed'],
     upper: ['front-double-biceps', 'side-chest', 'most-muscular', 'side-triceps'],
   };
-  let posingPoseIdx = 0;
-
   $('posingCoachBtn').addEventListener('click', function() {
     const slugs = DAY_POSE_SLUGS[state.filterDay];
     const pool = slugs ? MANDATORY_POSES.filter(p => slugs.includes(p.slug)) : MANDATORY_POSES;
-    const pose = pool[posingPoseIdx % pool.length];
-    posingPoseIdx++;
-    const img = $('posingResponseImg');
-    img.onerror = function() { img.style.display = 'none'; };
-    img.onload = function() { img.style.display = 'block'; };
-    img.src = 'assets/mobility/' + pose.slug + '.png';
-    $('posingResponseText').textContent = pose.name.toUpperCase() + '\n\n' + pose.cues.join('\n') + '\n\n' + POSING_FOOTER;
+    const dayName = (state.days.find(function(d) { return d.id === state.filterDay; }) || {}).name || '';
+    $('posingResponseDayName').textContent = dayName;
+    const list = $('posingResponseList');
+    if (!pool.length) {
+      list.innerHTML = '<div class="po-pose-card-cues">No mandatory poses mapped to this day yet.</div>';
+    } else {
+      list.innerHTML = pool.map(function(pose) {
+        return '<div class="po-pose-card">'
+          + '<div class="po-pose-card-name">' + escape(pose.name.toUpperCase()) + '</div>'
+          + '<img class="po-pose-card-img" data-slug="' + escape(pose.slug) + '" alt="' + escape(pose.name) + '" style="display:none">'
+          + '<div class="po-pose-card-cues">' + pose.cues.map(escape).join('<br>') + '</div>'
+          + '</div>';
+      }).join('') + '<div class="po-pose-card-footer">' + escape(POSING_FOOTER) + '</div>';
+      list.querySelectorAll('.po-pose-card-img').forEach(function(img) {
+        img.onerror = function() { img.style.display = 'none'; };
+        img.onload = function() { img.style.display = 'block'; };
+        img.src = 'assets/mobility/' + img.dataset.slug + '.png';
+      });
+    }
     $('posingResponse').classList.add('show');
   });
 
   // ── Posing Coach image lightbox ──
   const poLightbox = $('poLightbox');
   document.addEventListener('click', function(e) {
-    const img = e.target.closest('#posingResponseImg');
+    const img = e.target.closest('.po-pose-card-img');
     if (img && img.style.display !== 'none') {
       $('poLightboxImg').src = img.src;
       poLightbox.classList.add('show');
@@ -4929,7 +4989,7 @@ img, video, canvas, svg { max-width: 100%; }
     const today = getActiveDate();
     const u = state.units || 'lb';
     const allLogs = state.logs || {};
-    const exercises = state.exercises || [];
+    const exercises = (state.exercises || []).concat(getAdhocExercises());
 
     const sessionLines = [];
     exercises.forEach(function(ex) {
@@ -4948,7 +5008,10 @@ img, video, canvas, svg { max-width: 100%; }
       return;
     }
 
-    const message = 'Give me a 3-4 sentence post-workout debrief for today\'s session. Be specific about what I hit, what to push next time, and any flags:\n\n' + sessionLines.join('\n');
+    const tag = (state.sessionTags || {})[today];
+    const dayName = (state.days.find(function(d) { return d.id === state.filterDay; }) || {}).name;
+    const label = tag || dayName || 'workout';
+    const message = 'Give me a 3-4 sentence post-workout debrief for today\'s ' + label + ' session. Be specific about what I hit, what to push next time, and any flags:\n\n' + sessionLines.join('\n');
 
     try {
       body.textContent = (await askJarvis(message)) || 'No response.';
