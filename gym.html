@@ -4814,7 +4814,7 @@ img, video, canvas, svg { max-width: 100%; }
       try {
         const res = await fetch(JARVIS_URL + '/chat', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'x-jarvis-passphrase': 'jarvis' },
           body: JSON.stringify({ userId: 'default-user', message }),
           signal: controller.signal,
         });
