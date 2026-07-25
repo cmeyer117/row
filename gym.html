@@ -4432,8 +4432,6 @@ img, video, canvas, svg { max-width: 100%; }
     if (e.key === 'Escape') closeAdhocForm();
   });
   // ── Cues ──────────────────────────────────────────────────────
-  const JARVIS_URL = 'https://claude-workspace-production-8460.up.railway.app';
-
   const DEFAULT_CUES = {
     'Neutral Grip Shoulder Press Machine':    ['Elbows in, arch chest up toward ceiling','Deltoid drives — no trap elevation','Full ROM to stretched bottom','2-3 sec eccentric, full stretch at bottom, no trap shrug at top'],
     'Smith Machine Flat Chest Press':         ['Bar to lower sternum','Elbows 45–60° from torso','Full stretch at bottom','2-3 sec eccentric, full stretch at bottom, squeeze pecs at top'],
@@ -4812,10 +4810,10 @@ img, video, canvas, svg { max-width: 100%; }
       const controller = new AbortController();
       const timer = setTimeout(function() { controller.abort(); }, 12000);
       try {
-        const res = await fetch(JARVIS_URL + '/chat', {
+        const res = await fetch('/api/jarvis-chat', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-jarvis-passphrase': 'jarvis' },
-          body: JSON.stringify({ userId: 'default-user', message }),
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message }),
           signal: controller.signal,
         });
         clearTimeout(timer);
