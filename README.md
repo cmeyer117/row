@@ -24,3 +24,5 @@ Carl Meyer's personal fitness/life dashboard — a set of vanilla HTML/JS pages,
 - **Web Push:** service worker + `web-push` for workout/macro-drift notifications.
 
 See this repo's `CLAUDE.md` for development rules (TypeScript strictness, TDD, architecture intentions) and `project-row-dashboard.md` (Claude memory) for Supabase keys, key functions, and standing rules.
+
+<!-- Live self-healing verification test dispatch on 2026-07-25 (not a real outage). -->
