@@ -6126,7 +6126,7 @@ document.addEventListener('DOMContentLoaded', function () {
           }
           continue;
         }
-        if (k === 'po_coach_v1') {
+        if (k === 'po_coach_v1' && k in remote && remote[k] && typeof remote[k] === 'object') {
           // logs is the one irreplaceable part of this blob (historical lift
           // data) -- everything else here (exercises, days, gyms, settings)
           // is current config, fine to let the remote value win outright
@@ -6134,11 +6134,15 @@ document.addEventListener('DOMContentLoaded', function () {
           // pushes a stale/reduced local copy of logs permanently wipes real
           // history for every other device, same failure mode already fixed
           // above for po_coach_weights/po_coach_photos.
+          //
+          // Only takes this branch if remote actually HAS po_coach_v1 --
+          // otherwise falls through to the generic handling below, same as
+          // every other key, instead of writing a degenerate {logs: ...}
+          // object that would silently drop exercises/days/gyms/settings.
           let localObj = {};
           try { localObj = JSON.parse(localStorage.getItem(k) || '{}'); } catch {}
-          const remoteObj = (remote[k] && typeof remote[k] === 'object') ? remote[k] : {};
-          const mergedLogs = window.GymStateMergeLogic.mergeLogs(remoteObj.logs, localObj.logs);
-          const merged = Object.assign({}, remoteObj, { logs: mergedLogs });
+          const mergedLogs = window.GymStateMergeLogic.mergeLogs(remote[k].logs, localObj.logs);
+          const merged = Object.assign({}, remote[k], { logs: mergedLogs });
           const incoming = JSON.stringify(merged);
           if (localStorage.getItem(k) !== incoming) {
             try { _pcOrigSet(k, incoming); changed = true; } catch {}
