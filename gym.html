@@ -2327,10 +2327,43 @@ img, video, canvas, svg { max-width: 100%; }
 }
 .import-log-btn:hover { filter: brightness(1.06); }
 .import-log-btn:disabled { opacity: 0.4; cursor: default; filter: none; }
+
+/* ----- Season banner ----- */
+#seasonBanner {
+  max-width: 720px; margin: 0 auto 12px; padding: 12px 14px;
+  border: 1px solid var(--border); border-radius: 14px; background: var(--bg-card);
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+}
+#seasonBanner .season-label { font-size: 11px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+#seasonBanner .season-day { font-size: 12px; color: var(--text-2); margin-top: 2px; }
+#seasonBanner .season-change-btn {
+  flex-shrink: 0; padding: 8px 12px; border-radius: 10px;
+  border: 1px solid var(--border-strong); background: transparent; color: var(--text-2);
+  font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer;
+}
+#seasonPicker { display: none; max-width: 720px; margin: 0 auto 12px; padding: 14px; border: 1px solid var(--border); border-radius: 14px; background: var(--bg-card); }
+#seasonPicker.show { display: block; }
+#seasonPicker .season-picker-title { font-size: 13px; font-weight: 700; margin-bottom: 10px; }
+.season-phase-btn {
+  padding: 8px 12px; margin: 0 6px 6px 0; border-radius: 999px;
+  border: 1px solid var(--border-strong); background: transparent; color: var(--text-2);
+  font-family: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer;
+}
+.season-phase-btn.active { background: rgba(110,231,183,0.14); border-color: rgba(110,231,183,0.4); color: var(--accent); }
+#seasonPicker label { display: block; font-size: 11px; color: var(--text-3); margin: 10px 0 4px; }
+#seasonStartDate {
+  background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+  color: var(--text-1); font-family: inherit; font-size: 13px; padding: 8px 10px;
+}
+.season-picker-actions { margin-top: 12px; display: flex; gap: 8px; }
+.season-picker-save { flex: 1; padding: 10px; border-radius: 10px; border: none; background: var(--accent); color: #052e16; font-family: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.season-picker-cancel { padding: 10px 14px; border-radius: 10px; border: 1px solid var(--border-strong); background: transparent; color: var(--text-2); font-family: inherit; font-size: 13px; cursor: pointer; }
 </style>
 </head>
 <body>
 
+<div id="seasonBanner"></div>
+<div id="seasonPicker"></div>
 <div class="po-shell">
   <div class="po-seg-control" id="logProgressToggle" style="margin-bottom:10px">
     <button class="po-seg-btn active" id="gymTabLog" type="button">Log</button>
@@ -5874,6 +5907,7 @@ img, video, canvas, svg { max-width: 100%; }
 </script>
 <script src="gym-weight-photos.js"></script>
 <script src="gym-workout-events.js"></script>
+<script src="gym-season-logic.js"></script>
 <script src="hype-audio.js"></script>
 <script>
 // hype_audio gets its own independent app_state row via the plain
@@ -5929,7 +5963,7 @@ document.addEventListener('DOMContentLoaded', function () {
   const SUPABASE_URL = 'https://vikpcejlyxieguorwysf.supabase.co';
   const SUPABASE_KEY = 'sb_publishable_EvWPtfW1FBW5Vf-H6w0yHw_PcXK4imv';
   const APP_KEY = 'po-coach';
-  const PC_SYNCED_KEYS = ['po_coach_v1', 'po_coach_workout_done', 'po_coach_weights', 'po_coach_photos'];
+  const PC_SYNCED_KEYS = ['po_coach_v1', 'po_coach_workout_done', 'po_coach_weights', 'po_coach_photos', 'po_coach_season'];
 
   let pcSupa = null;
   // gym-weight-photos.js's uploadPhotoToStorage() needs to read pcSupa —
@@ -6052,6 +6086,7 @@ document.addEventListener('DOMContentLoaded', function () {
     try { renderAll(); } catch {}
     try { wtRender(); } catch {}
     try { photosRender(); } catch {}
+    try { window.__gymSeason.renderBanner(); } catch {}
   }
 
   function pcApplyRemoteState(remote) {
@@ -6315,6 +6350,84 @@ document.addEventListener('DOMContentLoaded', function () {
   window.addEventListener('pageshow', (e) => {
     if (e.persisted) { pcPullRemote(); pcCheckForUpdate(); }
   });
+})();
+</script>
+
+<script>
+// ----- Season Engine -----
+// Coach-directed phase tracking (cut/growth/peak/show_prep). No fixed target
+// date -- Carl's coach moves him between phases by call, not by calendar, so
+// this tracks elapsed days in the current phase rather than a countdown.
+// Storage key po_coach_season is in PC_SYNCED_KEYS above, so writes here
+// auto-push through the same legacy sync every other gym.html key uses.
+(function () {
+  var PHASES = { cut: 'Cut', growth: 'Growth', peak: 'Peak Week', show_prep: 'Show Prep' };
+
+  function loadSeason() {
+    try { return JSON.parse(localStorage.getItem('po_coach_season') || 'null'); } catch (e) { return null; }
+  }
+  function saveSeason(season) {
+    localStorage.setItem('po_coach_season', JSON.stringify(season));
+  }
+  var todayKey = window.GymSeasonLogic.todayKey;
+  var daysSince = window.GymSeasonLogic.daysSince;
+
+  function renderBanner() {
+    var el = document.getElementById('seasonBanner');
+    if (!el) return;
+    var season = loadSeason();
+    if (!season || !season.phase) {
+      el.innerHTML =
+        '<div><div class="season-label">No season set</div><div class="season-day">Track what phase you\'re in</div></div>' +
+        '<button class="season-change-btn" id="seasonSetBtn" type="button">Set Season</button>';
+      document.getElementById('seasonSetBtn').addEventListener('click', openPicker);
+      return;
+    }
+    var day = daysSince(season.startDate);
+    el.innerHTML =
+      '<div><div class="season-label">' + PHASES[season.phase] + '</div><div class="season-day">Day ' + day + '</div></div>' +
+      '<button class="season-change-btn" id="seasonChangeBtn" type="button">Change</button>';
+    document.getElementById('seasonChangeBtn').addEventListener('click', openPicker);
+  }
+
+  function openPicker() {
+    var season = loadSeason() || { phase: 'cut', startDate: todayKey() };
+    var el = document.getElementById('seasonPicker');
+    var selectedPhase = season.phase;
+    el.innerHTML =
+      '<div class="season-picker-title">Set your season</div>' +
+      '<div>' + Object.keys(PHASES).map(function (key) {
+        return '<button type="button" class="season-phase-btn' + (season.phase === key ? ' active' : '') + '" data-phase="' + key + '">' + PHASES[key] + '</button>';
+      }).join('') + '</div>' +
+      '<label for="seasonStartDate">Phase started</label>' +
+      '<input type="date" id="seasonStartDate" value="' + season.startDate + '">' +
+      '<div class="season-picker-actions">' +
+        '<button type="button" class="season-picker-save" id="seasonSaveBtn">Save</button>' +
+        '<button type="button" class="season-picker-cancel" id="seasonCancelBtn">Cancel</button>' +
+      '</div>';
+    el.classList.add('show');
+
+    el.querySelectorAll('.season-phase-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        selectedPhase = btn.dataset.phase;
+        el.querySelectorAll('.season-phase-btn').forEach(function (b) { b.classList.remove('active'); });
+        btn.classList.add('active');
+      });
+    });
+    document.getElementById('seasonSaveBtn').addEventListener('click', function () {
+      var startDate = document.getElementById('seasonStartDate').value || todayKey();
+      saveSeason({ phase: selectedPhase, startDate: startDate });
+      el.classList.remove('show');
+      renderBanner();
+    });
+    document.getElementById('seasonCancelBtn').addEventListener('click', function () {
+      el.classList.remove('show');
+    });
+  }
+
+  window.__gymSeason = { renderBanner: renderBanner, loadSeason: loadSeason };
+  renderBanner();
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) renderBanner(); });
 })();
 </script>
 
