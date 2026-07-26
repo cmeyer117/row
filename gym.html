@@ -3372,7 +3372,9 @@ img, video, canvas, svg { max-width: 100%; }
 
     list.innerHTML = '';
 
-    if (!warmupOpen) {
+    const forceOpen = anyJointFlagged();
+
+    if (!warmupOpen && !forceOpen) {
       list.style.display = 'none';
       toggle.textContent = 'show ▾';
       return;
