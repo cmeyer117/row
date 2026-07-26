@@ -611,13 +611,16 @@
   let activePhotoId = null;
   let comparePhotoId = null;       // the OTHER photo being compared to
   let pvDeleteConfirm = false;
+  function renderViewerPhoto(p) {
+    window.__gym.$('wtViewerImg').src = p.url || p.dataUrl;
+    window.__gym.$('wtViewerDate').textContent = photoFmtDate(p.dateKey).toUpperCase();
+    window.__gym.$('wtViewerWeight').textContent = p.weight || '—';
+  }
   function openPhoto(id) {
     const p = photos.find(x => x.id === id);
     if (!p) return;
     activePhotoId = id;
-    window.__gym.$('wtViewerImg').src = p.url || p.dataUrl;
-    window.__gym.$('wtViewerDate').textContent = photoFmtDate(p.dateKey).toUpperCase();
-    window.__gym.$('wtViewerWeight').textContent = p.weight || '—';
+    renderViewerPhoto(p);
     window.__gym.$('wtViewer').dataset.mode = 'single';
     window.__gym.$('wtViewer').classList.add('is-open');
     pvDeleteConfirm = false;
@@ -626,6 +629,19 @@
     // Disable Compare button if there's no other photo to compare against
     window.__gym.$('wtViewerCompare').disabled = photos.length < 2;
     window.__gym.$('wtViewerCompare').style.opacity = photos.length < 2 ? '0.4' : '';
+    // Slider: photos[] is stored newest-first, so slider value 0 = oldest,
+    // max = newest — the reverse of the array index.
+    const sliderRow = window.__gym.$('wtViewerSliderRow');
+    const slider = window.__gym.$('wtViewerSlider');
+    if (photos.length < 2) {
+      sliderRow.classList.add('hidden');
+    } else {
+      sliderRow.classList.remove('hidden');
+      const idx = photos.findIndex(x => x.id === id);
+      slider.min = 0;
+      slider.max = photos.length - 1;
+      slider.value = photos.length - 1 - idx;
+    }
   }
   function closePhoto() {
     window.__gym.$('wtViewer').classList.remove('is-open');
@@ -718,6 +734,13 @@
     closePhoto();
   }
 
+  window.__gym.$('wtViewerSlider').addEventListener('input', (e) => {
+    const idx = photos.length - 1 - parseInt(e.target.value, 10);
+    const p = photos[idx];
+    if (!p) return;
+    activePhotoId = p.id;
+    renderViewerPhoto(p);
+  });
   window.__gym.$('wtViewerClose').addEventListener('click', closePhoto);
   window.__gym.$('wtCompareClose').addEventListener('click', closePhoto);
   window.__gym.$('wtViewerDelete').addEventListener('click', () => deleteActivePhoto(window.__gym.$('wtViewerDelete')));
