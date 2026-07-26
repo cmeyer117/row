@@ -38,6 +38,18 @@
     return merged;
   }
 
+  // jointPain entries have no id field -- two entries are "the same" if
+  // every field matches exactly, same identity approach as mergeLogs.
+  // Flat array (not keyed by exercise id like logs), so the merge is a
+  // single set-union rather than per-key.
+  function mergeJointPain(remoteArr, localArr) {
+    remoteArr = Array.isArray(remoteArr) ? remoteArr : [];
+    localArr = Array.isArray(localArr) ? localArr : [];
+    const seen = new Set(remoteArr.map(stableKey));
+    const localOnly = localArr.filter((e) => !seen.has(stableKey(e)));
+    return [...remoteArr, ...localOnly];
+  }
+
   // Total logged-set count across all exercises, for the push-time
   // shrink tripwire (mirrors pcWarnIfShrinking's weights check).
   function totalLogCount(logs) {
@@ -46,9 +58,9 @@
   }
 
   if (typeof window !== 'undefined') {
-    window.GymStateMergeLogic = { mergeLogs: mergeLogs, totalLogCount: totalLogCount };
+    window.GymStateMergeLogic = { mergeLogs: mergeLogs, mergeJointPain: mergeJointPain, totalLogCount: totalLogCount };
   }
   if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { mergeLogs: mergeLogs, totalLogCount: totalLogCount };
+    module.exports = { mergeLogs: mergeLogs, mergeJointPain: mergeJointPain, totalLogCount: totalLogCount };
   }
 })();
