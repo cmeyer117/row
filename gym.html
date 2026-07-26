@@ -1671,6 +1671,28 @@ img, video, canvas, svg { max-width: 100%; }
 .wt-viewer-weight {
   color: var(--text-1); font-size: 20px; font-weight: 600;
 }
+.wt-viewer-slider-row {
+  padding: 4px 4px 16px;
+}
+.wt-viewer-slider {
+  width: 100%; display: block;
+  -webkit-appearance: none; appearance: none;
+  height: 4px; border-radius: 999px;
+  background: var(--border);
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.wt-viewer-slider::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 18px; height: 18px; border-radius: 50%;
+  background: var(--good); cursor: pointer;
+  border: 2px solid rgba(0,0,0,0.4);
+}
+.wt-viewer-slider::-moz-range-thumb {
+  width: 18px; height: 18px; border-radius: 50%;
+  background: var(--good); cursor: pointer;
+  border: 2px solid rgba(0,0,0,0.4);
+}
 .wt-viewer-actions {
   display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
 }
@@ -2582,6 +2604,9 @@ img, video, canvas, svg { max-width: 100%; }
       <div class="wt-viewer-meta">
         <div class="wt-viewer-date" id="wtViewerDate">—</div>
         <div class="wt-viewer-weight" id="wtViewerWeight">—</div>
+      </div>
+      <div class="wt-viewer-slider-row hidden" id="wtViewerSliderRow">
+        <input type="range" class="wt-viewer-slider" id="wtViewerSlider" min="0" max="0" value="0" step="1" aria-label="Scrub through progress photos by date">
       </div>
       <div class="wt-viewer-actions">
         <button class="wt-viewer-btn wt-viewer-compare" id="wtViewerCompare">Compare</button>
