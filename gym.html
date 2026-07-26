@@ -4900,6 +4900,16 @@ img, video, canvas, svg { max-width: 100%; }
     btn.addEventListener('click', function () {
       const joint = btn.getAttribute('data-joint');
       const picker = $('jointPainPicker');
+      // Clicking the same joint again while its picker is already open
+      // closes it; clicking a different joint (or opening fresh) rebuilds
+      // and shows it -- a blind display-toggle here would close the
+      // just-rebuilt picker instead of showing the new joint's options.
+      const alreadyOpenForThisJoint = picker.style.display !== 'none' && picker.getAttribute('data-open-joint') === joint;
+      if (alreadyOpenForThisJoint) {
+        picker.style.display = 'none';
+        picker.removeAttribute('data-open-joint');
+        return;
+      }
       picker.innerHTML = '';
       for (let i = 0; i <= 10; i++) {
         const b = document.createElement('button');
@@ -4909,11 +4919,13 @@ img, video, canvas, svg { max-width: 100%; }
         b.addEventListener('click', function () {
           logJointPain(joint, i);
           picker.style.display = 'none';
+          picker.removeAttribute('data-open-joint');
           renderWarmup();
         });
         picker.appendChild(b);
       }
-      picker.style.display = picker.style.display === 'none' ? 'flex' : 'none';
+      picker.setAttribute('data-open-joint', joint);
+      picker.style.display = 'flex';
     });
   });
 
