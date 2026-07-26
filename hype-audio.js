@@ -73,6 +73,7 @@
   // one ends, looping until stopped. Starting either cancels the other.
   let queue = null;
   let randomFilter = null;
+  let repeatClip = null;
 
   function notifyChange() { if (onChangeCb) onChangeCb(); }
 
@@ -90,6 +91,79 @@
 
   function isPlayingRandom() { return !!randomFilter; }
 
+  function isPlayingRepeat(clipId) { return !!repeatClip && repeatClip.id === clipId; }
+
+  // Pure decision functions for lock-screen (Media Session) skip buttons.
+  // Take the three play-mode states as explicit args rather than reading
+  // module closure vars directly, so they're unit-testable the same way
+  // pickRandom() is -- see docs/superpowers/specs/2026-07-26-gym-proof-playback-design.md.
+  function mediaSessionNext(queueState, randomFilterState, repeatClipState) {
+    if (repeatClipState) return { type: 'restart' };
+    if (queueState) {
+      const idx = queueState.index + 1;
+      if (idx < queueState.clips.length) return { type: 'clip', clip: queueState.clips[idx], index: idx };
+      return { type: 'none' };
+    }
+    if (randomFilterState) {
+      const next = pickRandom(randomFilterState);
+      return next ? { type: 'clip', clip: next, index: null } : { type: 'none' };
+    }
+    return { type: 'none' };
+  }
+
+  function mediaSessionPrevious(queueState, randomFilterState, repeatClipState, currentTimeSeconds) {
+    if (repeatClipState) return { type: 'restart' };
+    if (randomFilterState) return { type: 'none' };
+    if (queueState) {
+      if (currentTimeSeconds > 3) return { type: 'restart' };
+      const idx = queueState.index - 1;
+      if (idx >= 0) return { type: 'clip', clip: queueState.clips[idx], index: idx };
+      return { type: 'restart' };
+    }
+    return { type: 'none' };
+  }
+
+  // App-supplied hook for resolving a clip's lock-screen artwork URL --
+  // registered by the consuming page (index.html calls
+  // HypeAudio.setArtworkResolver(mentalityArt)). Optional; without it,
+  // metadata still shows a title, just no artwork image.
+  let artworkResolver = null;
+  function setArtworkResolver(fn) { artworkResolver = fn; }
+
+  function updateMediaSessionMetadata(clip) {
+    if (typeof navigator === 'undefined' || !navigator.mediaSession || typeof MediaMetadata === 'undefined') return;
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: clip.title,
+      artwork: artworkResolver ? [{ src: artworkResolver(clip), sizes: '512x512', type: 'image/png' }] : [],
+    });
+  }
+
+  function applyMediaSessionResult(result) {
+    if (result.type === 'clip') {
+      if (result.index !== null && queue) queue.index = result.index;
+      playSingle(result.clip);
+    } else if (result.type === 'restart' && currentAudio) {
+      currentAudio.currentTime = 0;
+      currentAudio.play().catch(function () {});
+    }
+  }
+
+  function setupMediaSessionHandlers() {
+    if (typeof navigator === 'undefined' || !navigator.mediaSession) return;
+    navigator.mediaSession.setActionHandler('play', function () {
+      if (currentAudio) currentAudio.play().catch(function () {});
+    });
+    navigator.mediaSession.setActionHandler('pause', function () {
+      if (currentAudio) currentAudio.pause();
+    });
+    navigator.mediaSession.setActionHandler('nexttrack', function () {
+      applyMediaSessionResult(mediaSessionNext(queue, randomFilter, repeatClip));
+    });
+    navigator.mediaSession.setActionHandler('previoustrack', function () {
+      applyMediaSessionResult(mediaSessionPrevious(queue, randomFilter, repeatClip, currentAudio ? currentAudio.currentTime : 0));
+    });
+  }
+
   // Internal: plays exactly one clip and wires its natural end to advance()
   // -- the only thing that knows about queue/randomFilter. A user pause
   // never advances (onpause isn't wired to it), only a clip actually ending.
@@ -98,9 +172,15 @@
     const audio = new Audio(clip.storage_url);
     currentAudio = audio;
     currentClipId = clip.id;
+    updateMediaSessionMetadata(clip);
     audio.onplay = notifyChange;
     audio.onpause = notifyChange;
     audio.onended = function () { currentClipId = null; advance(); };
+    audio.onerror = function () {
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+        alert('This clip isn\'t downloaded yet -- needs a connection to play for the first time.');
+      }
+    };
     audio.play().catch(function () {});
     updateClip(clip.id, { play_count: (clip.play_count || 0) + 1 });
     notifyChange();
@@ -108,6 +188,7 @@
   }
 
   function advance() {
+    if (repeatClip) { playSingle(repeatClip); return; }
     if (queue) {
       queue.index += 1;
       if (queue.index < queue.clips.length) { playSingle(queue.clips[queue.index]); return; }
@@ -123,6 +204,16 @@
   function playClip(clip) {
     queue = null;
     randomFilter = null;
+    repeatClip = null;
+    return playSingle(clip);
+  }
+
+  // Repeats one clip over and over until stopPlayback() or a different
+  // clip/mode is chosen.
+  function playRepeat(clip) {
+    queue = null;
+    randomFilter = null;
+    repeatClip = clip;
     return playSingle(clip);
   }
 
@@ -133,6 +224,7 @@
     const idx = clips.findIndex(function (c) { return c.id === clipId; });
     if (idx === -1) return null;
     randomFilter = null;
+    repeatClip = null;
     queue = { clips: clips, index: idx };
     return playSingle(clips[idx]);
   }
@@ -142,6 +234,7 @@
   // or a different clip is explicitly chosen.
   function playRandomLoop(filter) {
     queue = null;
+    repeatClip = null;
     const clip = pickRandom(filter);
     if (!clip) { randomFilter = null; return null; }
     randomFilter = filter || {};
@@ -151,6 +244,7 @@
   function stopPlayback() {
     queue = null;
     randomFilter = null;
+    repeatClip = null;
     if (currentAudio) { try { currentAudio.pause(); } catch (e) {} }
     currentAudio = null;
     currentClipId = null;
@@ -223,16 +317,22 @@
       playClip: playClip,
       playFromList: playFromList,
       playRandomLoop: playRandomLoop,
+      playRepeat: playRepeat,
       stopPlayback: stopPlayback,
       togglePlay: togglePlay,
       isPlaying: isPlaying,
       isCurrent: isCurrent,
       isPlayingRandom: isPlayingRandom,
+      isPlayingRepeat: isPlayingRepeat,
+      mediaSessionNext: mediaSessionNext,
+      mediaSessionPrevious: mediaSessionPrevious,
+      setArtworkResolver: setArtworkResolver,
       onPlaybackChange: onPlaybackChange,
       uploadClipFile: uploadClipFile,
       migrateGogginsToMindset: migrateGogginsToMindset,
       migrateCarlToOwnPillar: migrateCarlToOwnPillar,
     };
+    setupMediaSessionHandlers();
   }
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
@@ -242,6 +342,8 @@
       updateClip: updateClip,
       deleteClip: deleteClip,
       pickRandom: pickRandom,
+      mediaSessionNext: mediaSessionNext,
+      mediaSessionPrevious: mediaSessionPrevious,
       migrateGogginsToMindset: migrateGogginsToMindset,
       migrateCarlToOwnPillar: migrateCarlToOwnPillar,
     };
