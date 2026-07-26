@@ -803,6 +803,25 @@ img, video, canvas, svg { max-width: 100%; }
 }
 .po-warmup-toggle:hover { color: var(--text-2); }
 .po-warmup-list { display: flex; flex-direction: column; gap: 5px; margin-top: 8px; }
+.po-jointpain-row {
+  display: flex; gap: 6px; margin-top: 6px;
+}
+.po-jointpain-btn {
+  flex: 1; font-size: 11px; font-weight: 600; padding: 6px 4px;
+  background: linear-gradient(165deg, rgba(16,26,22,.55) 0%, rgba(7,12,10,.40) 100%);
+  border: 1px solid rgba(255,255,255,0.08); border-radius: 8px;
+  color: var(--text-2); cursor: pointer; font-family: inherit;
+}
+.po-jointpain-btn:hover { color: var(--text-1); border-color: rgba(255,255,255,0.16); }
+.po-jointpain-picker {
+  display: flex; gap: 4px; margin-top: 6px; flex-wrap: wrap;
+}
+.po-jointpain-severity {
+  width: 26px; height: 26px; font-size: 11px; font-weight: 700;
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 6px; color: var(--text-2); cursor: pointer; font-family: inherit;
+}
+.po-jointpain-severity:hover { background: rgba(255,255,255,0.10); color: var(--text-1); }
 .po-warmup-block-title {
   font-size: 9px; font-weight: 800; letter-spacing: 0.10em; text-transform: uppercase;
   color: var(--accent); margin: 4px 0 2px;
@@ -2651,6 +2670,12 @@ img, video, canvas, svg { max-width: 100%; }
           <span class="po-warmup-label">Warm-Up</span>
           <button class="po-warmup-toggle" id="warmupToggle" type="button">show ▾</button>
         </div>
+        <div class="po-jointpain-row">
+          <button class="po-jointpain-btn" data-joint="shoulder" type="button">Shoulder</button>
+          <button class="po-jointpain-btn" data-joint="elbow" type="button">Elbow</button>
+          <button class="po-jointpain-btn" data-joint="knee" type="button">Knee</button>
+        </div>
+        <div class="po-jointpain-picker" id="jointPainPicker" style="display:none"></div>
         <div class="po-warmup-list" id="warmupList" style="display:none"></div>
       </div>
 
@@ -3255,6 +3280,26 @@ img, video, canvas, svg { max-width: 100%; }
     if (reps >= upgradeAt) return { type: 'up', weight: weight + step, reps: repMin, tag: 'Add weight', reason: 'You hit ' + reps + ' reps — time to add ' + step + unit() + '. Expect ' + repMin + '-' + (repMin + 1) + ' next session.' };
     if (reps >= repMin && reps < upgradeAt) return { type: 'hold', weight: weight, reps: reps + 1, tag: 'Add a rep', reason: reps + ' reps in target. Stay at ' + weight + unit() + ', push for ' + (reps + 1) + '.' };
     return { type: 'hold', weight: weight, reps: repMin, tag: 'Repeat', reason: reps + ' reps short of ' + repMin + '-' + upgradeAt + '. Repeat ' + weight + unit() + ' until you hit ' + repMin + '+ clean.' };
+  }
+
+  function logJointPain(joint, severity) {
+    if (!Array.isArray(state.jointPain)) state.jointPain = [];
+    state.jointPain.push({ joint: joint, severity: severity, date: getActiveDate() });
+    saveState();
+  }
+
+  function jointPainCountInWindow(joint, days) {
+    const entries = state.jointPain || [];
+    const today = getActiveDate();
+    return entries.filter(function (e) {
+      if (e.joint !== joint) return false;
+      const gap = Math.round((new Date(today) - new Date(e.date)) / 86400000);
+      return gap >= 0 && gap <= days;
+    }).length;
+  }
+
+  function anyJointFlagged() {
+    return ['shoulder', 'elbow', 'knee'].some(function (j) { return jointPainCountInWindow(j, 7) >= 2; });
   }
 
   // ============================================================
@@ -4847,6 +4892,27 @@ img, video, canvas, svg { max-width: 100%; }
   $('warmupToggle').addEventListener('click', function() {
     warmupOpen = !warmupOpen;
     renderWarmup();
+  });
+
+  document.querySelectorAll('.po-jointpain-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      const joint = btn.getAttribute('data-joint');
+      const picker = $('jointPainPicker');
+      picker.innerHTML = '';
+      for (let i = 0; i <= 10; i++) {
+        const b = document.createElement('button');
+        b.className = 'po-jointpain-severity';
+        b.type = 'button';
+        b.textContent = String(i);
+        b.addEventListener('click', function () {
+          logJointPain(joint, i);
+          picker.style.display = 'none';
+          renderWarmup();
+        });
+        picker.appendChild(b);
+      }
+      picker.style.display = picker.style.display === 'none' ? 'flex' : 'none';
+    });
   });
 
   $('cuesEditBtn').addEventListener('click', function() {
