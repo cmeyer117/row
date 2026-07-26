@@ -6142,7 +6142,8 @@ document.addEventListener('DOMContentLoaded', function () {
           let localObj = {};
           try { localObj = JSON.parse(localStorage.getItem(k) || '{}'); } catch {}
           const mergedLogs = window.GymStateMergeLogic.mergeLogs(remote[k].logs, localObj.logs);
-          const merged = Object.assign({}, remote[k], { logs: mergedLogs });
+          const mergedJointPain = window.GymStateMergeLogic.mergeJointPain(remote[k].jointPain, localObj.jointPain);
+          const merged = Object.assign({}, remote[k], { logs: mergedLogs, jointPain: mergedJointPain });
           const incoming = JSON.stringify(merged);
           if (localStorage.getItem(k) !== incoming) {
             try { _pcOrigSet(k, incoming); changed = true; } catch {}
