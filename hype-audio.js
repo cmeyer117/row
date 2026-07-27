@@ -70,12 +70,10 @@
     return pickRandom({ moment: 'mid_set' }) || pickRandom({ pillar: ['iron', 'mindset', 'carl'] });
   }
 
-  // ponytail: false by default because Carl doesn't want playback cutting
-  // off music he already has going mid-workout. Flip to true to have the
-  // rest-timer clip and PR rant play automatically instead of requiring a
-  // tap -- both call sites (gym.html's startRestTimer) already check this
-  // flag, so flipping it is the only change needed.
-  const AUTO_PLAY_HYPE = false;
+  // 2026-07-27: Carl decided he wants this on immediately (no tap needed) --
+  // the mid-set hype clip and PR rant now auto-play as soon as a set is
+  // logged. gym.html's startRestTimer is the call site that reads this flag.
+  const AUTO_PLAY_HYPE = true;
 
   function playMidSetHype() {
     const clip = pickMidSetClip();
