@@ -5193,6 +5193,17 @@ img, video, canvas, svg { max-width: 100%; }
         });
         clearTimeout(timer);
         const data = await res.json();
+        // fetch() doesn't throw on non-2xx — a 401/500/etc. still resolves
+        // here with a parseable JSON body. Without this check, an auth or
+        // server error silently looked identical to "Jarvis had nothing to
+        // say" (both fell through to data.response/data.message being
+        // undefined -> null -> "No response." in the UI), which is exactly
+        // what happened during the 2026-07-24 passphrase-gating rollout.
+        if (!res.ok) {
+          const err = new Error((data && data.error) || ('HTTP ' + res.status));
+          err.status = res.status;
+          throw err;
+        }
         return data.response || data.message || null;
       } catch (e) {
         clearTimeout(timer);
@@ -5351,7 +5362,11 @@ img, video, canvas, svg { max-width: 100%; }
     try {
       body.textContent = (await askJarvis(message)) || 'No response.';
     } catch (e) {
-      body.textContent = 'Could not reach Jarvis. Signal may be weak — try again.';
+      body.textContent = e && e.status === 401
+        ? 'Jarvis rejected the request (401 — passphrase mismatch). This is a config issue, not a signal issue: check JARVIS_PASSPHRASE on the row Vercel project.'
+        : e && e.status
+        ? 'Jarvis returned an error (' + e.status + (e.message ? ': ' + e.message : '') + ').'
+        : 'Could not reach Jarvis. Signal may be weak — try again.';
     }
   }
 
