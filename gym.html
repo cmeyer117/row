@@ -3113,6 +3113,12 @@ img, video, canvas, svg { max-width: 100%; }
     s.exercises = Array.isArray(s.exercises) ? s.exercises : buildDefaultExercises();
     s.logs = (s.logs && typeof s.logs === 'object') ? s.logs : {};
     if (!s.sessions || typeof s.sessions !== 'object') s.sessions = {};
+    // One entry per day a check-in was submitted: { pain, recovery, pump },
+    // each 'low'|'med'|'high'. Keyed by the date the check-in was collected
+    // (same day as that day's last logged set) — getRx() looks this up by
+    // each exercise's own last-log date, not "today", so it stays correct
+    // no matter how many days later that exercise is next trained.
+    if (!s.checkins || typeof s.checkins !== 'object') s.checkins = {};
     s.filterGym = s.filterGym || s.gyms[0].id;
     s.filterDay = s.filterDay || s.days[0].id;
     // Ensure filterDay is a valid day (not "rest" or a stale value)
@@ -3758,13 +3764,19 @@ img, video, canvas, svg { max-width: 100%; }
       const reason = ex.bw
         ? 'Aim for ' + ex.repMin + '-' + ex.repMax + ' clean reps. Once you hit ' + ex.repMax + '+, push for more.'
         : 'Hit ' + ex.repMin + '-' + ex.repMax + ' reps. Once logged, the coach will start prescribing.';
-      wrap.innerHTML = '<div class="po-rx-card"><div class="po-rx-label">' + escape(ex.name) + ' · starting point</div><div class="po-rx-headline">' + head + '</div><span class="po-rx-tag hold">Start here</span><p class="po-rx-reason">' + reason + '</p></div>';
+      wrap.innerHTML = '<div class="po-rx-card po-rx-tappable" data-tap-reps="' + sr + '"' + (ex.bw ? ' data-tap-bw="1"' : ' data-tap-weight="' + (sw || 0) + '"') + '><div class="po-rx-label">' + escape(ex.name) + ' · starting point</div><div class="po-rx-headline">' + head + '</div><span class="po-rx-tag hold">Start here</span><p class="po-rx-reason">' + reason + ' Tap to log it.</p></div>';
       return;
     }
     const head = rx.bw
       ? '<span class="po-accent">' + rx.reps + '</span> reps'
       : '<span class="po-accent">' + (rx.plates != null ? (rx.plates + (rx.plates===1?' plate':' plates') + (rx.extraLbs ? '+'+rx.extraLbs : '')) : rx.weight + unit()) + '</span> × ' + rx.reps + ' reps';
-    wrap.innerHTML = '<div class="po-rx-card po-rx-' + rx.type + '"><div class="po-rx-label">' + escape(ex.name) + '</div><div class="po-rx-headline">' + head + '</div><span class="po-rx-tag ' + rx.type + '">' + rx.tag + '</span><p class="po-rx-reason">' + rx.reason + '</p></div>';
+    var tapAttrs = 'data-tap-reps="' + rx.reps + '"' + (rx.bw ? ' data-tap-bw="1"' : (rx.plates != null ? ' data-tap-plates="' + rx.plates + '" data-tap-extralbs="' + (rx.extraLbs || 0) + '"' : ' data-tap-weight="' + rx.weight + '"'));
+    const lastLog = logs[logs.length - 1];
+    const lastCheckin = lastLog ? state.checkins[lastLog.date.slice(0, 10)] : null;
+    const pumpNote = lastCheckin && lastCheckin.pump
+      ? '<p class="po-rx-reason" style="opacity:0.7;font-size:11px;">Pump last time: ' + lastCheckin.pump + '</p>'
+      : '';
+    wrap.innerHTML = '<div class="po-rx-card po-rx-' + rx.type + ' po-rx-tappable" ' + tapAttrs + '><div class="po-rx-label">' + escape(ex.name) + '</div><div class="po-rx-headline">' + head + '</div><span class="po-rx-tag ' + rx.type + '">' + rx.tag + '</span><p class="po-rx-reason">' + rx.reason + ' Tap to log it.</p>' + pumpNote + '</div>';
   }
   function renderStats() {
     const ex = getCurrentEx();
@@ -4494,7 +4506,33 @@ img, video, canvas, svg { max-width: 100%; }
     saveDoneDays(doneDays);
     renderTodaysWorkout();
     renderPastWorkouts();
-    if (wasUndone) fireDebrief();
+    if (wasUndone) {
+      fireDebrief();
+      if (typeof window.__gym_openCheckinModal === 'function') window.__gym_openCheckinModal();
+    }
+  });
+
+  // Ghost tap-to-accept: tapping the Rx card logs its exact suggestion via
+  // the same quickLog() text parser everything else uses — data attributes
+  // set by renderRx() carry the values, so no re-computation happens here.
+  $('rxWrap').addEventListener('click', function(e) {
+    const card = e.target.closest('.po-rx-tappable');
+    if (!card) return;
+    const ex = getCurrentEx();
+    if (!ex) return;
+    const reps = card.getAttribute('data-tap-reps');
+    let raw;
+    if (card.hasAttribute('data-tap-bw')) {
+      raw = ex.name + ' ' + reps;
+    } else if (card.hasAttribute('data-tap-plates')) {
+      const plates = card.getAttribute('data-tap-plates');
+      const extraLbs = card.getAttribute('data-tap-extralbs');
+      raw = ex.name + ' ' + plates + 'p' + (extraLbs && extraLbs !== '0' ? '+' + extraLbs : '') + '×' + reps;
+    } else {
+      raw = ex.name + ' ' + card.getAttribute('data-tap-weight') + '×' + reps;
+    }
+    const result = quickLog(raw, getActiveDate());
+    if (!result.ok) { console.warn('[ghost-tap]', result.msg); }
   });
   $('poTwPastToggle').addEventListener('click', () => {
     const body = $('poTwPastBody');
