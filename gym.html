@@ -3858,7 +3858,9 @@ img, video, canvas, svg { max-width: 100%; }
     const head = rx.bw
       ? '<span class="po-accent">' + rx.reps + '</span> reps'
       : '<span class="po-accent">' + (rx.plates != null ? (rx.plates + (rx.plates===1?' plate':' plates') + (rx.extraLbs ? '+'+rx.extraLbs : '')) : rx.weight + unit()) + '</span> × ' + rx.reps + ' reps';
-    var tapAttrs = 'data-tap-reps="' + rx.reps + '"' + (rx.bw ? ' data-tap-bw="1"' : (rx.plates != null ? ' data-tap-plates="' + rx.plates + '" data-tap-extralbs="' + (rx.extraLbs || 0) + '"' : ' data-tap-weight="' + rx.weight + '"'));
+    // getRx() only ever returns bw or weight-based results — never plates
+    // — so the tap attrs mirror that (see the ghost-tap click handler below).
+    var tapAttrs = 'data-tap-reps="' + rx.reps + '"' + (rx.bw ? ' data-tap-bw="1"' : ' data-tap-weight="' + rx.weight + '"');
     const lastLog = logs[logs.length - 1];
     const lastCheckin = lastLog ? state.checkins[lastLog.date.slice(0, 10)] : null;
     const pumpNote = lastCheckin && lastCheckin.pump
@@ -4623,16 +4625,13 @@ img, video, canvas, svg { max-width: 100%; }
     const ex = getCurrentEx();
     if (!ex) return;
     const reps = card.getAttribute('data-tap-reps');
-    let raw;
-    if (card.hasAttribute('data-tap-bw')) {
-      raw = ex.name + ' ' + reps;
-    } else if (card.hasAttribute('data-tap-plates')) {
-      const plates = card.getAttribute('data-tap-plates');
-      const extraLbs = card.getAttribute('data-tap-extralbs');
-      raw = ex.name + ' ' + plates + 'p' + (extraLbs && extraLbs !== '0' ? '+' + extraLbs : '') + '×' + reps;
-    } else {
-      raw = ex.name + ' ' + card.getAttribute('data-tap-weight') + '×' + reps;
-    }
+    // getRx() never sets .plates/.extraLbs on its return objects, so the
+    // Rx card can only ever carry data-tap-weight or data-tap-bw — no
+    // plates-format branch here (dead code otherwise, and its format
+    // guess wouldn't have matched parseQuickLog() anyway).
+    const raw = card.hasAttribute('data-tap-bw')
+      ? ex.name + ' ' + reps
+      : ex.name + ' ' + card.getAttribute('data-tap-weight') + '×' + reps;
     const result = quickLog(raw, getActiveDate());
     if (!result.ok) { console.warn('[ghost-tap]', result.msg); }
   });
