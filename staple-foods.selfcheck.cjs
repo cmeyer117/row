@@ -1,7 +1,20 @@
-// Run with: node staple-foods.selfcheck.js
+// Run with: node staple-foods.selfcheck.cjs
+//
+// Row's package.json sets "type": "module", which breaks plain require()
+// of a same-package .js file (see gym-season-logic.selfcheck.cjs's header
+// comment for the same issue). This runs the actual browser file's source
+// against a fake `window` instead of fighting Node's module resolution.
 'use strict';
 
-const { FOODS } = require('./staple-foods.js');
+const fs = require('fs');
+const vm = require('vm');
+const path = require('path');
+
+const sandbox = { window: {} };
+vm.createContext(sandbox);
+const source = fs.readFileSync(path.join(__dirname, 'staple-foods.js'), 'utf8');
+vm.runInContext(source, sandbox);
+const { FOODS } = sandbox.window.StapleFoods;
 
 function assertEqual(actual, expected, label) {
   if (actual !== expected) {
@@ -29,4 +42,4 @@ assertEqual(broccoli.protein_100g, 2.8, 'Broccoli protein_100g');
 const names = FOODS.map((f) => f.name);
 assertEqual(new Set(names).size, names.length, 'no duplicate food names in the dataset');
 
-console.log('staple-foods.selfcheck.js: all assertions passed');
+console.log('staple-foods.selfcheck.cjs: all assertions passed');
