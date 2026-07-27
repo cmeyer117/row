@@ -1,13 +1,30 @@
-// Run with: node hype-audio.selfcheck.js
+// Run with: node hype-audio.selfcheck.cjs
+//
+// hype-audio.js is loaded via a plain <script src> in gym.html (not
+// type="module"), so it can't use ESM export/import without breaking that
+// page load -- and Row's package.json sets "type": "module", which breaks
+// plain require() of a same-package .js file the other way (see
+// gym-season-logic.selfcheck.cjs's header comment for the same issue).
+// This runs the actual browser file's source against a fake `window` +
+// `localStorage` instead of fighting Node's module resolution.
 'use strict';
 
-const store = {};
-global.localStorage = {
-  getItem: (k) => (k in store ? store[k] : null),
-  setItem: (k, v) => { store[k] = String(v); },
-};
+const fs = require('fs');
+const vm = require('vm');
+const path = require('path');
 
-const HypeAudio = require('./hype-audio.js');
+const store = {};
+const sandbox = {
+  window: {},
+  localStorage: {
+    getItem: (k) => (k in store ? store[k] : null),
+    setItem: (k, v) => { store[k] = String(v); },
+  },
+};
+vm.createContext(sandbox);
+const source = fs.readFileSync(path.join(__dirname, 'hype-audio.js'), 'utf8');
+vm.runInContext(source, sandbox);
+const HypeAudio = sandbox.window.HypeAudio;
 
 function assertEqual(actual, expected, label) {
   const a = JSON.stringify(actual), e = JSON.stringify(expected);
@@ -41,4 +58,18 @@ assertEqual(HypeAudio.listClips().map((c) => c.id), ['1', '2', '3'], 'deleted cl
 assertEqual(HypeAudio.listClips().find((c) => c.id === '3').deleted, true, 'tombstone is marked deleted:true');
 assertEqual(HypeAudio.pickRandom({}).id === '3', false, 'pickRandom never returns a deleted clip');
 
-console.log('hype-audio.selfcheck.js: all assertions passed');
+// pickMidSetClip — tries moment:'mid_set' first, falls back to the
+// iron/mindset/carl pillar pool (same pool "Hype Me Up" already uses)
+// when mid_set has no clips, returns null only if both come up empty.
+HypeAudio.deleteClip('2'); // clip '2' from the addClip/listClips test above is also moment:'mid_set' — clear it so this block starts from a known-empty mid_set pool
+HypeAudio.addClip({ id: '10', title: 'MidSet', mentality: 'dorian', moment: 'mid_set', play_count: 0 });
+assertEqual(HypeAudio.pickMidSetClip().id, '10', 'pickMidSetClip prefers a mid_set clip when one exists');
+
+HypeAudio.deleteClip('10');
+HypeAudio.addClip({ id: '11', title: 'IronClip', mentality: 'dorian', pillar: 'iron', play_count: 0 });
+assertEqual(HypeAudio.pickMidSetClip().id, '11', 'pickMidSetClip falls back to the pillar pool when mid_set is empty');
+
+HypeAudio.deleteClip('11');
+assertEqual(HypeAudio.pickMidSetClip(), null, 'pickMidSetClip returns null when both mid_set and the pillar pool are empty');
+
+console.log('hype-audio.selfcheck.cjs: all assertions passed');

@@ -70,7 +70,7 @@ Everything here is client-side only, reusing `HypeAudio` (hype-audio.js) and `Gy
 
 ## Testing
 
-`gym-workout-events.js` already has `classifyWorkoutEvent` covered by its existing selfcheck — no behavior change there. The new logic (fallback pick order, button visibility gating on `eventType === 'pr'`) is plain functions extractable for a `*.selfcheck.js` following the existing pattern (e.g. `hype-audio.selfcheck.js`), covering: mid_set-present case, mid_set-empty-falls-back-to-pillar case, both-empty-shows-alert case, PR button shown only on `'pr'`.
+`gym-workout-events.js` already has `classifyWorkoutEvent` covered by its existing selfcheck — no behavior change there. The new logic (fallback pick order, button visibility gating on `eventType === 'pr'`) is plain functions extractable for a `*.selfcheck.js` following the existing pattern (e.g. `hype-audio.selfcheck.cjs`), covering: mid_set-present case, mid_set-empty-falls-back-to-pillar case, both-empty-shows-alert case, PR button shown only on `'pr'`.
 
 Live-verify at a narrow mobile width that the two buttons plus the existing `-15s`/`+15s`/`Skip` buttons in `.po-rest-timer-actions` don't overflow or crowd out the timer text — that row has fixed gaps and no wrapping rule today.
 

@@ -62,6 +62,33 @@
     return pool[Math.floor(Math.random() * pool.length)];
   }
 
+  // Rest-timer "hype me up" button: prefers a mid_set-tagged clip; falls
+  // back to the same iron/mindset/carl pillar pool the "Hype Me Up" home
+  // button already draws from, so the button isn't dead on arrival while
+  // the mid_set pool is still empty (see docs/superpowers/specs/2026-07-27-hype-audio-row-fusion-design.md).
+  function pickMidSetClip() {
+    return pickRandom({ moment: 'mid_set' }) || pickRandom({ pillar: ['iron', 'mindset', 'carl'] });
+  }
+
+  // ponytail: false by default because Carl doesn't want playback cutting
+  // off music he already has going mid-workout. Flip to true to have the
+  // rest-timer clip and PR rant play automatically instead of requiring a
+  // tap -- both call sites (gym.html's startRestTimer) already check this
+  // flag, so flipping it is the only change needed.
+  const AUTO_PLAY_HYPE = false;
+
+  function playMidSetHype() {
+    const clip = pickMidSetClip();
+    if (clip) playClip(clip);
+    return clip;
+  }
+
+  function playPrRant() {
+    const clip = pickRandom({ pillar: 'carl' });
+    if (clip) playClip(clip);
+    return clip;
+  }
+
   // Only one clip should ever be audible at once — module-level handle so a
   // second playClip() call stops whatever's already playing instead of layering.
   let currentAudio = null;
@@ -333,6 +360,10 @@
       updateClip: updateClip,
       deleteClip: deleteClip,
       pickRandom: pickRandom,
+      pickMidSetClip: pickMidSetClip,
+      AUTO_PLAY_HYPE: AUTO_PLAY_HYPE,
+      playMidSetHype: playMidSetHype,
+      playPrRant: playPrRant,
       playClip: playClip,
       playFromList: playFromList,
       playRandomLoop: playRandomLoop,
@@ -363,6 +394,10 @@
       updateClip: updateClip,
       deleteClip: deleteClip,
       pickRandom: pickRandom,
+      pickMidSetClip: pickMidSetClip,
+      AUTO_PLAY_HYPE: AUTO_PLAY_HYPE,
+      playMidSetHype: playMidSetHype,
+      playPrRant: playPrRant,
       mediaSessionNext: mediaSessionNext,
       mediaSessionPrevious: mediaSessionPrevious,
       playRandomLoop: playRandomLoop,

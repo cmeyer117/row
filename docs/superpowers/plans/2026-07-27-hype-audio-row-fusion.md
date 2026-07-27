@@ -6,7 +6,7 @@
 
 **Architecture:** All client-side, no backend/schema changes. One new pure helper (`pickMidSetClip`) added to the shared `hype-audio.js` core lib (already loaded by `gym.html`). `gym.html` threads the already-computed PR/grind/miss classification through to `startRestTimer`, storing it in a new module-level var so the rest-timer bar's render logic can gate the PR button on it. Both buttons call the existing `HypeAudio.playClip()`.
 
-**Tech Stack:** Plain JS (no build step, no framework), static HTML, Node-based selfcheck scripts (`node *.selfcheck.js`) for pure-function coverage — matches the existing pattern in this repo (`gym-workout-events.js`, `hype-audio.selfcheck.js`).
+**Tech Stack:** Plain JS (no build step, no framework), static HTML, Node-based selfcheck scripts (`node *.selfcheck.js`) for pure-function coverage — matches the existing pattern in this repo (`gym-workout-events.js`, `hype-audio.selfcheck.cjs`).
 
 Spec: `docs/superpowers/specs/2026-07-27-hype-audio-row-fusion-design.md`
 
@@ -17,13 +17,13 @@ Spec: `docs/superpowers/specs/2026-07-27-hype-audio-row-fusion-design.md`
 **Files:**
 - Modify: `hype-audio.js:53-63` (near `pickRandom`)
 - Modify: `hype-audio.js:328-357` (both `window.HypeAudio` and `module.exports` blocks)
-- Test: `hype-audio.selfcheck.js`
+- Test: `hype-audio.selfcheck.cjs`
 
 `pickMidSetClip` is the one piece of non-trivial logic in this feature (fallback ordering), so it gets a real pure-function test, following the existing pattern in this file. `playMidSetHype`/`playPrRant` are thin pick+play wrappers (not unit tested — they call `playClip`, which constructs a real `Audio` object; this repo's convention, per `hypeMeUpBtn`'s existing handler, is to verify audio playback live in a browser, not in the Node selfcheck). `AUTO_PLAY_HYPE` lives here (not duplicated per-page) so gym.html's two separate `<script>` scopes (the big rest-timer IIFE and the later `DOMContentLoaded` button-wiring block) both read the same single source of truth via `window.HypeAudio`.
 
 - [ ] **Step 1: Write the failing test**
 
-Add to the end of `hype-audio.selfcheck.js`, before the final `console.log` line:
+Add to the end of `hype-audio.selfcheck.cjs`, before the final `console.log` line:
 
 ```js
 // pickMidSetClip — tries moment:'mid_set' first, falls back to the
@@ -42,7 +42,7 @@ assertEqual(HypeAudio.pickMidSetClip(), null, 'pickMidSetClip returns null when 
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `node hype-audio.selfcheck.js`
+Run: `node hype-audio.selfcheck.cjs`
 Expected: FAIL — `TypeError: HypeAudio.pickMidSetClip is not a function`
 
 - [ ] **Step 3: Write minimal implementation**
@@ -89,13 +89,13 @@ Then add these four lines to both export blocks — in the `window.HypeAudio = {
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `node hype-audio.selfcheck.js`
-Expected: `hype-audio.selfcheck.js: all assertions passed`
+Run: `node hype-audio.selfcheck.cjs`
+Expected: `hype-audio.selfcheck.cjs: all assertions passed`
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add hype-audio.js hype-audio.selfcheck.js
+git add hype-audio.js hype-audio.selfcheck.cjs
 git commit -m "feat(hype-audio): add pickMidSetClip + auto-play-gated play wrappers"
 ```
 
