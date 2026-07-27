@@ -7,7 +7,8 @@
 // classic <script> in the browser. That combination means Node's normal
 // require()/import() machinery can't see this file's UMD-style
 // `module.exports` at all (confirmed: the same failure already exists on
-// gym-workout-events.selfcheck.js, silently broken since 07-20, not
+// gym-workout-events.selfcheck.js, silently broken since 07-20 and fixed
+// 2026-07-27 by renaming to .cjs and switching to a vm sandbox — not
 // something introduced here). Executing the source directly inside a
 // Function scope with a real `module` shim sidesteps Node's loader
 // entirely — no changes needed to the shipped browser file.

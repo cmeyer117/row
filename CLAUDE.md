@@ -37,13 +37,13 @@ Jarvis (AI assistant) lives in a separate repo, `cmeyer117/claude-workspace`, su
 
 ## Development Approach
 
-This repo has zero TypeScript/React (plain vanilla JS) — the old "TypeScript Rules"/React Testing Library boilerplate here never applied, removed 2026-07-21. For new logic modules, write a `*.selfcheck.js` alongside the module (matching the existing pattern) before considering the feature done.
+This repo has zero TypeScript/React (plain vanilla JS) — the old "TypeScript Rules"/React Testing Library boilerplate here never applied, removed 2026-07-21. For new logic modules, write a `*.selfcheck.cjs` alongside the module (matching the existing pattern) before considering the feature done.
 
 ## Tech Stack
 
 - **Frontend:** Vanilla HTML/CSS/JS, no framework, no build step
 - **Backend:** Supabase (`app_state` table) via `sync.js`
-- **Testing:** `*.selfcheck.js` files per module (e.g. `gym-workout-events.selfcheck.js`) — run directly with `node`, not a test runner
+- **Testing:** `*.selfcheck.cjs` files per module (e.g. `gym-workout-events.selfcheck.cjs`) — run directly with `node`, not a test runner. Must be `.cjs`, not `.js`: package.json sets `"type": "module"`, which makes Node silently no-op a plain `.js` selfcheck's `require()` of the library file (see `gym-season-logic.selfcheck.cjs`'s header comment)
 
 ## Commands
 

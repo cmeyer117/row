@@ -4,7 +4,7 @@
 // type="module"), so it can't use ESM export/import without breaking that
 // page load -- and Row's package.json sets "type": "module", which breaks
 // plain require() of a same-package .js file the other way (this bit
-// gym-workout-events.selfcheck.js too; not fixed here, out of scope). This
+// gym-workout-events.selfcheck.js too, since fixed 2026-07-27). This
 // runs the actual browser file's source against a fake `window` instead of
 // fighting Node's module resolution.
 'use strict';
