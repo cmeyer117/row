@@ -14,8 +14,22 @@ const vm = require('vm');
 const path = require('path');
 
 const store = {};
+function FakeAudio(src) {
+  this.src = src;
+  this.onplay = null;
+  this.onpause = null;
+  this.onended = null;
+  this.onerror = null;
+}
+// Fires onplay synchronously -- enough to exercise "play_count increments via
+// the real onplay event, not unconditionally right after calling .play()"
+// without needing real browser audio timing.
+FakeAudio.prototype.play = function () { if (this.onplay) this.onplay(); return Promise.resolve(); };
+FakeAudio.prototype.pause = function () { if (this.onpause) this.onpause(); };
+
 const sandbox = {
   window: {},
+  Audio: FakeAudio,
   localStorage: {
     getItem: (k) => (k in store ? store[k] : null),
     setItem: (k, v) => { store[k] = String(v); },
@@ -71,5 +85,19 @@ assertEqual(HypeAudio.pickMidSetClip().id, '11', 'pickMidSetClip falls back to t
 
 HypeAudio.deleteClip('11');
 assertEqual(HypeAudio.pickMidSetClip(), null, 'pickMidSetClip returns null when both mid_set and the pillar pool are empty');
+
+// playMidSetHype / playPrRant actually play a clip, and play_count only
+// increments via the real onplay event (not unconditionally right after
+// calling .play(), which could reject with no audio ever starting).
+HypeAudio.addClip({ id: '20', title: 'Hype', mentality: 'dorian', pillar: 'iron', play_count: 0 });
+const hypeClip = HypeAudio.playMidSetHype();
+assertEqual(hypeClip.id, '20', 'playMidSetHype plays the picked clip');
+assertEqual(HypeAudio.listClips().find((c) => c.id === '20').play_count, 1, 'playMidSetHype increments play_count via the onplay event');
+
+HypeAudio.deleteClip('20');
+HypeAudio.addClip({ id: '21', title: 'Rant', mentality: 'drive', pillar: 'carl', play_count: 0 });
+const rantClip = HypeAudio.playPrRant();
+assertEqual(rantClip.id, '21', 'playPrRant plays a pillar:carl clip');
+assertEqual(HypeAudio.listClips().find((c) => c.id === '21').play_count, 1, 'playPrRant increments play_count via the onplay event');
 
 console.log('hype-audio.selfcheck.cjs: all assertions passed');

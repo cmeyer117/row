@@ -217,7 +217,15 @@
     currentAudio = audio;
     currentClipId = clip.id;
     updateMediaSessionMetadata(clip);
-    audio.onplay = notifyChange;
+    // play_count increments on the real onplay event, not right after calling
+    // .play() -- that promise can reject (autoplay policy, offline, a bad
+    // storage_url) with no audio ever actually starting, which used to still
+    // count as a play every time (caught in Codex review, worse now that
+    // auto-play fires this on every logged set instead of only a manual tap).
+    audio.onplay = function () {
+      updateClip(clip.id, { play_count: (clip.play_count || 0) + 1 });
+      notifyChange();
+    };
     audio.onpause = notifyChange;
     audio.onended = function () { currentClipId = null; advance(); };
     audio.onerror = function () {
@@ -226,7 +234,6 @@
       }
     };
     audio.play().catch(function () {});
-    updateClip(clip.id, { play_count: (clip.play_count || 0) + 1 });
     notifyChange();
     return audio;
   }
