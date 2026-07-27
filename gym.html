@@ -2888,8 +2888,10 @@ img, video, canvas, svg { max-width: 100%; }
     </div>
   </div>
 
-  <!-- POST-WORKOUT CHECK-IN MODAL -->
-  <div class="sub-modal-bg" id="checkinModalBg">
+  <!-- POST-WORKOUT CHECK-IN MODAL. z-index above #debriefModal (9000) since
+       both can open from the same "Mark Done" tap and .sub-modal-bg's base
+       z-index (200) would otherwise leave this one hidden behind it. -->
+  <div class="sub-modal-bg" id="checkinModalBg" style="z-index:9500;">
     <div class="sub-modal">
       <div class="sub-modal-title">How'd that session feel?</div>
       <div class="po-checkin-row" data-checkin-field="pain">
