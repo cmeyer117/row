@@ -4850,6 +4850,7 @@ img, video, canvas, svg { max-width: 100%; }
 
   let restTimerInterval = null;
   let restTimerEndAt = 0; // wall-clock ms — survives setInterval throttling/suspension in background
+  let restTimerEventType = null; // 'pr' | 'grind' | 'miss' | null — set by startRestTimer, read by the PR-rant button's visibility check
 
   function restTimerMessage(ex) {
     const muscle = MUSCLE_PRIMARY[ex.name] || 'the target muscle';
@@ -4869,17 +4870,24 @@ img, video, canvas, svg { max-width: 100%; }
 
   function stopRestTimer() {
     if (restTimerInterval) { clearInterval(restTimerInterval); restTimerInterval = null; }
+    restTimerEventType = null;
     $('restTimerBar').style.display = 'none';
   }
 
-  function startRestTimer(ex) {
+  function startRestTimer(ex, eventType) {
     stopRestTimer();
+    restTimerEventType = eventType || null;
     const repMin = parseInt(ex.repMin, 10) || 8;
     const secs = repMin <= 6 ? 150 : 75; // heavy (repMin 4-8) = 2:30, isolation (8-16) = 1:15
     restTimerEndAt = Date.now() + secs * 1000;
     $('restTimerMsg').textContent = restTimerMessage(ex);
     $('restTimerBar').style.display = 'flex';
     updateRestTimerDisplay();
+    $('restTimerPrBtn').style.display = restTimerEventType === 'pr' ? '' : 'none';
+    if (window.HypeAudio && window.HypeAudio.AUTO_PLAY_HYPE) {
+      window.HypeAudio.playMidSetHype();
+      if (restTimerEventType === 'pr') window.HypeAudio.playPrRant();
+    }
     restTimerInterval = setInterval(function() {
       if (restTimerRemainingSecs() <= 0) { stopRestTimer(); return; }
       updateRestTimerDisplay();
@@ -5267,13 +5275,15 @@ img, video, canvas, svg { max-width: 100%; }
     arr.push(Object.assign({ weight: w, reps: reps, date: isoDate, variant: activeVariant }, entry));
     arr.sort((a, b) => a.date.localeCompare(b.date));
     state.logs[ex.id] = arr;
-    if (window.GymWorkoutEvents && window.__gym && typeof window.__gym.logWorkoutEvent === 'function') {
-      const eventType = window.GymWorkoutEvents.classifyWorkoutEvent({ weight: w, reps: reps }, priorLogs, ex);
-      if (eventType) window.__gym.logWorkoutEvent(ex.name, eventType, w, reps, !!ex.bw);
+    const eventType = window.GymWorkoutEvents
+      ? window.GymWorkoutEvents.classifyWorkoutEvent({ weight: w, reps: reps }, priorLogs, ex)
+      : null;
+    if (eventType && window.__gym && typeof window.__gym.logWorkoutEvent === 'function') {
+      window.__gym.logWorkoutEvent(ex.name, eventType, w, reps, !!ex.bw);
     }
     if (plateMode) { plateCounts = {}; updatePlateUI(); }
     resetChipToToday('logDateChip', 'logDateInput');
-    startRestTimer(ex);
+    startRestTimer(ex, eventType);
     saveState(); renderAll();
     // Strength changed → composition estimate may shift
     if (typeof wtRender === 'function') wtRender();
