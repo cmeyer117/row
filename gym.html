@@ -701,6 +701,18 @@ img, video, canvas, svg { max-width: 100%; }
   color: var(--text-2);
 }
 .po-rest-timer-adj:hover, .po-rest-timer-dismiss:hover { background: rgba(255,255,255,0.10); }
+.po-rest-timer-hype {
+  font-family: var(--font-mono); font-size: 11px; font-weight: 700;
+  padding: 6px 10px; border-radius: 8px; cursor: pointer;
+  border: 1px solid rgba(224,51,47,0.35); background: rgba(224,51,47,0.10); color: #ff6b66;
+}
+.po-rest-timer-hype:hover, .po-rest-timer-hype:active { background: rgba(224,51,47,0.2); }
+.po-rest-timer-pr {
+  font-family: var(--font-mono); font-size: 11px; font-weight: 700;
+  padding: 6px 10px; border-radius: 8px; cursor: pointer;
+  border: 1px solid rgba(255,193,7,0.4); background: rgba(255,193,7,0.12); color: #ffc107;
+}
+.po-rest-timer-pr:hover, .po-rest-timer-pr:active { background: rgba(255,193,7,0.22); }
 
 /* ----- Cues ----- */
 .po-cues-section {
@@ -2676,6 +2688,8 @@ img, video, canvas, svg { max-width: 100%; }
       <div class="po-rest-timer-actions">
         <button type="button" class="po-rest-timer-adj" data-delta="-15">-15s</button>
         <button type="button" class="po-rest-timer-adj" data-delta="15">+15s</button>
+        <button type="button" class="po-rest-timer-hype" id="restTimerHypeBtn">🔥 Hype</button>
+        <button type="button" class="po-rest-timer-pr" id="restTimerPrBtn" style="display:none">🏆 PR</button>
         <button type="button" class="po-rest-timer-dismiss" id="restTimerDismiss">Skip</button>
       </div>
     </div>
