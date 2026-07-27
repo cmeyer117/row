@@ -3360,9 +3360,11 @@ img, video, canvas, svg { max-width: 100%; }
       for (let i = logs.length - 1; i >= 0; i--) {
         if (logs[i].reps === reps) bwStuck++; else break;
       }
-      if (reps >= upgradeAt) return { type: 'up', weight: 0, reps: reps + 1, tag: 'Push for more', reason: reps + ' reps — strong. Push for ' + (reps + 1) + ' next time.', bw: true, stuck: bwStuck };
-      if (reps >= repMin) return { type: 'hold', weight: 0, reps: reps + 1, tag: 'Add a rep', reason: reps + ' reps. Push for ' + (reps + 1) + ' next session.', bw: true, stuck: bwStuck };
-      return { type: 'hold', weight: 0, reps: repMin, tag: 'Repeat', reason: reps + ' reps fell short. Repeat until you hit ' + repMin + '+.', bw: true, stuck: bwStuck };
+      let bwResult;
+      if (reps >= upgradeAt) bwResult = { type: 'up', weight: 0, reps: reps + 1, tag: 'Push for more', reason: reps + ' reps — strong. Push for ' + (reps + 1) + ' next time.', bw: true, stuck: bwStuck };
+      else if (reps >= repMin) bwResult = { type: 'hold', weight: 0, reps: reps + 1, tag: 'Add a rep', reason: reps + ' reps. Push for ' + (reps + 1) + ' next session.', bw: true, stuck: bwStuck };
+      else bwResult = { type: 'hold', weight: 0, reps: repMin, tag: 'Repeat', reason: reps + ' reps fell short. Repeat until you hit ' + repMin + '+.', bw: true, stuck: bwStuck };
+      return applyCheckinOverride(bwResult, last, ex, bwStuck);
     }
     let result;
     if (stuck >= 3 && reps < repMin) {
