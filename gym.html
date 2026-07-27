@@ -6061,6 +6061,18 @@ document.addEventListener('DOMContentLoaded', function () {
       window.HypeAudio.playClip(clip);
     };
   }
+  const restHypeBtn = document.getElementById('restTimerHypeBtn');
+  if (restHypeBtn) {
+    restHypeBtn.onclick = function () {
+      if (!window.HypeAudio.playMidSetHype()) alert('No hype clips yet — add some from the hype-audio app.');
+    };
+  }
+  const restPrBtn = document.getElementById('restTimerPrBtn');
+  if (restPrBtn) {
+    restPrBtn.onclick = function () {
+      if (!window.HypeAudio.playPrRant()) alert('No hype clips yet — add some from the hype-audio app.');
+    };
+  }
 });
 </script>
 <script>
