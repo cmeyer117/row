@@ -1,7 +1,23 @@
-// Run with: node gym-workout-events.selfcheck.js
+// Run with: node gym-workout-events.selfcheck.cjs
+//
+// gym-workout-events.js is loaded via a plain <script src> in gym.html (not
+// type="module"), so it can't use ESM export/import without breaking that
+// page load -- and Row's package.json sets "type": "module", which breaks
+// plain require() of a same-package .js file the other way (see
+// gym-season-logic.selfcheck.cjs's header comment for the same issue).
+// This runs the actual browser file's source against a fake `window`
+// instead of fighting Node's module resolution.
 'use strict';
 
-const { classifyWorkoutEvent } = require('./gym-workout-events.js');
+const fs = require('fs');
+const vm = require('vm');
+const path = require('path');
+
+const sandbox = { window: {} };
+vm.createContext(sandbox);
+const source = fs.readFileSync(path.join(__dirname, 'gym-workout-events.js'), 'utf8');
+vm.runInContext(source, sandbox);
+const { classifyWorkoutEvent } = sandbox.window.GymWorkoutEvents;
 
 function assertEqual(actual, expected, label) {
   if (actual !== expected) {
@@ -65,4 +81,4 @@ assertEqual(
   'bodyweight reps under repMin is a miss'
 );
 
-console.log('gym-workout-events.selfcheck.js: all assertions passed');
+console.log('gym-workout-events.selfcheck.cjs: all assertions passed');
