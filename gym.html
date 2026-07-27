@@ -4892,8 +4892,12 @@ img, video, canvas, svg { max-width: 100%; }
     updateRestTimerDisplay();
     $('restTimerPrBtn').style.display = restTimerEventType === 'pr' ? '' : 'none';
     if (window.HypeAudio && window.HypeAudio.AUTO_PLAY_HYPE) {
-      window.HypeAudio.playMidSetHype();
+      // A PR plays its own rant, not the general hype clip too -- playClip()
+      // stops whatever's already playing, so calling both back to back would
+      // silently kill the hype clip a fraction of a second in and still
+      // increment its play_count for a clip nobody actually heard.
       if (restTimerEventType === 'pr') window.HypeAudio.playPrRant();
+      else window.HypeAudio.playMidSetHype();
     }
     restTimerInterval = setInterval(function() {
       if (restTimerRemainingSecs() <= 0) { stopRestTimer(); return; }
