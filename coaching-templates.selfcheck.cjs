@@ -1,5 +1,20 @@
-// coaching-templates.selfcheck.js — run with: node coaching-templates.selfcheck.js
-const { STAGES, assemblePlan, needsReview } = require('./coaching-templates.js');
+// coaching-templates.selfcheck.cjs — run with: node coaching-templates.selfcheck.cjs
+//
+// Row's package.json sets "type": "module", which breaks plain require()
+// of a same-package .js file (see gym-season-logic.selfcheck.cjs's header
+// comment for the same issue). This runs the actual browser file's source
+// against a fake `window` instead of fighting Node's module resolution.
+'use strict';
+
+const fs = require('fs');
+const vm = require('vm');
+const path = require('path');
+
+const sandbox = { window: {} };
+vm.createContext(sandbox);
+const source = fs.readFileSync(path.join(__dirname, 'coaching-templates.js'), 'utf8');
+vm.runInContext(source, sandbox);
+const { STAGES, assemblePlan, needsReview } = sandbox.window.CoachingTemplates;
 
 // All three stages exist with real content, not placeholders.
 console.assert(Object.keys(STAGES).length === 3, 'expected 3 stages');
@@ -27,4 +42,4 @@ console.assert(threw, 'unknown stage should throw, not silently fall through');
 const homePlan = assemblePlan({ stage: 'beginner', goal: 'cut', equipment: 'home', trainingDaysPerWeek: 3, sessionLength: 45, injuryFlags: [] });
 console.assert(homePlan.equipmentNote !== null, 'non-full-gym equipment should surface a substitution note');
 
-console.log('coaching-templates.selfcheck.js: all assertions passed');
+console.log('coaching-templates.selfcheck.cjs: all assertions passed');
