@@ -1,8 +1,23 @@
-// Run with: node macro-calc.selfcheck.js
+// Run with: node macro-calc.selfcheck.cjs
+//
+// Row's package.json sets "type": "module", which breaks plain require()
+// of a same-package .js file (see gym-season-logic.selfcheck.cjs's header
+// comment for the same issue). This runs the actual browser files' source
+// against a fake `window` instead of fighting Node's module resolution.
+// Both macro-calc.js and staple-foods.js attach to the same window, so
+// they share one sandbox context here.
 'use strict';
 
-const { calculateMacros, resolveServingMacros, remainingBudget, hasCompleteServingData, sumIngredients } = require('./macro-calc.js');
-const { FOODS } = require('./staple-foods.js');
+const fs = require('fs');
+const vm = require('vm');
+const path = require('path');
+
+const sandbox = { window: {} };
+vm.createContext(sandbox);
+vm.runInContext(fs.readFileSync(path.join(__dirname, 'macro-calc.js'), 'utf8'), sandbox);
+vm.runInContext(fs.readFileSync(path.join(__dirname, 'staple-foods.js'), 'utf8'), sandbox);
+const { calculateMacros, resolveServingMacros, remainingBudget, hasCompleteServingData, sumIngredients } = sandbox.window.MacroCalc;
+const { FOODS } = sandbox.window.StapleFoods;
 
 function assertEqual(actual, expected, label) {
   if (actual !== expected) {
@@ -108,4 +123,4 @@ const withNullRow = sumIngredients([
 assertEqual(withNullRow.calories, 130, 'sumIngredients tolerates null/undefined rows without throwing');
 assertEqual(sumIngredients(undefined, FOODS).calories, 0, 'sumIngredients(undefined, FOODS) returns a zeroed total, not a throw');
 
-console.log('macro-calc.selfcheck.js: all assertions passed');
+console.log('macro-calc.selfcheck.cjs: all assertions passed');
