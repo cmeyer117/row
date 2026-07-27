@@ -9,8 +9,8 @@ Third item on the hype-audio vision batch (Fable brainstorm, 2026-07-26; items #
 
 Both integration points already exist and require no new backend/schema work:
 
-- **Rest timer**: `startRestTimer(ex)` (gym.html:4875) fires immediately after every logged set (gym.html:5276), tracked via `restTimerEndAt`/`restTimerBar`.
-- **PR detection**: `GymWorkoutEvents.classifyWorkoutEvent(entry, priorLogs, ex)` (gym-workout-events.js) already runs at the same moment (gym.html:5271) and returns `'pr'` / `'grind'` / `'miss'` / `null`. Currently its only consumer is `window.__gym.logWorkoutEvent(...)`, which feeds Jarvis's Weekly Coach's Read — no UI feedback exists today.
+- **Rest timer**: `startRestTimer(ex)` (gym.html:4875) fires immediately after every logged set from the main **Log Set** button (gym.html:5276), tracked via `restTimerEndAt`/`restTimerBar`. The separate **quick-log** text-entry path (`quickLog()`, gym.html:~5414-5427) also classifies events but does *not* call `startRestTimer` today — it never shows the rest timer bar at all. That's existing behavior, not something this spec changes: these new buttons only ever appear on the main Log Set flow, same as the rest timer bar itself already only appears there.
+- **PR detection**: `GymWorkoutEvents.classifyWorkoutEvent(entry, priorLogs, ex)` (gym-workout-events.js) already runs at the same moment (gym.html:5271) and returns `'pr'` / `'grind'` / `'miss'` / `null`. Currently its only consumer is `window.__gym.logWorkoutEvent(...)`, which feeds Jarvis's Weekly Coach's Read — no UI feedback exists today. Note the first-ever logged set for an exercise always returns `null` (no prior logs to beat) — there's no PR button on a brand-new exercise's first set, which is correct, not a bug.
 - **Playback**: `window.HypeAudio` (hype-audio.js, already loaded in `gym.html`) exposes `pickRandom(filter)` and `playClip(clip)`. `pickRandom` filters by `mentality`/`moment`/`pillar`, AND'd together — it does not fall back internally between filters.
 - **Clip pools today**: `moment:'pre_workout'` has 67 tagged clips. `moment:'mid_set'` and `moment:'post_workout'` are both empty. `pillar:'carl'` has 34 tagged clips (nonzero — no fallback needed there).
 
@@ -32,13 +32,15 @@ clip = HypeAudio.pickRandom({ moment: 'mid_set' })
     || HypeAudio.pickRandom({ pillar: ['iron', 'mindset', 'carl'] })
 if (clip) HypeAudio.playClip(clip)
 ```
-(`pickRandom` returning `null`/falsy on an empty-filter match is already its documented behavior — confirmed by reading `hype-audio.js`.) If both calls come back empty (e.g. before any hype-audio clips exist at all), no-op silently — same non-intrusive behavior the existing empty-pool alert on "Hype Me Up" already models, reused verbatim rather than re-implemented.
+(`pickRandom` returning `null`/falsy on an empty-filter match is already its documented behavior — confirmed by reading `hype-audio.js`.) If both calls come back empty (e.g. before any hype-audio clips exist at all), show the same alert "Hype Me Up" already shows in that case ("No hype clips yet — add some from the hype-audio app.", gym.html:6036) — reused verbatim, not a silent no-op.
 
 Label/styling: reuse `.po-coach-btn.hype` (same classes as "🔥 Hype Me Up", gym.html:2751) sized to match the existing `.po-rest-timer-adj` buttons it sits next to.
 
 ### 2. PR rant button
 
 Renders in the same `.po-rest-timer-actions` row, but only when the `eventType` computed at gym.html:5271 (`GymWorkoutEvents.classifyWorkoutEvent(...)`) is `'pr'` for that log action. Hidden/absent on `'grind'`, `'miss'`, or `null`.
+
+**Wiring note**: `eventType` today is a local variable inside the Log Set click handler — it doesn't reach `startRestTimer(ex)`, which only takes `ex`. This requires a small signature change: `startRestTimer(ex, eventType)`, storing `eventType` in a new module-level `restTimerEventType` var (parallel to the existing `restTimerEndAt`) so the render logic for this button can read it. `stopRestTimer()` resets `restTimerEventType = null` alongside hiding the bar, so a stale PR flag can't leak into the next set's render.
 
 Tap behavior:
 ```
@@ -62,9 +64,15 @@ Both button handlers get factored as plain functions (`playMidSetHype()`, `playP
 
 Everything here is client-side only, reusing `HypeAudio` (hype-audio.js) and `GymWorkoutEvents` (gym-workout-events.js) exactly as they exist today. No new Supabase columns, no new sync keys, no changes to the moment-modes clip schema.
 
+## Known pre-existing quirk, not fixed here
+
+`undoBtn`'s handler (gym.html:5299-5308) doesn't call `stopRestTimer()` — undoing a set today already leaves the rest timer bar running for the set you just undid. These new buttons inherit that same quirk (a PR-rant button could still be tappable for a set that's now been undone). Not introduced by this feature and out of scope to fix here — flagging so it's a known, not a surprise.
+
 ## Testing
 
-`gym-workout-events.js` already has `classifyWorkoutEvent` covered by its existing selfcheck — no behavior change there. The new logic (fallback pick order, button visibility gating on `eventType === 'pr'`) is plain functions extractable for a `*.selfcheck.js` following the existing pattern (e.g. `hype-audio.selfcheck.js`), covering: mid_set-present case, mid_set-empty-falls-back-to-pillar case, both-empty no-op case, PR button shown only on `'pr'`.
+`gym-workout-events.js` already has `classifyWorkoutEvent` covered by its existing selfcheck — no behavior change there. The new logic (fallback pick order, button visibility gating on `eventType === 'pr'`) is plain functions extractable for a `*.selfcheck.js` following the existing pattern (e.g. `hype-audio.selfcheck.js`), covering: mid_set-present case, mid_set-empty-falls-back-to-pillar case, both-empty-shows-alert case, PR button shown only on `'pr'`.
+
+Live-verify at a narrow mobile width that the two buttons plus the existing `-15s`/`+15s`/`Skip` buttons in `.po-rest-timer-actions` don't overflow or crowd out the timer text — that row has fixed gaps and no wrapping rule today.
 
 ## Out of scope (this spec)
 
