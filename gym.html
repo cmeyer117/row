@@ -819,6 +819,11 @@ img, video, canvas, svg { max-width: 100%; }
   color: var(--text-2); cursor: pointer; font-family: inherit;
 }
 .po-jointpain-btn:hover { color: var(--text-1); border-color: rgba(255,255,255,0.16); }
+.po-checkin-row { display: flex; align-items: center; gap: 8px; margin: 10px 0; }
+.po-checkin-row-label { width: 64px; font-size: 12px; color: var(--text-2); font-weight: 600; flex-shrink: 0; }
+.po-checkin-btn { flex: 1; padding: 8px 0; border-radius: 8px; border: 1px solid rgba(255,255,255,0.10); background: rgba(255,255,255,0.04); color: var(--text-2); font-size: 12px; cursor: pointer; }
+.po-checkin-btn:hover { background: rgba(255,255,255,0.08); }
+.po-checkin-btn.selected { background: rgba(110,231,183,0.16); border-color: rgba(110,231,183,0.35); color: #6ee7b7; }
 .po-jointpain-picker {
   display: flex; gap: 4px; margin-top: 6px; flex-wrap: wrap;
 }
@@ -2883,6 +2888,35 @@ img, video, canvas, svg { max-width: 100%; }
     </div>
   </div>
 
+  <!-- POST-WORKOUT CHECK-IN MODAL -->
+  <div class="sub-modal-bg" id="checkinModalBg">
+    <div class="sub-modal">
+      <div class="sub-modal-title">How'd that session feel?</div>
+      <div class="po-checkin-row" data-checkin-field="pain">
+        <div class="po-checkin-row-label">Pain</div>
+        <button type="button" class="po-checkin-btn" data-val="low">Low</button>
+        <button type="button" class="po-checkin-btn" data-val="med">Med</button>
+        <button type="button" class="po-checkin-btn" data-val="high">High</button>
+      </div>
+      <div class="po-checkin-row" data-checkin-field="recovery">
+        <div class="po-checkin-row-label">Recovery</div>
+        <button type="button" class="po-checkin-btn" data-val="low">Low</button>
+        <button type="button" class="po-checkin-btn" data-val="med">Med</button>
+        <button type="button" class="po-checkin-btn" data-val="high">High</button>
+      </div>
+      <div class="po-checkin-row" data-checkin-field="pump">
+        <div class="po-checkin-row-label">Pump</div>
+        <button type="button" class="po-checkin-btn" data-val="low">Low</button>
+        <button type="button" class="po-checkin-btn" data-val="med">Med</button>
+        <button type="button" class="po-checkin-btn" data-val="high">High</button>
+      </div>
+      <div class="sub-modal-actions">
+        <button type="button" class="po-btn-secondary" id="checkinSkip">Skip</button>
+        <button type="button" class="po-btn-primary" id="checkinSave">Save</button>
+      </div>
+    </div>
+  </div>
+
   <!-- PROGRESS CARD EXPANDED-GRAPH MODAL -->
   <div class="sub-modal-bg" id="progModalBg">
     <div class="sub-modal">
@@ -4598,6 +4632,43 @@ img, video, canvas, svg { max-width: 100%; }
     const result = quickLog(raw, getActiveDate());
     if (!result.ok) { console.warn('[ghost-tap]', result.msg); }
   });
+
+  (function initCheckinModal() {
+    const bg = $('checkinModalBg');
+    const selections = { pain: null, recovery: null, pump: null };
+    bg.querySelectorAll('.po-checkin-row').forEach(function(row) {
+      const field = row.getAttribute('data-checkin-field');
+      row.querySelectorAll('.po-checkin-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          selections[field] = btn.getAttribute('data-val');
+          row.querySelectorAll('.po-checkin-btn').forEach(function(b) { b.classList.remove('selected'); });
+          btn.classList.add('selected');
+        });
+      });
+    });
+    function reset() {
+      selections.pain = null; selections.recovery = null; selections.pump = null;
+      bg.querySelectorAll('.po-checkin-btn').forEach(function(b) { b.classList.remove('selected'); });
+    }
+    $('checkinSkip').addEventListener('click', function() {
+      bg.classList.remove('show');
+      reset();
+    });
+    $('checkinSave').addEventListener('click', function() {
+      // Only record fields the user actually tapped — a partial check-in
+      // (e.g. pain + recovery, no pump opinion) is still useful data.
+      if (selections.pain || selections.recovery || selections.pump) {
+        const dateKey = getActiveDate();
+        state.checkins[dateKey] = {
+          pain: selections.pain, recovery: selections.recovery, pump: selections.pump
+        };
+        saveState();
+      }
+      bg.classList.remove('show');
+      reset();
+    });
+    window.__gym_openCheckinModal = function() { bg.classList.add('show'); };
+  })();
   $('poTwPastToggle').addEventListener('click', () => {
     const body = $('poTwPastBody');
     const toggle = $('poTwPastToggle');
