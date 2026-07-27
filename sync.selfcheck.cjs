@@ -1,13 +1,18 @@
 // Self-check for sync.js's mergeArrays — extracts the real function from the
 // shipped file (not a re-implementation) and asserts the concurrent-write
 // merge behavior that was the whole point of the fix.
+//
+// Renamed from .js to .cjs: Row's package.json sets "type": "module", which
+// makes `require('fs')` throw under the plain .js extension even though this
+// file never requires sync.js itself (it regex-extracts and evals the
+// function's source text, sidestepping module resolution entirely).
 'use strict';
 const fs = require('fs');
 const path = require('path');
 
 const src = fs.readFileSync(path.join(__dirname, 'sync.js'), 'utf8');
 const match = src.match(/function mergeArrays\([\s\S]*?\n {4}\}/);
-if (!match) { console.error('sync.selfcheck.js: mergeArrays not found in sync.js'); process.exit(1); }
+if (!match) { console.error('sync.selfcheck.cjs: mergeArrays not found in sync.js'); process.exit(1); }
 const mergeArrays = new Function('return (' + match[0].replace('function mergeArrays', 'function') + ')')();
 
 function assertEqual(actual, expected, label) {
@@ -44,4 +49,4 @@ assertEqual(
   'a local tombstone beats a stale non-deleted remote copy of the same id'
 );
 
-console.log('sync.selfcheck.js: all assertions passed');
+console.log('sync.selfcheck.cjs: all assertions passed');
