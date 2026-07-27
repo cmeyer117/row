@@ -2238,6 +2238,7 @@ img, video, canvas, svg { max-width: 100%; }
   padding: 3px 8px; border-radius: 999px; flex-shrink: 0; margin-top: 2px;
   background: rgba(255,255,255,0.06); color: var(--text-3);
 }
+.prog-card-badge-stalled { background: rgba(251, 191, 36, 0.14); color: #fbbf24; border-color: rgba(251, 191, 36, 0.24); }
 .prog-card-stats {
   display: flex; gap: 18px; margin-bottom: 12px;
 }
@@ -2886,6 +2887,7 @@ img, video, canvas, svg { max-width: 100%; }
   <div class="sub-modal-bg" id="progModalBg">
     <div class="sub-modal">
       <div class="sub-modal-title" id="progModalTitle">Exercise</div>
+      <div id="progModalRelative" style="font-family:var(--font-mono);font-size:11px;color:var(--text-3);margin:-4px 0 8px;"></div>
       <div id="progModalChart"></div>
       <div id="progModalSessions"></div>
       <div class="sub-modal-actions">
@@ -3264,6 +3266,17 @@ img, video, canvas, svg { max-width: 100%; }
   // gym-weight-photos.js is a separate script (own scope) and calls this —
   // expose it on window, same pattern as window.__gym.pcSupa below.
   window.estimate1RM = estimate1RM;
+  // Reads the same localStorage key the bodyweight tracker (po_coach_weights)
+  // already writes to. Returns null if nothing's been logged yet — callers
+  // must handle that, never divide by a fabricated default.
+  function getLatestBodyweight() {
+    try {
+      const entries = JSON.parse(localStorage.getItem('po_coach_weights') || '[]');
+      if (!Array.isArray(entries) || !entries.length) return null;
+      const sorted = entries.slice().sort((a, b) => a.dateKey.localeCompare(b.dateKey));
+      return sorted[sorted.length - 1].weight || null;
+    } catch (e) { return null; }
+  }
   function roundToStep(v, s) { return Math.round(v / s) * s; }
   function getFiltered() {
     const program = state.exercises.filter(e =>
@@ -3307,17 +3320,54 @@ img, video, canvas, svg { max-width: 100%; }
       if (logs[i].weight === weight) stuck++; else break;
     }
     if (bw) {
-      if (reps >= upgradeAt) return { type: 'up', weight: 0, reps: reps + 1, tag: 'Push for more', reason: reps + ' reps — strong. Push for ' + (reps + 1) + ' next time.', bw: true };
-      if (reps >= repMin) return { type: 'hold', weight: 0, reps: reps + 1, tag: 'Add a rep', reason: reps + ' reps. Push for ' + (reps + 1) + ' next session.', bw: true };
-      return { type: 'hold', weight: 0, reps: repMin, tag: 'Repeat', reason: reps + ' reps fell short. Repeat until you hit ' + repMin + '+.', bw: true };
+      // Bodyweight exercises track reps, not weight — "stalled" here means
+      // consecutive sessions logging the same rep count, not the same weight.
+      let bwStuck = 0;
+      for (let i = logs.length - 1; i >= 0; i--) {
+        if (logs[i].reps === reps) bwStuck++; else break;
+      }
+      if (reps >= upgradeAt) return { type: 'up', weight: 0, reps: reps + 1, tag: 'Push for more', reason: reps + ' reps — strong. Push for ' + (reps + 1) + ' next time.', bw: true, stuck: bwStuck };
+      if (reps >= repMin) return { type: 'hold', weight: 0, reps: reps + 1, tag: 'Add a rep', reason: reps + ' reps. Push for ' + (reps + 1) + ' next session.', bw: true, stuck: bwStuck };
+      return { type: 'hold', weight: 0, reps: repMin, tag: 'Repeat', reason: reps + ' reps fell short. Repeat until you hit ' + repMin + '+.', bw: true, stuck: bwStuck };
     }
+    let result;
     if (stuck >= 3 && reps < repMin) {
       const dl = roundToStep(weight * 0.9, step);
-      return { type: 'down', weight: dl, reps: repMax, tag: 'Deload', reason: 'Stuck at ' + weight + unit() + ' for ' + stuck + ' sessions. Drop 10%, reset, build back cleaner.' };
+      result = { type: 'down', weight: dl, reps: repMax, tag: 'Deload', reason: 'Stuck at ' + weight + unit() + ' for ' + stuck + ' sessions. Drop 10%, reset, build back cleaner.', stuck: stuck };
+    } else if (reps >= upgradeAt) {
+      result = { type: 'up', weight: weight + step, reps: repMin, tag: 'Add weight', reason: 'You hit ' + reps + ' reps — time to add ' + step + unit() + '. Expect ' + repMin + '-' + (repMin + 1) + ' next session.', stuck: stuck };
+    } else if (reps >= repMin && reps < upgradeAt) {
+      result = { type: 'hold', weight: weight, reps: reps + 1, tag: 'Add a rep', reason: reps + ' reps in target. Stay at ' + weight + unit() + ', push for ' + (reps + 1) + '.', stuck: stuck };
+    } else {
+      result = { type: 'hold', weight: weight, reps: repMin, tag: 'Repeat', reason: reps + ' reps short of ' + repMin + '-' + upgradeAt + '. Repeat ' + weight + unit() + ' until you hit ' + repMin + '+ clean.', stuck: stuck };
     }
-    if (reps >= upgradeAt) return { type: 'up', weight: weight + step, reps: repMin, tag: 'Add weight', reason: 'You hit ' + reps + ' reps — time to add ' + step + unit() + '. Expect ' + repMin + '-' + (repMin + 1) + ' next session.' };
-    if (reps >= repMin && reps < upgradeAt) return { type: 'hold', weight: weight, reps: reps + 1, tag: 'Add a rep', reason: reps + ' reps in target. Stay at ' + weight + unit() + ', push for ' + (reps + 1) + '.' };
-    return { type: 'hold', weight: weight, reps: repMin, tag: 'Repeat', reason: reps + ' reps short of ' + repMin + '-' + upgradeAt + '. Repeat ' + weight + unit() + ' until you hit ' + repMin + '+ clean.' };
+    return applyCheckinOverride(result, last, ex, stuck);
+  }
+
+  // Looks up the check-in submitted on the same day as `last` (the log this
+  // prescription is based on) and, if present, applies the pain/recovery
+  // rules from docs/superpowers/specs/2026-07-27-adaptive-checkin-ghosts-relative-stats-design.md.
+  // Pain=high short-circuits: recovery is never checked once pain overrides.
+  // Pump is never applied here — it's informational only, surfaced in renderRx().
+  function applyCheckinOverride(result, last, ex, stuck) {
+    const dateKey = last.date.slice(0, 10);
+    const checkin = state.checkins[dateKey];
+    if (!checkin) return result;
+    const { repMin, repMax, step } = ex;
+    if (checkin.pain === 'high') {
+      if (ex.bw) {
+        return { type: 'hold', weight: 0, reps: repMin, tag: 'Pain — repeat', reason: 'Logged high pain last session. Repeat at ' + repMin + ' reps, don\'t push.', bw: true, stuck: stuck };
+      }
+      const dl = roundToStep(last.weight * 0.9, step);
+      return { type: 'down', weight: dl, reps: repMax, tag: 'Pain — deload', reason: 'Logged high pain last session. Drop 10%, reset, and reassess.', stuck: stuck };
+    }
+    if (checkin.recovery === 'low' && result.type === 'up') {
+      if (ex.bw) {
+        return { type: 'hold', weight: 0, reps: last.reps + 1, tag: 'Add a rep', reason: last.reps + ' reps — strong, but recovery was low last time. Hold the push, aim for ' + (last.reps + 1) + '.', bw: true, stuck: stuck };
+      }
+      return { type: 'hold', weight: last.weight, reps: last.reps + 1, tag: 'Add a rep', reason: last.reps + ' reps — solid, but recovery was low last time. Hold at ' + last.weight + unit() + ', push for ' + (last.reps + 1) + '.', stuck: stuck };
+    }
+    return result;
   }
 
   function logJointPain(joint, severity) {
@@ -4143,6 +4193,11 @@ img, video, canvas, svg { max-width: 100%; }
       var dayObj = (state.days || []).find(function(d){ return d.id === ex.day; });
       var dayName = dayObj ? dayObj.name : (ex.isAdhoc ? 'Extra' : '');
 
+      // Stalled badge — only meaningful while stuck but NOT already in an
+      // active deload (getRx's own 'down' type already communicates that).
+      var rxForBadge = getRx(ex, logs);
+      var showStalled = rxForBadge && rxForBadge.stuck >= 4 && rxForBadge.type !== 'down';
+
       // PR display
       var prStr;
       if (ex.bw) {
@@ -4168,6 +4223,7 @@ img, video, canvas, svg { max-width: 100%; }
         +   '<div class="prog-card-name">' + escape(ex.name) + '</div>'
         +   '<div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">'
         +     (dayName ? '<div class="prog-card-badge">' + escape(dayName) + '</div>' : '')
+        +     (showStalled ? '<div class="prog-card-badge prog-card-badge-stalled" title="' + rxForBadge.stuck + ' sessions at the same ' + (ex.bw ? 'rep count' : 'weight') + '">Stalled</div>' : '')
         +     '<button type="button" class="prog-card-log-btn" data-exid="' + ex.id + '" aria-label="Log a set" title="Log a set" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.10);border-radius:8px;width:26px;height:26px;display:flex;align-items:center;justify-content:center;color:var(--text-2);cursor:pointer;">'
         +       '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>'
         +     '</button>'
@@ -4231,6 +4287,14 @@ img, video, canvas, svg { max-width: 100%; }
           : (prLog.weight || 0) + unit() + ' × ' + prLog.reps);
 
     $('progModalTitle').textContent = ex.name + ' — PR ' + prStr;
+    var relEl = $('progModalRelative');
+    var bw = getLatestBodyweight();
+    if (ex.bw || !bw) {
+      relEl.textContent = '';
+    } else {
+      var ratio = estimate1RM(prLog.weight || 0, prLog.reps) / bw;
+      relEl.textContent = 'e1RM ÷ bodyweight: ' + ratio.toFixed(2) + '×';
+    }
 
     var sessionTops = sessionKeys.map(function(dk) {
       return Math.max.apply(null, sessions[dk].map(function(l) { return l.weight || 0; }));
