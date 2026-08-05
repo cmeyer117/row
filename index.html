@@ -13,6 +13,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="macro-calc.js"></script>
 <script src="sync.js" defer></script>
 <script src="topbar.js" defer></script>
 <style>
@@ -302,6 +303,14 @@ body::after {
 .steps-quick-saved { color: var(--accent); opacity: 0; transition: opacity 0.3s; }
 .steps-quick-saved.show { opacity: 1; }
 
+.ops-strip { display: flex; align-items: center; gap: 10px; margin: 0 0 20px; flex-wrap: wrap; }
+.ops-chip {
+  padding: 10px 14px; border-radius: 14px;
+  background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06);
+  font-family: var(--font-mono); font-size: 12px;
+  color: var(--text-secondary); text-decoration: none;
+}
+
 /* ===== Responsive ===== */
 @media (max-width: 720px) {
   .bento {
@@ -351,6 +360,12 @@ body::after {
     <input type="number" inputmode="numeric" id="stepsQuickInput" placeholder="8000">
     <button type="button" id="stepsQuickSave">Save</button>
     <span class="steps-quick-saved" id="stepsQuickSaved">Saved</span>
+  </div>
+
+  <div class="ops-strip" id="opsStrip">
+    <a href="health.html" class="ops-chip"><span id="opsMacroChip">Macros</span></a>
+    <a href="health.html" class="ops-chip"><span id="opsStackChip">Stack</span></a>
+    <a href="gym.html" class="ops-chip"><span id="opsCheckinChip">Check-in</span></a>
   </div>
 
   <div class="bento">
@@ -514,6 +529,53 @@ body::after {
   // rather than a separate silo. Only gym.html owns the Supabase push for
   // that key, so this shows up locally right away and syncs out passively
   // next time gym.html itself is opened on this device.
+  // Macros chip — remaining calories from today's food_log vs macro_targets.
+  (async function initMacroChip() {
+    try {
+      if (!window.supabase || !window.MacroCalc) return;
+      const client = window.supabase.createClient(
+        'https://vikpcejlyxieguorwysf.supabase.co',
+        'sb_publishable_EvWPtfW1FBW5Vf-H6w0yHw_PcXK4imv'
+      );
+      const now = new Date();
+      const todayKey = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+      const { data, error } = await client.from('food_log').select('*').eq('log_date', todayKey);
+      if (error) return;
+      const DEFAULT_TARGETS = { proteinG: 180, carbG: 200, fatG: 65, calories: 2200 };
+      let targets = Object.assign({}, DEFAULT_TARGETS);
+      const raw = localStorage.getItem('macro_targets');
+      if (raw) { try { targets = Object.assign({}, DEFAULT_TARGETS, JSON.parse(raw)); } catch (e) {} }
+      const remaining = window.MacroCalc.remainingBudget(targets, data || []);
+      document.getElementById('opsMacroChip').textContent = Math.round(remaining.calories) + ' cal left';
+    } catch (e) {}
+  })();
+
+  // Stack chip — X/Y supplement items marked taken today.
+  (function initStackChip() {
+    try {
+      const now = new Date();
+      if (now.getHours() < 6) now.setDate(now.getDate() - 1);
+      const activeDate = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+      const items = JSON.parse(localStorage.getItem('stack:items') || 'null');
+      const taken = JSON.parse(localStorage.getItem('stack:taken:' + activeDate) || 'null') || {};
+      if (!Array.isArray(items) || !items.length) return;
+      document.getElementById('opsStackChip').textContent = Object.keys(taken).length + '/' + items.length + ' taken';
+    } catch (e) {}
+  })();
+
+  // Check-in chip — true if today's pain/recovery/pump check-in has any
+  // of those 3 fields logged. Steps excluded (already has its own widget).
+  (function initCheckinChip() {
+    try {
+      const now = new Date();
+      const todayKey = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+      const state = JSON.parse(localStorage.getItem('po_coach_v1') || '{}');
+      const entry = state.checkins && state.checkins[todayKey];
+      const logged = !!entry && (entry.pain != null || entry.recovery != null || entry.pump != null);
+      document.getElementById('opsCheckinChip').textContent = logged ? 'Logged' : 'Not yet';
+    } catch (e) {}
+  })();
+
   (function initStepsQuick() {
     const input = document.getElementById('stepsQuickInput');
     const saveBtn = document.getElementById('stepsQuickSave');
