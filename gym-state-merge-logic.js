@@ -1,15 +1,15 @@
-// gym-state-merge-logic.js — pure merge logic for po_coach_v1's `logs`.
-// No DOM, no Supabase.
+// gym-state-merge-logic.js — pure merge logic for po_coach_v1's `logs`,
+// `jointPain`, and `checkins`. No DOM, no Supabase.
 //
 // po_coach_v1 is pushed as a full-object replace on every save (like every
 // other PC_SYNCED_KEYS entry that isn't po_coach_weights/po_coach_photos --
 // those two already have union-merge protection after a prior incident,
-// per the comment on po_coach_weights's merge in gym.html). `logs` is the
-// one part of po_coach_v1 that's irreplaceable historical data (the others
-// -- exercises, days, gyms, settings -- are current config, fine to let
-// the remote value win outright). Without this, any client that pushes a
-// stale/reduced local copy of logs permanently wipes real lift history for
-// every other device, with nothing to detect or undo it.
+// per the comment on po_coach_weights's merge in gym.html). `logs`,
+// `jointPain`, and `checkins` are the irreplaceable-history parts of
+// po_coach_v1 (the rest -- exercises, days, gyms, settings -- is current
+// config, fine to let the remote value win outright). Without this, any
+// client that pushes a stale/reduced local copy permanently wipes real
+// history for every other device, with nothing to detect or undo it.
 (function () {
   'use strict';
 
@@ -50,6 +50,33 @@
     return [...remoteArr, ...localOnly];
   }
 
+  // checkins is a plain object keyed by dateKey, one entry per day
+  // ({pain, recovery, pump, steps}) -- unlike logs/jointPain there's no
+  // array of independent entries to union, so a whole-object union can't
+  // protect against the real failure mode here: two devices both writing
+  // *different fields* for the *same day* (e.g. device A saves pain from a
+  // post-workout check-in, device B later saves steps from an evening
+  // re-open). A field-by-field merge per date, remote-wins-on-genuine-
+  // conflict but never letting a null on either side erase a real value
+  // from the other, closes that gap without needing per-field timestamps.
+  function mergeCheckins(remoteObj, localObj) {
+    remoteObj = remoteObj || {};
+    localObj = localObj || {};
+    const merged = {};
+    const allDates = new Set([...Object.keys(remoteObj), ...Object.keys(localObj)]);
+    const FIELDS = ['pain', 'recovery', 'pump', 'steps'];
+    for (const dk of allDates) {
+      const r = remoteObj[dk] || {};
+      const l = localObj[dk] || {};
+      const entry = {};
+      for (const field of FIELDS) {
+        entry[field] = r[field] != null ? r[field] : (l[field] != null ? l[field] : null);
+      }
+      merged[dk] = entry;
+    }
+    return merged;
+  }
+
   // Total logged-set count across all exercises, for the push-time
   // shrink tripwire (mirrors pcWarnIfShrinking's weights check).
   function totalLogCount(logs) {
@@ -58,9 +85,9 @@
   }
 
   if (typeof window !== 'undefined') {
-    window.GymStateMergeLogic = { mergeLogs: mergeLogs, mergeJointPain: mergeJointPain, totalLogCount: totalLogCount };
+    window.GymStateMergeLogic = { mergeLogs: mergeLogs, mergeJointPain: mergeJointPain, mergeCheckins: mergeCheckins, totalLogCount: totalLogCount };
   }
   if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { mergeLogs: mergeLogs, mergeJointPain: mergeJointPain, totalLogCount: totalLogCount };
+    module.exports = { mergeLogs: mergeLogs, mergeJointPain: mergeJointPain, mergeCheckins: mergeCheckins, totalLogCount: totalLogCount };
   }
 })();

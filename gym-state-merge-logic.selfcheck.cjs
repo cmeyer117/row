@@ -13,7 +13,7 @@ const source = fs.readFileSync(path.join(__dirname, 'gym-state-merge-logic.js'),
 const sandbox = { window: {} };
 vm.createContext(sandbox);
 vm.runInContext(source, sandbox);
-const { mergeLogs, totalLogCount } = sandbox.window.GymStateMergeLogic;
+const { mergeLogs, mergeCheckins, totalLogCount } = sandbox.window.GymStateMergeLogic;
 
 function assertEqual(actual, expected, label) {
   const a = JSON.stringify(actual), e = JSON.stringify(expected);
@@ -68,5 +68,44 @@ assertEqual(
 assertEqual(totalLogCount({ ex1: [{}, {}], ex2: [{}] }), 3, 'totalLogCount sums across all exercises');
 assertEqual(totalLogCount({}), 0, 'totalLogCount handles empty logs');
 assertEqual(totalLogCount(null), 0, 'totalLogCount handles null/missing logs');
+
+// This is the actual bug being fixed: two devices write different fields
+// for the same day (device A saves pain post-workout, device B later saves
+// steps in the evening) -- a naive full-object-replace push from either
+// device must not erase the other's real value.
+assertEqual(
+  mergeCheckins(
+    { '2026-08-04': { pain: 'med', recovery: null, pump: null, steps: null } },
+    { '2026-08-04': { pain: null, recovery: null, pump: null, steps: 9200 } }
+  ),
+  { '2026-08-04': { pain: 'med', recovery: null, pump: null, steps: 9200 } },
+  'remote pain and local-only steps both survive for the same day'
+);
+
+// A day present only locally (never synced) is not dropped.
+assertEqual(
+  mergeCheckins({}, { '2026-08-04': { pain: 'low', recovery: null, pump: null, steps: null } }),
+  { '2026-08-04': { pain: 'low', recovery: null, pump: null, steps: null } },
+  'local-only day is not erased by an empty remote checkins object'
+);
+
+// A day present only remotely (from another device) is picked up.
+assertEqual(
+  mergeCheckins({ '2026-08-03': { pain: null, recovery: 'high', pump: null, steps: 7000 } }, {}),
+  { '2026-08-03': { pain: null, recovery: 'high', pump: null, steps: 7000 } },
+  'remote-only day from another device is not lost'
+);
+
+// Genuine same-field conflict: remote wins (no per-field timestamp to
+// arbitrate by, so this matches the existing remote-wins-on-config
+// philosophy used for non-array fields elsewhere in this blob).
+assertEqual(
+  mergeCheckins(
+    { '2026-08-04': { pain: 'high', recovery: null, pump: null, steps: null } },
+    { '2026-08-04': { pain: 'low', recovery: null, pump: null, steps: null } }
+  ),
+  { '2026-08-04': { pain: 'high', recovery: null, pump: null, steps: null } },
+  'genuine same-field conflict on the same day: remote wins'
+);
 
 console.log('gym-state-merge-logic.selfcheck.cjs: all assertions passed');
