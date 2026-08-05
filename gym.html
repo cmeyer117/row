@@ -4181,6 +4181,9 @@ img, video, canvas, svg { max-width: 100%; }
     if (document.querySelector('.po-shell').classList.contains('view-progress')) {
       renderProgress();
     }
+    if (document.querySelector('.po-shell').classList.contains('view-volume')) {
+      renderVolume();
+    }
   }
 
   // ============================================================
@@ -4374,7 +4377,7 @@ img, video, canvas, svg { max-width: 100%; }
     var filtersEl = $('volFilters');
     var days = [{ id: 'all', name: 'All' }].concat(state.days || []);
     filtersEl.innerHTML = days.map(function(d) {
-      return '<button class="prog-filter-btn' + (volFilter === d.id ? ' active' : '') + '" data-day="' + d.id + '">' + d.name + '</button>';
+      return '<button class="prog-filter-btn' + (volFilter === d.id ? ' active' : '') + '" data-day="' + d.id + '">' + escape(d.name) + '</button>';
     }).join('');
     filtersEl.querySelectorAll('.prog-filter-btn').forEach(function(btn) {
       btn.addEventListener('click', function() {
