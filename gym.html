@@ -2271,6 +2271,11 @@ img, video, canvas, svg { max-width: 100%; }
   font-family: var(--font-mono); font-size: 12px;
 }
 
+/* ===== Volume View ===== */
+#volumeView { display: none; padding-bottom: 100px; }
+.po-shell.view-volume > *:not(#volumeView):not(.gym-tabbar):not(#logProgressToggle) { display: none !important; }
+.po-shell.view-volume #volumeView { display: block; }
+
 /* ===== Import Modal ===== */
 .import-btn {
   padding: 13px 18px;
@@ -2422,6 +2427,7 @@ img, video, canvas, svg { max-width: 100%; }
   <div class="po-seg-control" id="logProgressToggle" style="margin-bottom:10px">
     <button class="po-seg-btn active" id="gymTabLog" type="button">Log</button>
     <button class="po-seg-btn" id="gymTabProgress" type="button">Progress</button>
+    <button class="po-seg-btn" id="gymTabVolume" type="button">Volume</button>
   </div>
   <div class="po-toprow">
     <button class="po-day-pill" type="button" id="dayPill" title="Tap to switch the day filter to today's split">
@@ -2970,6 +2976,25 @@ img, video, canvas, svg { max-width: 100%; }
     </div>
     <div class="prog-filters" id="progFilters"></div>
     <div class="prog-list" id="progList"></div>
+  </div>
+
+  <!-- VOLUME VIEW -->
+  <div id="volumeView">
+    <div class="prog-header">
+      <span class="prog-title">Volume</span>
+    </div>
+    <div class="prog-filters" id="volFilters"></div>
+    <div class="wt-chart-wrap hidden" id="volChartWrap">
+      <div class="wt-chart-yaxis">
+        <span id="volYAxisMax">—</span>
+        <span id="volYAxisMin">—</span>
+      </div>
+      <svg class="wt-chart" viewBox="0 0 320 130" preserveAspectRatio="none">
+        <g id="volChartContent"></g>
+      </svg>
+    </div>
+    <div class="prog-empty hidden" id="volEmpty">Need 2+ weeks of logged sets for a trend.</div>
+    <div class="prog-list" id="volList"></div>
   </div>
 
   <!-- TAB BAR -->
@@ -4344,6 +4369,46 @@ img, video, canvas, svg { max-width: 100%; }
     });
   }
 
+  var volFilter = 'all';
+  function renderVolume() {
+    var filtersEl = $('volFilters');
+    var days = [{ id: 'all', name: 'All' }].concat(state.days || []);
+    filtersEl.innerHTML = days.map(function(d) {
+      return '<button class="prog-filter-btn' + (volFilter === d.id ? ' active' : '') + '" data-day="' + d.id + '">' + d.name + '</button>';
+    }).join('');
+    filtersEl.querySelectorAll('.prog-filter-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        volFilter = btn.dataset.day;
+        renderVolume();
+      });
+    });
+
+    var allEx = (state.exercises || []).concat(getAllAdhocExercises());
+    var weeks = window.GymVolumeLogic.weeklyVolumeByDay(allEx, state.logs || {}, volFilter, 10);
+    var vals = weeks.map(function(w) { return w.totalVol; });
+    var nonZeroWeeks = weeks.filter(function(w) { return w.totalVol > 0; });
+
+    var chartWrap = $('volChartWrap');
+    var emptyEl = $('volEmpty');
+    if (nonZeroWeeks.length < 2) {
+      chartWrap.classList.add('hidden');
+      emptyEl.classList.remove('hidden');
+    } else {
+      emptyEl.classList.add('hidden');
+      chartWrap.classList.remove('hidden');
+      var path = buildSparkPath(vals, 320, 130);
+      $('volChartContent').innerHTML = '<path d="' + path + '" stroke="#6ee7b7" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>';
+      $('volYAxisMax').textContent = Math.round(Math.max.apply(null, vals)).toLocaleString();
+      $('volYAxisMin').textContent = Math.round(Math.min.apply(null, vals)).toLocaleString();
+    }
+
+    var listEl = $('volList');
+    listEl.innerHTML = weeks.slice().reverse().map(function(w) {
+      return '<div class="prog-card"><div class="prog-card-top"><span class="prog-card-name">' + fmtPastDate(w.weekKey) + '</span></div>'
+        + '<div class="prog-stat"><span class="prog-stat-label">Volume</span><span class="prog-stat-val">' + Math.round(w.totalVol).toLocaleString() + '</span></div></div>';
+    }).join('');
+  }
+
   function renderProgressModal(exId) {
     var ex = (state.exercises || []).find(function(e) { return e.id === exId; });
     if (!ex) return;
@@ -4416,20 +4481,27 @@ img, video, canvas, svg { max-width: 100%; }
     var shell = document.querySelector('.po-shell');
     var logBtn = $('gymTabLog');
     var progBtn = $('gymTabProgress');
+    var volBtn = $('gymTabVolume');
+    shell.classList.remove('view-progress', 'view-volume');
+    logBtn.classList.remove('active');
+    progBtn.classList.remove('active');
+    volBtn.classList.remove('active');
     if (tab === 'progress') {
       shell.classList.add('view-progress');
-      logBtn.classList.remove('active');
       progBtn.classList.add('active');
       renderProgress();
+    } else if (tab === 'volume') {
+      shell.classList.add('view-volume');
+      volBtn.classList.add('active');
+      renderVolume();
     } else {
-      shell.classList.remove('view-progress');
       logBtn.classList.add('active');
-      progBtn.classList.remove('active');
     }
   }
 
   $('gymTabLog').addEventListener('click', function() { switchTab('log'); });
   $('gymTabProgress').addEventListener('click', function() { switchTab('progress'); });
+  $('gymTabVolume').addEventListener('click', function() { switchTab('volume'); });
   $('gymTabFitness').addEventListener('click', function() { switchTab('log'); });
 
   // ============================================================
@@ -6346,6 +6418,7 @@ img, video, canvas, svg { max-width: 100%; }
 <script src="gym-weight-photos.js"></script>
 <script src="gym-workout-events.js"></script>
 <script src="gym-season-logic.js"></script>
+<script src="gym-volume-logic.js"></script>
 <script src="plate-calc.js"></script>
 <script src="gym-state-merge-logic.js"></script>
 <script src="hype-audio.js"></script>
