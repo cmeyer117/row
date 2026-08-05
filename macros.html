@@ -295,9 +295,6 @@ async function fetchTodayEntries() {
   return data || [];
 }
 
-// Both return { error } (error === null on success) so callers can decide
-// whether to close a modal / refresh, or show the failure instead of
-// silently behaving as if the write succeeded.
 async function fetchRecentEntries(days) {
   const client = getSupa();
   if (!client) return [];
@@ -309,6 +306,9 @@ async function fetchRecentEntries(days) {
   return data || [];
 }
 
+// Both return { error } (error === null on success) so callers can decide
+// whether to close a modal / refresh, or show the failure instead of
+// silently behaving as if the write succeeded.
 async function insertEntry(entry) {
   const client = getSupa();
   if (!client) return { error: new Error('Supabase not ready') };
