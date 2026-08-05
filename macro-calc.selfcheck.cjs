@@ -16,7 +16,7 @@ const sandbox = { window: {} };
 vm.createContext(sandbox);
 vm.runInContext(fs.readFileSync(path.join(__dirname, 'macro-calc.js'), 'utf8'), sandbox);
 vm.runInContext(fs.readFileSync(path.join(__dirname, 'staple-foods.js'), 'utf8'), sandbox);
-const { calculateMacros, resolveServingMacros, remainingBudget, hasCompleteServingData, sumIngredients } = sandbox.window.MacroCalc;
+const { calculateMacros, resolveServingMacros, remainingBudget, hasCompleteServingData, sumIngredients, dedupeByRecency, rankByFrequency, rankByFrecency } = sandbox.window.MacroCalc;
 const { FOODS } = sandbox.window.StapleFoods;
 
 function assertEqual(actual, expected, label) {
@@ -122,5 +122,63 @@ const withNullRow = sumIngredients([
 ], FOODS);
 assertEqual(withNullRow.calories, 130, 'sumIngredients tolerates null/undefined rows without throwing');
 assertEqual(sumIngredients(undefined, FOODS).calories, 0, 'sumIngredients(undefined, FOODS) returns a zeroed total, not a throw');
+
+// ---- Quick Add ranking functions ----
+
+function daysAgo(n) { return new Date(Date.now() - n * 86400000).toISOString(); }
+
+// dedupeByRecency — same name logged twice with different macros; the more
+// recent instance's macros win, and the result collapses to one entry.
+const dedupeEntries = [
+  { name: 'Protein Shake', protein_g: 25, carb_g: 5, fat_g: 2, calories: 140, source: 'manual', barcode: null, created_at: daysAgo(3) },
+  { name: 'Protein Shake', protein_g: 30, carb_g: 8, fat_g: 3, calories: 180, source: 'manual', barcode: null, created_at: daysAgo(1) },
+];
+const dedupeResult = dedupeByRecency(dedupeEntries);
+assertEqual(dedupeResult.length, 1, 'dedupeByRecency collapses same-name entries to one');
+assertEqual(dedupeResult[0].protein_g, 30, "dedupeByRecency keeps the more recent instance's macros");
+
+// rankByFrequency — a 3x-logged food outranks a 1x-logged food regardless
+// of which was logged more recently.
+const freqEntries = [
+  { name: 'Chicken Rice Bowl', protein_g: 50, carb_g: 60, fat_g: 10, calories: 520, source: 'manual', barcode: null, created_at: daysAgo(10) },
+  { name: 'Chicken Rice Bowl', protein_g: 50, carb_g: 60, fat_g: 10, calories: 520, source: 'manual', barcode: null, created_at: daysAgo(6) },
+  { name: 'Chicken Rice Bowl', protein_g: 50, carb_g: 60, fat_g: 10, calories: 520, source: 'manual', barcode: null, created_at: daysAgo(2) },
+  { name: 'One-Off Snack', protein_g: 5, carb_g: 20, fat_g: 8, calories: 170, source: 'manual', barcode: null, created_at: daysAgo(0) },
+];
+const freqResult = rankByFrequency(freqEntries);
+assertEqual(freqResult[0].name, 'Chicken Rice Bowl', 'rankByFrequency ranks the 3x-logged food first despite being less recent');
+
+// rankByFrecency — a fresh-but-rare food outranks a stale-but-frequent food
+// when the count gap is small (decay dominates).
+const frecencySmallGap = [
+  { name: 'Fresh Food', protein_g: 20, carb_g: 20, fat_g: 5, calories: 220, source: 'manual', barcode: null, created_at: daysAgo(1) },
+  { name: 'Fresh Food', protein_g: 20, carb_g: 20, fat_g: 5, calories: 220, source: 'manual', barcode: null, created_at: daysAgo(1) },
+  { name: 'Stale Food', protein_g: 20, carb_g: 20, fat_g: 5, calories: 220, source: 'manual', barcode: null, created_at: daysAgo(20) },
+  { name: 'Stale Food', protein_g: 20, carb_g: 20, fat_g: 5, calories: 220, source: 'manual', barcode: null, created_at: daysAgo(20) },
+  { name: 'Stale Food', protein_g: 20, carb_g: 20, fat_g: 5, calories: 220, source: 'manual', barcode: null, created_at: daysAgo(20) },
+];
+const frecencySmallGapResult = rankByFrecency(frecencySmallGap);
+assertEqual(frecencySmallGapResult[0].name, 'Fresh Food', 'rankByFrecency lets a fresh 2x food outrank a stale 3x food (decay dominates a small count gap)');
+
+// rankByFrecency — a large count gap still wins even against a fresher
+// low-count food (frequency dominates when the gap is big enough).
+const frecencyBigGap = [];
+for (let i = 0; i < 10; i++) {
+  frecencyBigGap.push({ name: 'Staple Food', protein_g: 20, carb_g: 20, fat_g: 5, calories: 220, source: 'manual', barcode: null, created_at: daysAgo(5) });
+}
+frecencyBigGap.push({ name: 'New Food', protein_g: 20, carb_g: 20, fat_g: 5, calories: 220, source: 'manual', barcode: null, created_at: daysAgo(0) });
+const frecencyBigGapResult = rankByFrecency(frecencyBigGap);
+assertEqual(frecencyBigGapResult[0].name, 'Staple Food', 'rankByFrecency lets a big count gap (10x vs 1x) win even against a fresher food');
+
+// All three cap at 8 items and tolerate empty/undefined input.
+const manyEntries = [];
+for (let i = 0; i < 12; i++) {
+  manyEntries.push({ name: 'Food ' + i, protein_g: 10, carb_g: 10, fat_g: 5, calories: 130, source: 'manual', barcode: null, created_at: daysAgo(i) });
+}
+assertEqual(dedupeByRecency(manyEntries).length, 8, 'dedupeByRecency caps at 8 items');
+assertEqual(rankByFrequency(manyEntries).length, 8, 'rankByFrequency caps at 8 items');
+assertEqual(rankByFrecency(manyEntries).length, 8, 'rankByFrecency caps at 8 items');
+assertEqual(dedupeByRecency([]).length, 0, 'dedupeByRecency of empty array returns empty array');
+assertEqual(rankByFrequency(undefined).length, 0, 'rankByFrequency(undefined) does not throw, returns empty array');
 
 console.log('macro-calc.selfcheck.cjs: all assertions passed');
