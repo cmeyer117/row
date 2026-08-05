@@ -5568,17 +5568,18 @@ img, video, canvas, svg { max-width: 100%; }
   // Format a log entry for display. Handles lbs, plates, and bodyweight.
   // l = log entry {weight, reps, plates?, extraLbs?}  ex = exercise object
   function formatSet(l, ex) {
-    if (ex && ex.bw) return l.reps + ' reps';
+    var rirSuffix = l.rir != null ? ' @' + l.rir : '';
+    if (ex && ex.bw) return l.reps + ' reps' + rirSuffix;
     if (l.plateConfig) {
       var parts = Object.entries(l.plateConfig).map(function(kv) { return kv[1] + '×' + kv[0]; });
-      return parts.join(' + ') + ' × ' + l.reps;
+      return parts.join(' + ') + ' × ' + l.reps + rirSuffix;
     }
     if (l.plates != null) {
       var pStr = l.plates + (l.plates === 1 ? ' plate' : ' plates');
       if (l.extraLbs) pStr += '+' + l.extraLbs;
-      return pStr + ' × ' + l.reps;
+      return pStr + ' × ' + l.reps + rirSuffix;
     }
-    return l.weight + unit() + ' × ' + l.reps;
+    return l.weight + unit() + ' × ' + l.reps + rirSuffix;
   }
 
   // Parse plate notation from a weight token.
@@ -5594,22 +5595,27 @@ img, video, canvas, svg { max-width: 100%; }
   function parseQuickLog(raw) {
     var s = raw.trim();
 
+    // Optional trailing RIR: "@2" -- strip it off before any weight/reps match.
+    var rir = null;
+    var rirMatch = s.match(/^(.*?)\s*@\s*(\d+)\s*$/);
+    if (rirMatch) { s = rirMatch[1].trim(); rir = parseInt(rirMatch[2], 10); }
+
     // Plate formats: "hack 3p×9" / "hack 3.5p×9" / "hack 3p25×9"
     var mp = s.match(/^(.*?)\s+([\d.]+p\d*)\s*[x×X]\s*(\d+)\s*$/i);
     if (mp) {
       var pl = parsePlates(mp[2]);
       if (pl) return { namePart: mp[1].trim(), plates: pl.plates, extraLbs: pl.extraLbs,
-                       weight: pl.plates * 45 + pl.extraLbs, reps: parseInt(mp[3], 10) };
+                       weight: pl.plates * 45 + pl.extraLbs, reps: parseInt(mp[3], 10), rir: rir };
     }
     // Bodyweight-only plate: "hack 3p" (no reps token — treat trailing number as reps? no, ambiguous. skip.)
 
     // Standard lbs: "bench 225×8"
     var m = s.match(/^(.*?)\s+([\d.]+)\s*[x×X]\s*(\d+)\s*$/i);
-    if (m) return { namePart: m[1].trim(), weight: parseFloat(m[2]), reps: parseInt(m[3], 10) };
+    if (m) return { namePart: m[1].trim(), weight: parseFloat(m[2]), reps: parseInt(m[3], 10), rir: rir };
 
     // Bodyweight: "pullups 10"
     var m2 = s.match(/^(.*?)\s+(\d+)\s*$/);
-    if (m2) return { namePart: m2[1].trim(), weight: null, reps: parseInt(m2[2], 10) };
+    if (m2) return { namePart: m2[1].trim(), weight: null, reps: parseInt(m2[2], 10), rir: rir };
 
     return null;
   }
@@ -5646,6 +5652,7 @@ img, video, canvas, svg { max-width: 100%; }
     var priorLogs = state.logs[ex.id].slice();
     var entry = { weight: w, reps: reps, date: isoDate, variant: getSession(ex.id).activeVariant || null };
     if (parsed.plates != null) { entry.plates = parsed.plates; entry.extraLbs = parsed.extraLbs || 0; }
+    if (parsed.rir != null) { entry.rir = parsed.rir; }
     state.logs[ex.id].push(entry);
     state.logs[ex.id].sort(function(a, b) { return a.date.localeCompare(b.date); });
     state.currentEx = ex.id;
