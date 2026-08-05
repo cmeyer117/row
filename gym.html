@@ -2429,6 +2429,7 @@ img, video, canvas, svg { max-width: 100%; }
       <span class="po-day-split" id="dayPillSplit">—</span>
     </button>
     <button class="po-day-pill" type="button" id="quickLogToggle" title="Quick log a set">+ Log</button>
+    <button class="po-day-pill" type="button" id="plateCalcToggle" title="Plate calculator">🍽 Plates</button>
   </div>
 
   <!-- Week strip — read-only status/progress per rotation day, last 5 days
@@ -2449,6 +2450,25 @@ img, video, canvas, svg { max-width: 100%; }
       <button class="import-btn" id="importBtn" type="button">Paste</button>
     </div>
     <div class="po-quick-feedback ql-hidden" id="quickLogFeedback"></div>
+  </div>
+
+  <!-- Plate Calculator Modal -->
+  <div class="sub-modal-bg" id="plateCalcModalBg">
+    <div class="sub-modal">
+      <div class="sub-modal-title">Plate Calculator</div>
+      <div class="po-checkin-row">
+        <div class="po-checkin-row-label">Target weight</div>
+        <input class="po-quick-input" id="plateCalcTarget" type="number" inputmode="decimal" placeholder="315" style="max-width:100px">
+      </div>
+      <div class="po-checkin-row">
+        <div class="po-checkin-row-label">Bar weight</div>
+        <input class="po-quick-input" id="plateCalcBar" type="number" inputmode="decimal" placeholder="45" style="max-width:100px">
+      </div>
+      <div class="po-empty" id="plateCalcResult" style="padding:16px 0;font-size:15px;color:var(--text-1)"></div>
+      <div class="sub-modal-actions">
+        <button type="button" class="po-btn-secondary" id="plateCalcClose">Close</button>
+      </div>
+    </div>
   </div>
 
   <!-- Debrief Modal -->
@@ -5687,6 +5707,51 @@ img, video, canvas, svg { max-width: 100%; }
       }
     });
   })();
+
+  (function initPlateCalc() {
+    var toggle = $('plateCalcToggle');
+    var bg = $('plateCalcModalBg');
+    var targetInput = $('plateCalcTarget');
+    var barInput = $('plateCalcBar');
+    var result = $('plateCalcResult');
+    var BAR_KEY = 'plateCalc:barWeight';
+
+    function render() {
+      var target = parseFloat(targetInput.value);
+      var bar = parseFloat(barInput.value) || 45;
+      if (!target || target <= 0) {
+        result.textContent = 'Enter a target weight.';
+        return;
+      }
+      var r = window.PlateCalc.weightToPlates(target, bar);
+      if (!r.perSide.length) {
+        result.textContent = 'Bar only (' + bar + ' lb) — no plates needed.';
+        return;
+      }
+      var counts = {};
+      r.perSide.forEach(function (p) { counts[p] = (counts[p] || 0) + 1; });
+      var parts = Object.keys(counts).sort(function (a, b) { return b - a; })
+        .map(function (p) { return counts[p] + '×' + p; });
+      var text = parts.join(' + ') + ' per side';
+      if (r.leftover > 0) text += ' (+' + r.leftover + ' lb/side unmatched)';
+      result.textContent = text;
+    }
+
+    toggle.addEventListener('click', function () {
+      var savedBar = localStorage.getItem(BAR_KEY);
+      if (savedBar) barInput.value = savedBar;
+      bg.classList.add('show');
+      render();
+    });
+    targetInput.addEventListener('input', render);
+    barInput.addEventListener('input', function () {
+      localStorage.setItem(BAR_KEY, barInput.value || '45');
+      render();
+    });
+    $('plateCalcClose').addEventListener('click', function () {
+      bg.classList.remove('show');
+    });
+  })();
   // ============================================================
 
   // ============================================================
@@ -6225,6 +6290,7 @@ img, video, canvas, svg { max-width: 100%; }
 <script src="gym-weight-photos.js"></script>
 <script src="gym-workout-events.js"></script>
 <script src="gym-season-logic.js"></script>
+<script src="plate-calc.js"></script>
 <script src="gym-state-merge-logic.js"></script>
 <script src="hype-audio.js"></script>
 <script>
