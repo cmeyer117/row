@@ -280,6 +280,28 @@ body::after {
 
 .tile-spark { width: 64px; height: 22px; display: block; position: relative; z-index: 6; }
 
+.steps-quick {
+  display: flex; align-items: center; gap: 10px;
+  margin: 0 0 20px;
+  padding: 10px 16px;
+  border-radius: 14px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.06);
+  font-family: var(--font-mono); font-size: 12px;
+}
+.steps-quick-label { color: var(--text-tertiary); letter-spacing: 0.04em; }
+.steps-quick input {
+  width: 70px; background: transparent; border: none; border-bottom: 1px solid rgba(255,255,255,0.12);
+  color: var(--text-primary); font-family: var(--font-mono); font-size: 13px; padding: 2px 4px; outline: none;
+}
+.steps-quick button {
+  background: rgba(110,231,183,0.12); color: #6EE7B7; border: 1px solid rgba(110,231,183,0.25);
+  border-radius: 999px; padding: 4px 12px; font-family: var(--font-mono); font-size: 11px; font-weight: 700;
+  cursor: pointer;
+}
+.steps-quick-saved { color: var(--accent); opacity: 0; transition: opacity 0.3s; }
+.steps-quick-saved.show { opacity: 1; }
+
 /* ===== Responsive ===== */
 @media (max-width: 720px) {
   .bento {
@@ -322,6 +344,13 @@ body::after {
       <h1 class="hero-greeting" id="greeting">Good day</h1>
       <p class="hero-date" id="today-date"></p>
     </div>
+  </div>
+
+  <div class="steps-quick" id="stepsQuick">
+    <span class="steps-quick-label">Steps today</span>
+    <input type="number" inputmode="numeric" id="stepsQuickInput" placeholder="8000">
+    <button type="button" id="stepsQuickSave">Save</button>
+    <span class="steps-quick-saved" id="stepsQuickSaved">Saved</span>
   </div>
 
   <div class="bento">
@@ -478,6 +507,44 @@ body::after {
         '<circle class="tile-node" cx="' + last[0] + '" cy="' + last[1] + '" r="2.2" />';
     }
   } catch (e) {}
+
+  // Steps quick-entry — writes directly into gym.html's own po_coach_v1
+  // blob (the same checkins object the post-workout modal writes) so it
+  // feeds getRx()/Weekly Coach's Read through the one existing pipeline,
+  // rather than a separate silo. Only gym.html owns the Supabase push for
+  // that key, so this shows up locally right away and syncs out passively
+  // next time gym.html itself is opened on this device.
+  (function initStepsQuick() {
+    const input = document.getElementById('stepsQuickInput');
+    const saveBtn = document.getElementById('stepsQuickSave');
+    const saved = document.getElementById('stepsQuickSaved');
+    function todayKey() {
+      const d = new Date();
+      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    }
+    function loadExisting() {
+      try {
+        const state = JSON.parse(localStorage.getItem('po_coach_v1') || '{}');
+        const existing = state.checkins && state.checkins[todayKey()];
+        if (existing && existing.steps != null) input.value = existing.steps;
+      } catch (e) {}
+    }
+    saveBtn.addEventListener('click', function () {
+      const val = parseInt(input.value, 10);
+      if (!val || val <= 0) return;
+      try {
+        const state = JSON.parse(localStorage.getItem('po_coach_v1') || '{}');
+        if (!state.checkins) state.checkins = {};
+        const dk = todayKey();
+        const existing = state.checkins[dk] || { pain: null, recovery: null, pump: null, steps: null };
+        state.checkins[dk] = Object.assign({}, existing, { steps: val });
+        localStorage.setItem('po_coach_v1', JSON.stringify(state));
+        saved.classList.add('show');
+        setTimeout(function () { saved.classList.remove('show'); }, 2000);
+      } catch (e) {}
+    });
+    loadExisting();
+  })();
 })();
 </script>
 </body>
