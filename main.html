@@ -614,6 +614,21 @@ body::after {
 @media (max-width: 480px) {
   body { padding: max(20px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) 50px max(14px, env(safe-area-inset-left)); }
   .gm-card { padding: 16px; }
+.ml-eyebrow { font-size: 10.5px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: var(--text-tertiary); margin-bottom: 6px; }
+.ml-sub { font-size: 12px; color: var(--text-tertiary); margin: 6px 0; }
+.ml-phase-title { font-size: 16px; font-weight: 700; color: var(--text-primary); margin-bottom: 10px; }
+.ml-prompt { display: block; font-size: 13px; color: var(--text-secondary); margin: 10px 0 6px; }
+.ml-textarea { width: 100%; min-height: 70px; resize: vertical; font-family: inherit; }
+.ml-actions { display: flex; align-items: center; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+.ml-error { color: var(--danger); font-size: 12px; }
+.ml-error:empty { display: none; }
+.ml-ifthen { margin-top: 10px; padding: 10px 12px; border-radius: 12px; background: rgba(255,255,255,0.05); font-size: 13px; color: var(--text-primary); }
+.ml-outcome-list { display: flex; flex-direction: column; gap: 8px; margin: 10px 0; }
+.ml-outcome-item { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-primary); }
+.ml-outcome-edit-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.ml-mover-row { border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 12px; margin-bottom: 12px; display: flex; flex-direction: column; gap: 8px; }
+.ml-skip-btn { background: transparent; border: 1px solid rgba(255,255,255,0.14); color: var(--text-tertiary); border-radius: 10px; padding: 8px 14px; font-size: 12px; cursor: pointer; }
+.ml-evening { margin-top: 16px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.08); display: flex; flex-direction: column; gap: 8px; }
   .gm-progress-num { font-size: 36px; }
 }
 
@@ -830,6 +845,9 @@ body::after {
   <div class="section" style="margin-top:22px;">
     <div class="section-title">To Do List</div>
 
+    <!-- MORNING LAUNCH -->
+    <div class="gm-card ml-card" id="mlCard"></div>
+
     <!-- TODAY -->
     <div class="gm-card" id="gmCardToday">
       <div class="gm-header">
@@ -881,6 +899,7 @@ body::after {
 
 </div>
 
+<script src="morning-launch-logic.js"></script>
 <script>
 (function () {
   'use strict';
@@ -898,6 +917,7 @@ body::after {
       window.dispatchEvent(new CustomEvent('goals-changed'));
     }
   }
+  function newId(prefix) { return (prefix || 'id') + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
   function storeDelete(key) { try { localStorage.removeItem(key); } catch (e) {} }
   function storeListKeys(prefix) {
     const out = [];
@@ -953,10 +973,13 @@ body::after {
     storeListKeys('goals:').forEach(k => {
       const dateStr = k.slice('goals:'.length);
       if (dateStr >= todayDateStr) return;
-      const old = getGoals(k);
+      // Deterministic legacy IDs (not random newId()) so two devices that
+      // roll the same untagged goal forward before syncing converge on the
+      // same ID instead of colliding under sync's merge-by-ID.
+      const old = (window.MorningLaunchLogic ? window.MorningLaunchLogic.upgradeGoalsWithIds(getGoals(k), k) : getGoals(k));
       old.forEach(g => {
         if (!g.done && g.text && !texts.has(g.text)) {
-          today.push({ text: g.text, done: false });
+          today.push({ text: g.text, done: false, id: g.id });
           texts.add(g.text);
         }
       });
@@ -1240,6 +1263,7 @@ body::after {
       if (cb.checked) list[idx].doneAt = Date.now();
       else delete list[idx].doneAt;
       setGoals(key, list);
+      if (typeof mlReconcileTodayCheck === 'function') mlReconcileTodayCheck(key, list[idx].id, cb.checked);
       reload();
     });
     li.appendChild(cb);
@@ -1363,7 +1387,11 @@ body::after {
   }
 
   function loadToday() {
-    const goals = getGoals(todayKey());
+    let goals = getGoals(todayKey());
+    if (window.MorningLaunchLogic) {
+      const upgraded = window.MorningLaunchLogic.upgradeGoalsWithIds(goals, todayKey());
+      if (upgraded.some((g, i) => g !== goals[i])) { setGoals(todayKey(), upgraded); goals = upgraded; }
+    }
     renderListInto(goals, document.getElementById('goalList'), document.getElementById('emptyState'), todayKey(), false);
   }
   function loadTomorrow() {
@@ -1411,7 +1439,7 @@ body::after {
   function makeAddHandlers(input, addBtn, polishBtn, key, statusEl, reload) {
     function plainAdd(text) {
       const list = getGoals(key);
-      list.push({ text, done: false });
+      list.push({ text, done: false, id: newId('g') });
       setGoals(key, list);
       input.value = '';
       reload();
@@ -1580,6 +1608,583 @@ body::after {
 
   dtRender();
 
+  // ---------- Morning Launch ----------
+  // ponytail: one card, rebuilt on every structural change (same pattern
+  // as dtRender/renderListInto elsewhere in this file). Draft field inputs
+  // save quietly (storeSet only, no re-render) so typing doesn't lose
+  // focus/cursor; only phase transitions, mode switches, and checkbox
+  // toggles trigger a full mlRender().
+  const ML_OUTCOMES_KEY = 'morning_outcomes_v1';
+  let mlExpanded = false;
+  let mlAlignRevealed = false;
+
+  function mlSessionKey() { return 'morning_launch:' + getActiveDateString(); }
+  function mlOutcomesLoad() {
+    const o = storeGet(ML_OUTCOMES_KEY);
+    return (o && Array.isArray(o.outcomes)) ? o : { outcomes: [], reviewedAt: null };
+  }
+  function mlOutcomesSave(o) { storeSet(ML_OUTCOMES_KEY, o); }
+  function mlSessionLoad() {
+    const s = storeGet(mlSessionKey());
+    return (s && s.version === 1) ? s : window.MorningLaunchLogic.newSession(getActiveDateString());
+  }
+  function mlSessionSaveQuiet(s) { storeSet(mlSessionKey(), s); }
+  function mlSessionSave(s) { storeSet(mlSessionKey(), s); mlRender(); }
+  function mlGoalsByDateKey() {
+    const map = {};
+    storeListKeys('goals:').forEach(k => { map[k] = getGoals(k); });
+    return map;
+  }
+
+  function el(tag, cls, text) {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;
+    return e;
+  }
+
+  function mlReconcileTodayCheck(goalDateKey, goalId, done) {
+    if (!goalId || !window.MorningLaunchLogic) return;
+    const session = mlSessionLoad();
+    if (session.status !== 'completed' || !Array.isArray(session.needleMovers)) return;
+    if (!session.needleMovers.some(m => m.goalDateKey === goalDateKey && m.goalId === goalId)) return;
+    session.needleMovers = window.MorningLaunchLogic.reconcileFromToday(session.needleMovers, goalDateKey, goalId, done);
+    mlSessionSave(session);
+  }
+
+  function mlToggleMoverDone(session, mover, done) {
+    const goals = getGoals(mover.goalDateKey);
+    const g = goals.find(x => x.id === mover.goalId);
+    if (g) {
+      g.done = done;
+      if (done) g.doneAt = Date.now(); else delete g.doneAt;
+      setGoals(mover.goalDateKey, goals);
+      if (mover.goalDateKey === todayKey()) loadToday();
+    }
+    session.needleMovers = window.MorningLaunchLogic.reconcileFromToday(session.needleMovers, mover.goalDateKey, mover.goalId, done);
+    mlSessionSave(session);
+  }
+
+  function mlRecreateMoverGoal(session, mover) {
+    const goals = getGoals(todayKey());
+    const newGoal = { id: newId('g'), text: mover.textSnapshot || 'Needle mover', done: !!mover.doneSnapshot };
+    goals.push(newGoal);
+    setGoals(todayKey(), goals);
+    session.needleMovers = session.needleMovers.map(m => m.id === mover.id
+      ? Object.assign({}, m, { goalDateKey: todayKey(), goalId: newGoal.id })
+      : m);
+    mlSessionSave(session);
+    loadToday();
+  }
+
+  function mlReplaceMoverGoal(session, mover, goal) {
+    session.needleMovers = session.needleMovers.map(m => m.id === mover.id
+      ? Object.assign({}, m, { goalDateKey: todayKey(), goalId: goal.id, textSnapshot: goal.text, doneSnapshot: !!goal.done })
+      : m);
+    mlSessionSave(session);
+  }
+
+  function mlHandleSkip() {
+    const reason = prompt('Quick reason for skipping today\'s launch?');
+    if (reason === null) return;
+    if (!reason.trim()) { alert('A short reason is required to skip.'); return; }
+    const session = mlSessionLoad();
+    session.status = 'skipped';
+    session.skipReason = reason.trim();
+    mlSessionSave(session);
+  }
+
+  function mlBuildEntry(session) {
+    const wrap = el('div', 'ml-entry');
+    wrap.appendChild(el('div', 'ml-eyebrow', 'Morning Launch'));
+    const started = session.currentPhase !== 'clear' || !!session.brainDump;
+    wrap.appendChild(el('div', 'ml-sub', started ? ('Continue where you left off — ' + session.currentPhase) : 'Estimated 10–15 minutes'));
+    const actions = el('div', 'ml-actions');
+    const startBtn = el('button', 'gm-add', started ? 'Continue Morning Launch' : 'Start Morning Launch');
+    startBtn.type = 'button';
+    startBtn.addEventListener('click', () => { mlExpanded = true; mlRender(); });
+    actions.appendChild(startBtn);
+    const skipBtn = el('button', 'ml-skip-btn', 'Skip today');
+    skipBtn.type = 'button';
+    skipBtn.addEventListener('click', mlHandleSkip);
+    actions.appendChild(skipBtn);
+    wrap.appendChild(actions);
+    return wrap;
+  }
+
+  function mlBuildSkipped(session) {
+    const wrap = el('div', 'ml-entry');
+    wrap.appendChild(el('div', 'ml-eyebrow', 'Morning Launch — skipped'));
+    wrap.appendChild(el('div', 'ml-sub', 'Reason: ' + (session.skipReason || '')));
+    const resumeBtn = el('button', 'gm-add', 'Resume Morning Launch');
+    resumeBtn.type = 'button';
+    resumeBtn.addEventListener('click', () => {
+      session.status = 'draft';
+      mlExpanded = true;
+      mlSessionSave(session);
+    });
+    wrap.appendChild(resumeBtn);
+    return wrap;
+  }
+
+  function mlNextButton(session, targetPhase, opts) {
+    opts = opts || {};
+    const wrap = el('div', 'ml-actions');
+    const err = el('div', 'ml-error');
+    const btn = el('button', 'gm-add', opts.label || 'Continue');
+    btn.type = 'button';
+    btn.addEventListener('click', () => {
+      if (opts.beforeAdvance) opts.beforeAdvance();
+      if (opts.extraValidate) {
+        const msg = opts.extraValidate();
+        if (msg) { err.textContent = msg; return; }
+      }
+      const check = window.MorningLaunchLogic.advancePhase(session, targetPhase);
+      if (!check.ok) { err.textContent = check.errors.join(' '); return; }
+      session.currentPhase = targetPhase;
+      mlSessionSave(session);
+    });
+    wrap.appendChild(btn);
+    wrap.appendChild(err);
+    return wrap;
+  }
+
+  function mlBuildClear(session) {
+    const wrap = el('div', 'ml-phase');
+    wrap.appendChild(el('div', 'ml-phase-title', 'Clear'));
+    wrap.appendChild(el('label', 'ml-prompt', 'What is occupying your mind right now?'));
+    const ta = document.createElement('textarea');
+    ta.className = 'gm-input ml-textarea';
+    ta.value = session.brainDump || '';
+    ta.setAttribute('aria-label', 'Brain dump');
+    ta.addEventListener('input', () => { session.brainDump = ta.value; mlSessionSaveQuiet(session); });
+    wrap.appendChild(ta);
+    wrap.appendChild(mlNextButton(session, 'align', {
+      beforeAdvance: () => { session.brainDump = ta.value; },
+      label: 'Continue to Align'
+    }));
+    return wrap;
+  }
+
+  function mlBuildOutcomesEditor(outcomesState) {
+    const wrap = el('div', 'ml-phase');
+    wrap.appendChild(el('div', 'ml-phase-title', 'Current Outcomes (up to 5 active)'));
+    const list = el('div', 'ml-outcome-list');
+    const rows = outcomesState.outcomes.map(o => Object.assign({}, o));
+    function redraw() {
+      list.innerHTML = '';
+      rows.forEach((o, idx) => {
+        const row = el('div', 'ml-outcome-edit-row');
+        const cb = document.createElement('input');
+        cb.type = 'checkbox'; cb.checked = !!o.active;
+        cb.addEventListener('change', () => { o.active = cb.checked; });
+        row.appendChild(cb);
+        const txt = document.createElement('input');
+        txt.type = 'text'; txt.className = 'gm-input'; txt.placeholder = 'Outcome text'; txt.value = o.text || '';
+        txt.addEventListener('input', () => { o.text = txt.value; });
+        row.appendChild(txt);
+        const del = el('button', 'goal-delete', '×');
+        del.type = 'button'; del.setAttribute('aria-label', 'Remove outcome');
+        del.addEventListener('click', () => { rows.splice(idx, 1); redraw(); });
+        row.appendChild(del);
+        list.appendChild(row);
+      });
+    }
+    redraw();
+    wrap.appendChild(list);
+    const addBtn = el('button', 'ml-skip-btn', '+ Add outcome');
+    addBtn.type = 'button';
+    addBtn.addEventListener('click', () => {
+      rows.push({ id: newId('outcome'), text: '', active: rows.filter(r => r.active).length < 5, order: rows.length });
+      redraw();
+    });
+    wrap.appendChild(addBtn);
+    const err = el('div', 'ml-error');
+    const saveBtn = el('button', 'gm-add', 'Save outcomes');
+    saveBtn.type = 'button';
+    saveBtn.addEventListener('click', () => {
+      const cleaned = rows.filter(o => o.text && o.text.trim()).map((o, i) => ({ id: o.id, text: o.text.trim(), active: !!o.active, order: i }));
+      const check = window.MorningLaunchLogic.validateOutcomes(cleaned);
+      if (!check.ok) { err.textContent = check.errors.join(' '); return; }
+      mlOutcomesSave({ outcomes: cleaned, reviewedAt: new Date().toISOString() });
+      mlRender();
+    });
+    wrap.appendChild(saveBtn);
+    wrap.appendChild(err);
+    return wrap;
+  }
+
+  function mlBuildAlign(session, outcomesState) {
+    const ML = window.MorningLaunchLogic;
+    const wrap = el('div', 'ml-phase');
+    wrap.appendChild(el('div', 'ml-phase-title', 'Align'));
+    wrap.appendChild(el('p', 'ml-prompt', 'Write shortened versions of your five current outcomes from memory.'));
+    const inputs = [];
+    const list = el('div', 'ml-outcome-list');
+    for (let i = 0; i < 5; i++) {
+      const inp = document.createElement('input');
+      inp.type = 'text'; inp.className = 'gm-input'; inp.placeholder = 'Outcome ' + (i + 1);
+      inp.value = (session.recalledOutcomes && session.recalledOutcomes[i]) || '';
+      inp.addEventListener('input', () => {
+        session.recalledOutcomes = inputs.map(x => x.value);
+        mlSessionSaveQuiet(session);
+      });
+      list.appendChild(inp);
+      inputs.push(inp);
+    }
+    wrap.appendChild(list);
+
+    if (!mlAlignRevealed) {
+      const submitBtn = el('button', 'gm-add', 'Reveal saved outcomes');
+      submitBtn.type = 'button';
+      submitBtn.addEventListener('click', () => {
+        session.recalledOutcomes = inputs.map(i => i.value.trim());
+        mlSessionSaveQuiet(session);
+        mlAlignRevealed = true;
+        mlRender();
+      });
+      wrap.appendChild(submitBtn);
+      return wrap;
+    }
+
+    const check = ML.validateOutcomes(outcomesState.outcomes);
+    if (!check.ok) {
+      wrap.appendChild(el('div', 'ml-error', check.errors.join(' ') + ' Edit your outcomes below.'));
+      wrap.appendChild(mlBuildOutcomesEditor(outcomesState));
+      return wrap;
+    }
+
+    const active = outcomesState.outcomes.filter(o => o.active).sort((a, b) => a.order - b.order);
+    wrap.appendChild(el('div', 'ml-sub', 'Your current outcomes — pick the one that matters most today:'));
+    const revealList = el('div', 'ml-outcome-list');
+    active.forEach(o => {
+      const row = el('label', 'ml-outcome-item');
+      const radio = document.createElement('input');
+      radio.type = 'radio'; radio.name = 'mlFocusOutcome'; radio.value = o.id;
+      radio.checked = session.focusOutcomeId === o.id;
+      radio.addEventListener('change', () => { session.focusOutcomeId = o.id; mlSessionSaveQuiet(session); });
+      row.appendChild(radio);
+      row.appendChild(el('span', null, o.text));
+      revealList.appendChild(row);
+    });
+    wrap.appendChild(revealList);
+    wrap.appendChild(mlNextButton(session, 'visualize', {
+      extraValidate: () => session.focusOutcomeId ? null : 'Select the outcome that matters most today.',
+      label: 'Continue to Visualize'
+    }));
+    return wrap;
+  }
+
+  function mlBuildVisualize(session) {
+    const ML = window.MorningLaunchLogic;
+    const wrap = el('div', 'ml-phase');
+    wrap.appendChild(el('div', 'ml-phase-title', 'Visualize'));
+    wrap.appendChild(el('label', 'ml-prompt', 'What does doing the work successfully look like? Describe the process you will perform.'));
+    const pv = document.createElement('textarea');
+    pv.className = 'gm-input ml-textarea'; pv.value = session.processVisualization || '';
+    pv.addEventListener('input', () => { session.processVisualization = pv.value; mlSessionSaveQuiet(session); });
+    wrap.appendChild(pv);
+
+    wrap.appendChild(el('label', 'ml-prompt', 'What internal obstacle is most likely to interfere?'));
+    const ob = document.createElement('input');
+    ob.type = 'text'; ob.className = 'gm-input'; ob.value = session.obstacle || '';
+    ob.addEventListener('input', () => { session.obstacle = ob.value; mlSessionSaveQuiet(session); refreshSentence(); });
+    wrap.appendChild(ob);
+
+    wrap.appendChild(el('label', 'ml-prompt', 'If that happens, what exactly will you do?'));
+    const rs = document.createElement('input');
+    rs.type = 'text'; rs.className = 'gm-input'; rs.value = session.response || '';
+    rs.addEventListener('input', () => { session.response = rs.value; mlSessionSaveQuiet(session); refreshSentence(); });
+    wrap.appendChild(rs);
+
+    const sentence = el('div', 'ml-ifthen', ML.formatIfThen(session.obstacle, session.response) || 'Fill in both fields to see your if-then plan.');
+    function refreshSentence() { sentence.textContent = ML.formatIfThen(ob.value, rs.value) || 'Fill in both fields to see your if-then plan.'; }
+    wrap.appendChild(sentence);
+
+    const confirmLabel = el('label', 'ml-outcome-item');
+    const confirmCb = document.createElement('input');
+    confirmCb.type = 'checkbox';
+    confirmCb.checked = !!(session.obstacle && session.response);
+    confirmLabel.appendChild(confirmCb);
+    confirmLabel.appendChild(el('span', null, 'I confirm this if-then plan'));
+    wrap.appendChild(confirmLabel);
+
+    wrap.appendChild(mlNextButton(session, 'commit', {
+      beforeAdvance: () => {
+        session.processVisualization = pv.value;
+        session.obstacle = ob.value;
+        session.response = rs.value;
+      },
+      extraValidate: () => confirmCb.checked ? null : 'Confirm the if-then plan before continuing.',
+      label: 'Continue to Commit'
+    }));
+    return wrap;
+  }
+
+  function mlEmptyMoverDraft(order) {
+    return { id: newId('mover'), mode: 'existing', goalDateKey: '', goalId: '', newText: '', outcomeId: '', definitionOfDone: '', firstAction: '', estimatedMinutes: 30, order: order, textSnapshot: '', doneSnapshot: false };
+  }
+  function mlMoverLabel(m) { return m.mode === 'new' ? m.newText : (m.textSnapshot || (m.goalId ? '(selected task)' : '')); }
+
+  function mlBuildMoverEditor(session, m, idx, activeOutcomes, todayGoals, usedGoalIds) {
+    const box = el('div', 'ml-mover-row');
+    box.appendChild(el('div', 'ml-eyebrow', 'Needle mover ' + (idx + 1)));
+
+    const modeWrap = el('div', 'ml-actions');
+    ['existing', 'new'].forEach(mode => {
+      const label = document.createElement('label');
+      const radio = document.createElement('input');
+      radio.type = 'radio'; radio.name = 'mlMode' + idx; radio.value = mode; radio.checked = m.mode === mode;
+      radio.addEventListener('change', () => { m.mode = mode; mlSessionSaveQuiet(session); mlRender(); });
+      label.appendChild(radio);
+      label.appendChild(document.createTextNode(mode === 'existing' ? ' Pick from Today' : ' Create new'));
+      modeWrap.appendChild(label);
+    });
+    box.appendChild(modeWrap);
+
+    if (m.mode === 'existing') {
+      const sel = document.createElement('select');
+      sel.className = 'gm-input';
+      const blank = document.createElement('option'); blank.value = ''; blank.textContent = 'Select a task…'; sel.appendChild(blank);
+      todayGoals.forEach(g => {
+        if (usedGoalIds.has(g.id) && g.id !== m.goalId) return;
+        const opt = document.createElement('option'); opt.value = g.id; opt.textContent = g.text;
+        if (g.id === m.goalId) opt.selected = true;
+        sel.appendChild(opt);
+      });
+      sel.addEventListener('change', () => {
+        m.goalId = sel.value;
+        m.goalDateKey = todayKey();
+        const g = todayGoals.find(x => x.id === sel.value);
+        m.textSnapshot = g ? g.text : '';
+        m.doneSnapshot = g ? !!g.done : false;
+        mlSessionSaveQuiet(session);
+      });
+      box.appendChild(sel);
+    } else {
+      const inp = document.createElement('input');
+      inp.type = 'text'; inp.className = 'gm-input'; inp.placeholder = 'New needle mover text'; inp.value = m.newText || '';
+      inp.addEventListener('input', () => { m.newText = inp.value; mlSessionSaveQuiet(session); });
+      box.appendChild(inp);
+    }
+
+    const outSel = document.createElement('select');
+    outSel.className = 'gm-input';
+    const blankOut = document.createElement('option'); blankOut.value = ''; blankOut.textContent = 'Linked outcome…'; outSel.appendChild(blankOut);
+    activeOutcomes.forEach(o => {
+      const opt = document.createElement('option'); opt.value = o.id; opt.textContent = o.text;
+      if (o.id === m.outcomeId) opt.selected = true;
+      outSel.appendChild(opt);
+    });
+    outSel.addEventListener('change', () => { m.outcomeId = outSel.value; mlSessionSaveQuiet(session); });
+    box.appendChild(outSel);
+
+    const dod = document.createElement('input');
+    dod.type = 'text'; dod.className = 'gm-input'; dod.placeholder = 'Definition of done'; dod.value = m.definitionOfDone || '';
+    dod.addEventListener('input', () => { m.definitionOfDone = dod.value; mlSessionSaveQuiet(session); });
+    box.appendChild(dod);
+
+    const fa = document.createElement('input');
+    fa.type = 'text'; fa.className = 'gm-input'; fa.placeholder = 'First physical action'; fa.value = m.firstAction || '';
+    fa.addEventListener('input', () => { m.firstAction = fa.value; mlSessionSaveQuiet(session); });
+    box.appendChild(fa);
+
+    const est = document.createElement('input');
+    est.type = 'number'; est.min = '1'; est.className = 'gm-input'; est.placeholder = 'Estimated minutes'; est.value = m.estimatedMinutes || '';
+    est.addEventListener('input', () => { m.estimatedMinutes = parseInt(est.value, 10) || 0; mlSessionSaveQuiet(session); });
+    box.appendChild(est);
+
+    return box;
+  }
+
+  function mlResolveDraftMover(m) {
+    if (m.mode === 'new') {
+      if (!m.newText || !m.newText.trim()) return { error: 'Every needle mover needs text.' };
+      if (!m.goalId) {
+        const goals = getGoals(todayKey());
+        const newGoal = { id: newId('g'), text: m.newText.trim(), done: false };
+        goals.push(newGoal);
+        setGoals(todayKey(), goals);
+        m.goalId = newGoal.id;
+        m.goalDateKey = todayKey();
+        m.textSnapshot = newGoal.text;
+        m.doneSnapshot = false;
+      }
+    } else if (!m.goalId) {
+      return { error: 'Select an existing task for every needle mover, or switch to Create new.' };
+    }
+    if (!m.definitionOfDone || !m.definitionOfDone.trim()) return { error: 'Every needle mover needs a definition of done.' };
+    if (!m.firstAction || !m.firstAction.trim()) return { error: 'Every needle mover needs a first physical action.' };
+    return {
+      mover: {
+        id: m.id, goalDateKey: m.goalDateKey, goalId: m.goalId, outcomeId: m.outcomeId || null,
+        definitionOfDone: m.definitionOfDone.trim(), firstAction: m.firstAction.trim(),
+        estimatedMinutes: m.estimatedMinutes || 0, order: m.order,
+        textSnapshot: m.textSnapshot, doneSnapshot: !!m.doneSnapshot
+      }
+    };
+  }
+
+  function mlBuildCommit(session, outcomesState) {
+    const ML = window.MorningLaunchLogic;
+    const wrap = el('div', 'ml-phase');
+    wrap.appendChild(el('div', 'ml-phase-title', 'Commit'));
+    wrap.appendChild(el('p', 'ml-prompt', 'Choose or create three needle movers.'));
+
+    if (!Array.isArray(session.needleMovers) || session.needleMovers.length !== 3) {
+      session.needleMovers = [0, 1, 2].map(mlEmptyMoverDraft);
+      mlSessionSaveQuiet(session);
+    }
+    const movers = session.needleMovers;
+    const activeOutcomes = (outcomesState.outcomes || []).filter(o => o.active).sort((a, b) => a.order - b.order);
+    const todayGoals = getGoals(todayKey()).filter(g => !g.done);
+    const usedGoalIds = new Set(movers.filter(m => m.mode === 'existing' && m.goalId).map(m => m.goalId));
+
+    movers.forEach((m, idx) => wrap.appendChild(mlBuildMoverEditor(session, m, idx, activeOutcomes, todayGoals, usedGoalIds)));
+
+    const winWrap = el('div', 'ml-outcome-list');
+    winWrap.appendChild(el('div', 'ml-prompt', 'Win condition — which one matters most today?'));
+    movers.forEach(m => {
+      const row = el('label', 'ml-outcome-item');
+      const radio = document.createElement('input');
+      radio.type = 'radio'; radio.name = 'mlWinMover'; radio.value = m.id;
+      radio.checked = session.winMoverId === m.id;
+      radio.addEventListener('change', () => { session.winMoverId = m.id; mlSessionSaveQuiet(session); });
+      row.appendChild(radio);
+      row.appendChild(el('span', null, mlMoverLabel(m) || '(untitled mover)'));
+      winWrap.appendChild(row);
+    });
+    wrap.appendChild(winWrap);
+
+    const err = el('div', 'ml-error');
+    const completeBtn = el('button', 'gm-add', 'Complete Launch');
+    completeBtn.type = 'button';
+    completeBtn.addEventListener('click', () => {
+      const resolved = movers.map(m => mlResolveDraftMover(m));
+      const errors = resolved.map(r => r.error).filter(Boolean);
+      if (errors.length) { err.textContent = errors.join(' '); mlSessionSaveQuiet(session); return; }
+      const finalMovers = resolved.map(r => r.mover);
+      const result = ML.completeSession(session, outcomesState.outcomes, finalMovers, session.winMoverId);
+      if (!result.ok) { err.textContent = result.errors.join(' '); return; }
+      mlSessionSave(result.session);
+      loadToday();
+    });
+    wrap.appendChild(completeBtn);
+    wrap.appendChild(err);
+    return wrap;
+  }
+
+  function mlBuildCompleted(session) {
+    const ML = window.MorningLaunchLogic;
+    const wrap = el('div', 'ml-phase');
+    const summary = ML.summarize(session);
+    wrap.appendChild(el('div', 'ml-phase-title', 'Win: ' + (summary.winCondition || '—')));
+
+    const goalsByDateKey = mlGoalsByDateKey();
+    const list = el('ul', 'ml-outcome-list');
+    session.needleMovers.slice().sort((a, b) => a.order - b.order).forEach(m => {
+      const ref = ML.resolveMoverReference(m, goalsByDateKey);
+      const row = el('li', 'ml-outcome-item');
+      if (ref.status === 'missing') {
+        row.appendChild(el('span', 'ml-error', (m.textSnapshot || 'Needle mover') + ' — task unavailable.'));
+        const recreate = el('button', 'ml-skip-btn', 'Recreate');
+        recreate.type = 'button';
+        recreate.addEventListener('click', () => mlRecreateMoverGoal(session, m));
+        row.appendChild(recreate);
+        const replaceSel = document.createElement('select');
+        replaceSel.className = 'gm-input';
+        const blank = document.createElement('option'); blank.value = ''; blank.textContent = 'Replace with…'; replaceSel.appendChild(blank);
+        getGoals(todayKey()).forEach(g => {
+          const opt = document.createElement('option'); opt.value = g.id; opt.textContent = g.text; replaceSel.appendChild(opt);
+        });
+        replaceSel.addEventListener('change', () => {
+          if (!replaceSel.value) return;
+          const g = getGoals(todayKey()).find(x => x.id === replaceSel.value);
+          if (g) mlReplaceMoverGoal(session, m, g);
+        });
+        row.appendChild(replaceSel);
+      } else {
+        const cb = document.createElement('input');
+        cb.type = 'checkbox'; cb.checked = !!ref.goal.done;
+        cb.addEventListener('change', () => mlToggleMoverDone(session, m, cb.checked));
+        row.appendChild(cb);
+        row.appendChild(el('span', null, (m.textSnapshot || ref.goal.text) + (m.id === session.winMoverId ? ' ★' : '')));
+      }
+      list.appendChild(row);
+    });
+    wrap.appendChild(list);
+
+    wrap.appendChild(el('div', 'ml-sub', 'First action: ' + (summary.currentFirstAction || 'All movers complete.')));
+    wrap.appendChild(el('div', 'ml-ifthen', summary.ifThen));
+
+    const reviewBtn = el('button', 'ml-skip-btn', mlExpandedReview ? 'Hide launch details' : 'Review Launch');
+    reviewBtn.type = 'button';
+    reviewBtn.addEventListener('click', () => { mlExpandedReview = !mlExpandedReview; mlRender(); });
+    wrap.appendChild(reviewBtn);
+
+    if (mlExpandedReview) {
+      wrap.appendChild(el('div', 'ml-sub', 'Process visualization: ' + session.processVisualization));
+      const focus = (session.savedOutcomeSnapshot || []).find(o => o.id === session.focusOutcomeId);
+      wrap.appendChild(el('div', 'ml-sub', 'Focus outcome: ' + (focus ? focus.text : '—')));
+    }
+
+    const eveningEl = mlBuildEvening(session);
+    if (eveningEl) wrap.appendChild(eveningEl);
+
+    return wrap;
+  }
+  let mlExpandedReview = false;
+
+  function mlEveningDue() { return new Date().getHours() >= 17; }
+
+  function mlBuildEvening(session) {
+    if (!mlEveningDue()) return null;
+    const wrap = el('div', 'ml-evening');
+    wrap.appendChild(el('div', 'ml-phase-title', 'Evening Close (optional)'));
+    if (session.evening && session.evening.completedAt) {
+      wrap.appendChild(el('div', 'ml-sub', 'Moved: ' + session.evening.moved));
+      wrap.appendChild(el('div', 'ml-sub', 'Interfered: ' + session.evening.interference));
+      wrap.appendChild(el('div', 'ml-sub', 'Tomorrow: ' + session.evening.tomorrowChange));
+      return wrap;
+    }
+    const moved = document.createElement('input'); moved.type = 'text'; moved.className = 'gm-input'; moved.placeholder = 'What moved today?';
+    const interf = document.createElement('input'); interf.type = 'text'; interf.className = 'gm-input'; interf.placeholder = 'What interfered?';
+    const change = document.createElement('input'); change.type = 'text'; change.className = 'gm-input'; change.placeholder = 'What changes tomorrow?';
+    [moved, interf, change].forEach(i => wrap.appendChild(i));
+    const saveBtn = el('button', 'gm-add', 'Save evening close');
+    saveBtn.type = 'button';
+    saveBtn.addEventListener('click', () => {
+      session.evening = { moved: moved.value.trim(), interference: interf.value.trim(), tomorrowChange: change.value.trim(), completedAt: new Date().toISOString() };
+      mlSessionSave(session);
+    });
+    wrap.appendChild(saveBtn);
+    return wrap;
+  }
+
+  function mlRender() {
+    const card = document.getElementById('mlCard');
+    if (!card || !window.MorningLaunchLogic) return;
+    const outcomesState = mlOutcomesLoad();
+    const session = mlSessionLoad();
+    card.innerHTML = '';
+
+    if (session.status === 'skipped') { card.appendChild(mlBuildSkipped(session)); return; }
+    if (session.status === 'completed') { card.appendChild(mlBuildCompleted(session)); return; }
+    if (!mlExpanded) { card.appendChild(mlBuildEntry(session)); return; }
+
+    if (session.currentPhase === 'align') {
+      mlAlignRevealed = mlAlignRevealed || (Array.isArray(session.recalledOutcomes) && session.recalledOutcomes.length === 5);
+    } else {
+      mlAlignRevealed = false;
+    }
+
+    if (session.currentPhase === 'clear') card.appendChild(mlBuildClear(session));
+    else if (session.currentPhase === 'align') card.appendChild(mlBuildAlign(session, outcomesState));
+    else if (session.currentPhase === 'visualize') card.appendChild(mlBuildVisualize(session));
+    else if (session.currentPhase === 'commit') card.appendChild(mlBuildCommit(session, outcomesState));
+    else card.appendChild(mlBuildEntry(session));
+  }
+
   // ---------- Boot ----------
   rollover();
   processStreak();
@@ -1589,10 +2194,11 @@ body::after {
   updateDayRing();
   setInterval(updateDayRing, 60 * 1000);
   startTicker();
+  mlRender();
 
   // Re-render when storage changes from another tab (or our bridged parent).
   window.addEventListener('storage', () => {
-    loadToday(); loadTomorrow(); renderStreak();
+    loadToday(); loadTomorrow(); renderStreak(); mlRender();
   });
 })();
 </script>
@@ -1601,7 +2207,8 @@ document.addEventListener('DOMContentLoaded', function () {
   if (typeof initCloudSync !== 'function') return;
   initCloudSync({
     appKey: 'goals',
-    syncedPrefixes: ['goals:'],
+    syncedKeys: ['morning_outcomes_v1'],
+    syncedPrefixes: ['goals:', 'morning_launch:'],
     onApplied: function () {
       window.dispatchEvent(new CustomEvent('goals-changed'));
       window.dispatchEvent(new Event('storage'));
