@@ -2952,6 +2952,10 @@ img, video, canvas, svg { max-width: 100%; }
         <button type="button" class="po-checkin-btn" data-val="med">Med</button>
         <button type="button" class="po-checkin-btn" data-val="high">High</button>
       </div>
+      <div class="po-checkin-row">
+        <div class="po-checkin-row-label">Steps today</div>
+        <input class="po-quick-input" id="checkinSteps" type="number" inputmode="numeric" placeholder="8000" style="max-width:100px">
+      </div>
       <div class="sub-modal-actions">
         <button type="button" class="po-btn-secondary" id="checkinSkip">Skip</button>
         <button type="button" class="po-btn-primary" id="checkinSave">Save</button>
@@ -4691,6 +4695,7 @@ img, video, canvas, svg { max-width: 100%; }
     });
     function reset() {
       selections.pain = null; selections.recovery = null; selections.pump = null;
+      $('checkinSteps').value = '';
       bg.querySelectorAll('.po-checkin-btn').forEach(function(b) { b.classList.remove('selected'); });
     }
     $('checkinSkip').addEventListener('click', function() {
@@ -4698,12 +4703,14 @@ img, video, canvas, svg { max-width: 100%; }
       reset();
     });
     $('checkinSave').addEventListener('click', function() {
-      // Only record fields the user actually tapped — a partial check-in
-      // (e.g. pain + recovery, no pump opinion) is still useful data.
-      if (selections.pain || selections.recovery || selections.pump) {
+      // Only record fields the user actually tapped/filled — a partial
+      // check-in (e.g. pain + recovery, no pump opinion) is still useful data.
+      const stepsVal = $('checkinSteps').value;
+      const steps = stepsVal ? parseInt(stepsVal, 10) : null;
+      if (selections.pain || selections.recovery || selections.pump || steps) {
         const dateKey = getActiveDate();
         state.checkins[dateKey] = {
-          pain: selections.pain, recovery: selections.recovery, pump: selections.pump
+          pain: selections.pain, recovery: selections.recovery, pump: selections.pump, steps: steps
         };
         saveState();
       }
