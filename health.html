@@ -930,6 +930,265 @@ main {
 (() => {
   'use strict';
 
+  const _get = (k) => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } };
+  const _set = (k, v) => localStorage.setItem(k, JSON.stringify(v));
+
+  function upsertByDate(list, date, fields) {
+    const cleanFields = {};
+    Object.keys(fields).forEach((k) => {
+      if (fields[k] !== null && fields[k] !== undefined && fields[k] !== '') cleanFields[k] = fields[k];
+    });
+    if (Object.keys(cleanFields).length === 0) return list;
+    const existing = list.find((e) => e.date === date);
+    if (existing) {
+      Object.assign(existing, cleanFields);
+      return list;
+    }
+    return [...list, { date, ...cleanFields }].sort((a, b) => a.date.localeCompare(b.date));
+  }
+
+  function buildMiniSpark(vals, w, h) {
+    if (!vals.length) return '';
+    const min = Math.min(...vals), max = Math.max(...vals);
+    const range = max - min || 1;
+    const pad = 6;
+    const stepX = vals.length > 1 ? (w - pad * 2) / (vals.length - 1) : 0;
+    const points = vals.map((v, i) => {
+      const x = pad + i * stepX;
+      const y = h - pad - ((v - min) / range) * (h - pad * 2);
+      return x.toFixed(1) + ',' + y.toFixed(1);
+    });
+    return '<svg viewBox="0 0 ' + w + ' ' + h + '" xmlns="http://www.w3.org/2000/svg">' +
+      '<polyline fill="none" stroke="var(--text-primary)" stroke-width="2" points="' + points.join(' ') + '" />' +
+      '</svg>';
+  }
+
+  function hmSwitchTab(tab) {
+    ['vitals', 'labs', 'measurements', 'sleep'].forEach((t) => {
+      document.getElementById('hmView-' + t).hidden = t !== tab;
+    });
+    document.querySelectorAll('.hm-tab-btn').forEach((btn) => {
+      btn.classList.toggle('hm-tab-active', btn.dataset.hmTab === tab);
+    });
+  }
+
+  document.getElementById('hmTabs').addEventListener('click', (e) => {
+    const btn = e.target.closest('.hm-tab-btn');
+    if (btn) hmSwitchTab(btn.dataset.hmTab);
+  });
+
+  function getVitals() { return _get('health:vitals') || []; }
+  function setVitals(list) { _set('health:vitals', list); }
+
+  function renderVitals() {
+    const list = getVitals();
+    const listEl = document.getElementById('hmVitalsList');
+    listEl.innerHTML = list.slice().reverse().map((e) =>
+      '<div class="hm-list-row"><span>' + e.date + ' — HR ' + (e.restingHr ?? '—') +
+      ' · BP ' + (e.bpSystolic ?? '—') + '/' + (e.bpDiastolic ?? '—') +
+      '</span><span class="hm-list-del" data-del-date="' + e.date + '">✕</span></div>'
+    ).join('');
+
+    const metric = document.getElementById('hmVitalsMetric').value;
+    const vals = list.filter((e) => e[metric] != null).map((e) => e[metric]);
+    const chartEl = document.getElementById('hmVitalsChart');
+    chartEl.innerHTML = vals.length >= 2
+      ? buildMiniSpark(vals, 300, 90)
+      : '<div class="hm-chart-empty">Need 2+ entries for a trend</div>';
+  }
+
+  document.getElementById('hmVitalsAddBtn').addEventListener('click', () => {
+    const date = document.getElementById('hmVitalsDate').value || new Date().toISOString().slice(0, 10);
+    const fields = {
+      restingHr: document.getElementById('hmVitalsHr').value ? Number(document.getElementById('hmVitalsHr').value) : null,
+      bpSystolic: document.getElementById('hmVitalsSys').value ? Number(document.getElementById('hmVitalsSys').value) : null,
+      bpDiastolic: document.getElementById('hmVitalsDia').value ? Number(document.getElementById('hmVitalsDia').value) : null,
+    };
+    setVitals(upsertByDate(getVitals(), date, fields));
+    document.getElementById('hmVitalsHr').value = '';
+    document.getElementById('hmVitalsSys').value = '';
+    document.getElementById('hmVitalsDia').value = '';
+    renderVitals();
+  });
+
+  document.getElementById('hmVitalsMetric').addEventListener('change', renderVitals);
+
+  document.getElementById('hmVitalsList').addEventListener('click', (e) => {
+    const del = e.target.closest('[data-del-date]');
+    if (!del) return;
+    setVitals(getVitals().filter((entry) => entry.date !== del.dataset.delDate));
+    renderVitals();
+  });
+
+  renderVitals();
+
+  const LAB_MARKERS = [
+    ['totalT', 'Total Testosterone'], ['freeT', 'Free Testosterone'], ['shbg', 'SHBG'],
+    ['e2', 'Estradiol (E2)'], ['lh', 'LH'], ['prolactin', 'Prolactin'],
+    ['totalChol', 'Total Cholesterol'], ['ldl', 'LDL'], ['hdl', 'HDL'], ['trig', 'Triglycerides'],
+    ['glucose', 'Fasting Glucose'], ['a1c', 'A1C'], ['alt', 'ALT'], ['ast', 'AST'],
+    ['creatinine', 'Creatinine/eGFR'], ['hematocrit', 'Hematocrit/Hemoglobin'], ['psa', 'PSA'],
+  ];
+
+  function getLabs() { return _get('health:labs') || []; }
+  function setLabs(list) { _set('health:labs', list); }
+
+  function populateLabsChartDropdown() {
+    const sel = document.getElementById('hmLabsChartMarker');
+    if (sel.options.length) return;
+    sel.innerHTML = LAB_MARKERS.map(([k, label]) => '<option value="' + k + '">' + label + '</option>').join('');
+  }
+
+  function renderLabs() {
+    populateLabsChartDropdown();
+    const list = getLabs();
+    const listEl = document.getElementById('hmLabsList');
+    listEl.innerHTML = list.slice().reverse().map((e) => {
+      const parts = Object.keys(e.values || {}).map((k) => {
+        const label = (LAB_MARKERS.find(([mk]) => mk === k) || [k, k])[1];
+        return label + ': ' + e.values[k];
+      }).join(' · ');
+      return '<div class="hm-list-row"><span>' + e.date + ' — ' + parts +
+        '</span><span class="hm-list-del" data-del-date="' + e.date + '">✕</span></div>';
+    }).join('');
+
+    const marker = document.getElementById('hmLabsChartMarker').value;
+    const vals = list.filter((e) => e.values && e.values[marker] != null).map((e) => e.values[marker]);
+    const chartEl = document.getElementById('hmLabsChart');
+    chartEl.innerHTML = vals.length >= 2
+      ? buildMiniSpark(vals, 300, 90)
+      : '<div class="hm-chart-empty">Need 2+ entries for a trend</div>';
+  }
+
+  document.getElementById('hmLabsAddBtn').addEventListener('click', () => {
+    const date = document.getElementById('hmLabsDate').value || new Date().toISOString().slice(0, 10);
+    const marker = document.getElementById('hmLabsMarker').value;
+    const value = document.getElementById('hmLabsValue').value;
+    if (!value) return;
+    const list = getLabs();
+    const existing = list.find((e) => e.date === date);
+    if (existing) {
+      existing.values = existing.values || {};
+      existing.values[marker] = Number(value);
+    } else {
+      list.push({ date, values: { [marker]: Number(value) } });
+      list.sort((a, b) => a.date.localeCompare(b.date));
+    }
+    setLabs(list);
+    document.getElementById('hmLabsValue').value = '';
+    renderLabs();
+  });
+
+  document.getElementById('hmLabsChartMarker').addEventListener('change', renderLabs);
+
+  document.getElementById('hmLabsList').addEventListener('click', (e) => {
+    const del = e.target.closest('[data-del-date]');
+    if (!del) return;
+    setLabs(getLabs().filter((entry) => entry.date !== del.dataset.delDate));
+    renderLabs();
+  });
+
+  renderLabs();
+
+  function getMeasurements() { return _get('health:measurements') || []; }
+  function setMeasurements(list) { _set('health:measurements', list); }
+
+  function renderMeasurements() {
+    const list = getMeasurements();
+    const listEl = document.getElementById('hmMeasList');
+    listEl.innerHTML = list.slice().reverse().map((e) =>
+      '<div class="hm-list-row"><span>' + e.date +
+      ' — Waist ' + (e.waist ?? '—') + ' · Chest ' + (e.chest ?? '—') +
+      ' · Arms ' + (e.arms ?? '—') + ' · Thighs ' + (e.thighs ?? '—') +
+      '</span><span class="hm-list-del" data-del-date="' + e.date + '">✕</span></div>'
+    ).join('');
+
+    const metric = document.getElementById('hmMeasMetric').value;
+    const vals = list.filter((e) => e[metric] != null).map((e) => e[metric]);
+    const chartEl = document.getElementById('hmMeasChart');
+    chartEl.innerHTML = vals.length >= 2
+      ? buildMiniSpark(vals, 300, 90)
+      : '<div class="hm-chart-empty">Need 2+ entries for a trend</div>';
+  }
+
+  document.getElementById('hmMeasAddBtn').addEventListener('click', () => {
+    const date = document.getElementById('hmMeasDate').value || new Date().toISOString().slice(0, 10);
+    const fields = {
+      waist: document.getElementById('hmMeasWaist').value ? Number(document.getElementById('hmMeasWaist').value) : null,
+      chest: document.getElementById('hmMeasChest').value ? Number(document.getElementById('hmMeasChest').value) : null,
+      arms: document.getElementById('hmMeasArms').value ? Number(document.getElementById('hmMeasArms').value) : null,
+      thighs: document.getElementById('hmMeasThighs').value ? Number(document.getElementById('hmMeasThighs').value) : null,
+    };
+    setMeasurements(upsertByDate(getMeasurements(), date, fields));
+    ['hmMeasWaist', 'hmMeasChest', 'hmMeasArms', 'hmMeasThighs'].forEach((id) => { document.getElementById(id).value = ''; });
+    renderMeasurements();
+  });
+
+  document.getElementById('hmMeasMetric').addEventListener('change', renderMeasurements);
+
+  document.getElementById('hmMeasList').addEventListener('click', (e) => {
+    const del = e.target.closest('[data-del-date]');
+    if (!del) return;
+    setMeasurements(getMeasurements().filter((entry) => entry.date !== del.dataset.delDate));
+    renderMeasurements();
+  });
+
+  renderMeasurements();
+
+  function getSleep() { return _get('health:sleep') || []; }
+  function setSleep(list) { _set('health:sleep', list); }
+
+  function renderSleep() {
+    const list = getSleep();
+    const listEl = document.getElementById('hmSleepList');
+    listEl.innerHTML = list.slice().reverse().map((e) =>
+      '<div class="hm-list-row"><span>' + e.date +
+      ' — ' + (e.hours ?? '—') + 'h · quality ' + (e.quality ?? '—') +
+      '</span><span class="hm-list-del" data-del-date="' + e.date + '">✕</span></div>'
+    ).join('');
+
+    const metric = document.getElementById('hmSleepMetric').value;
+    const vals = list.filter((e) => e[metric] != null).map((e) => e[metric]);
+    const chartEl = document.getElementById('hmSleepChart');
+    chartEl.innerHTML = vals.length >= 2
+      ? buildMiniSpark(vals, 300, 90)
+      : '<div class="hm-chart-empty">Need 2+ entries for a trend</div>';
+  }
+
+  document.getElementById('hmSleepAddBtn').addEventListener('click', () => {
+    const date = document.getElementById('hmSleepDate').value || new Date().toISOString().slice(0, 10);
+    const fields = {
+      hours: document.getElementById('hmSleepHours').value ? Number(document.getElementById('hmSleepHours').value) : null,
+      quality: document.getElementById('hmSleepQuality').value ? Number(document.getElementById('hmSleepQuality').value) : null,
+    };
+    setSleep(upsertByDate(getSleep(), date, fields));
+    document.getElementById('hmSleepHours').value = '';
+    document.getElementById('hmSleepQuality').value = '';
+    renderSleep();
+  });
+
+  document.getElementById('hmSleepMetric').addEventListener('change', renderSleep);
+
+  document.getElementById('hmSleepList').addEventListener('click', (e) => {
+    const del = e.target.closest('[data-del-date]');
+    if (!del) return;
+    setSleep(getSleep().filter((entry) => entry.date !== del.dataset.delDate));
+    renderSleep();
+  });
+
+  renderSleep();
+
+  window.RowHealthMarkers = {
+    _get, _set, upsertByDate, buildMiniSpark,
+    rerenderAll: () => { renderVitals(); renderLabs(); renderMeasurements(); renderSleep(); }
+  };
+})();
+</script>
+
+<script>
+(() => {
+  'use strict';
+
   const storeGet = (k) => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } };
   const storeSet = (k, v) => localStorage.setItem(k, JSON.stringify(v));
 
