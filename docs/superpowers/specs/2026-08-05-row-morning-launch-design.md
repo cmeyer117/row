@@ -142,7 +142,9 @@ Key prefix: `morning_launch:` followed by the existing Eastern-time date key.
       "definitionOfDone": "string",
       "firstAction": "string",
       "estimatedMinutes": 60,
-      "order": 0
+      "order": 0,
+      "textSnapshot": "string",
+      "doneSnapshot": false
     }
   ],
   "winMoverId": "string",
@@ -158,7 +160,15 @@ Key prefix: `morning_launch:` followed by the existing Eastern-time date key.
 }
 ```
 
-Existing goal objects receive stable IDs when needed. Historical objects without IDs are lazily upgraded without changing their text or completion state.
+Existing goal objects receive stable IDs when needed. Historical objects without IDs are lazily upgraded without changing their text or completion state. Legacy IDs are derived deterministically from the goal's date key, text, and position rather than randomly, so two devices that independently upgrade the same untagged goal before syncing converge on the same ID instead of colliding under sync's merge-by-ID.
+
+Each mover's `textSnapshot`/`doneSnapshot` is written once at Commit (mover text) and refreshed on every reconciled completion change (done state) — they are the durable record the Vault export reads. The live command view still displays and reconciles through the `goalDateKey`/`goalId` reference so a single task record remains editable in one place; the snapshot exists only so history survives `rollover()` deleting or reconstructing old `goals:*` records. Later edits to the referenced task's text do not rewrite `textSnapshot`.
+
+`savedOutcomeSnapshot` is captured once, at Align confirmation (when the focus outcome is selected), and never updated afterward even if canonical outcomes change before Commit completes.
+
+A skipped session can resume the same day: resuming sets `status` back to `draft`, retains `skipReason` as historical metadata, and continues at the saved `currentPhase`.
+
+The evening-close threshold is a fixed local-time default of 17:00 for version one (no settings UI). "Eastern-time date key" means Row's existing `getActiveDateString()` convention (local device clock, 6 AM rollover) — not an explicit `America/New_York` conversion. Multi-timezone device use inherits this existing Row-wide limitation; Morning Launch does not add a new one.
 
 Drafts save after every input change. Sync must include both `morning_outcomes_v1` and the `morning_launch:` prefix in the existing Goals app state. Cloud-applied changes dispatch the existing Goals refresh path plus a Morning Launch-specific refresh event.
 
@@ -188,11 +198,11 @@ Extend the existing `row-vessel-vault-sync` scheduled workflow to export complet
 
 `Carl Meyer/11 - Personal Logs/Morning Launch/YYYY-MM Morning Launch Log.md`
 
-Each date appears at most once and contains:
+Each date appears at most once, marked by a hidden `<!-- morning-launch:YYYY-MM-DD -->` comment above its heading so the workflow can detect duplicates without depending on visible text formatting, and contains:
 
 - Status and completion time.
 - Focus outcome snapshot.
-- Win condition and three needle movers with completion state.
+- Win condition and three needle movers (from each mover's `textSnapshot`) with completion state (from `doneSnapshot`) — never a live lookup against `goals:*`, which rollover may have deleted or reconstructed by export time.
 - Process visualization.
 - If-then plan.
 - Evening close, when present.
