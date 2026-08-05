@@ -559,7 +559,13 @@ body::after {
       const items = JSON.parse(localStorage.getItem('stack:items') || 'null');
       const taken = JSON.parse(localStorage.getItem('stack:taken:' + activeDate) || 'null') || {};
       if (!Array.isArray(items) || !items.length) return;
-      document.getElementById('opsStackChip').textContent = Object.keys(taken).length + '/' + items.length + ' taken';
+      // Count via items.filter, not Object.keys(taken).length — matches
+      // health.html's own takenCount (line ~967). A stack template reset
+      // (TEMPLATE_VERSION bump) can leave stale ids in the taken map that
+      // no longer match any current item; a raw key count would inflate
+      // past items.length (e.g. "9/8 taken").
+      const takenCount = items.filter((i) => taken[i.id]).length;
+      document.getElementById('opsStackChip').textContent = takenCount + '/' + items.length + ' taken';
     } catch (e) {}
   })();
 
