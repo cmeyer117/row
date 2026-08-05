@@ -536,6 +536,13 @@ html, body {
       Right shoulder — torn posterior labrum. Right-side rotation significantly limited. Knees and elbows chronically aching. Posing (lat spread) affected by right-side restriction.
     </div>
 
+    <div class="mob-block-title">Pain Trend — Last 12 Weeks</div>
+    <div id="jointPainTrendWrap">
+      <svg id="jointPainTrendSvg" viewBox="0 0 300 80" style="width:100%;max-width:400px;display:block;margin:0 auto"></svg>
+      <div id="jointPainTrendLegend" style="display:flex;gap:16px;justify-content:center;font-size:12px;color:var(--text-2);margin-top:6px"></div>
+      <div id="jointPainTrendEmpty" class="mob-ex-note" style="display:none;text-align:center">No joint pain logged yet — log from the warm-up panel in the Fitness tab.</div>
+    </div>
+
     <div class="mob-block-title">Every Day — 5–8 Min (Training or Not)</div>
     <div class="mob-exercise-list">
       <div class="mob-ex-row">
@@ -1167,6 +1174,63 @@ html, body {
     });
   }
   swapPhotos(document);
+})();
+</script>
+<script>
+(function renderJointPainTrend() {
+  var JOINTS = [
+    { key: 'shoulder', color: '#6ee7b7', label: 'Shoulder' },
+    { key: 'elbow', color: '#fbbf24', label: 'Elbow' },
+    { key: 'knee', color: '#ff8a8a', label: 'Knee' }
+  ];
+  var svg = document.getElementById('jointPainTrendSvg');
+  var legend = document.getElementById('jointPainTrendLegend');
+  var empty = document.getElementById('jointPainTrendEmpty');
+  var wrap = document.getElementById('jointPainTrendWrap');
+
+  var raw;
+  try { raw = JSON.parse(localStorage.getItem('po_coach_v1') || 'null'); } catch (e) { raw = null; }
+  var entries = (raw && Array.isArray(raw.jointPain)) ? raw.jointPain : [];
+
+  var cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - 84); // 12 weeks
+  var cutoffKey = cutoff.toISOString().slice(0, 10);
+  entries = entries.filter(function (e) { return e.date >= cutoffKey; });
+
+  if (!entries.length) {
+    svg.style.display = 'none';
+    legend.style.display = 'none';
+    empty.style.display = 'block';
+    return;
+  }
+
+  var W = 300, H = 80, pad = 6;
+  var paths = [];
+  JOINTS.forEach(function (joint) {
+    var pts = entries.filter(function (e) { return e.joint === joint.key; })
+      .sort(function (a, b) { return a.date.localeCompare(b.date); });
+    if (pts.length < 2) return;
+    var coords = pts.map(function (p, i) {
+      var x = pad + (W - pad * 2) * (i / (pts.length - 1));
+      var y = H - pad - (H - pad * 2) * (p.severity / 10);
+      return x.toFixed(1) + ' ' + y.toFixed(1);
+    });
+    var d = coords.map(function (c, i) { return (i === 0 ? 'M' : 'L') + c; }).join(' ');
+    paths.push('<path d="' + d + '" stroke="' + joint.color + '" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>');
+  });
+
+  if (!paths.length) {
+    svg.style.display = 'none';
+    legend.style.display = 'none';
+    empty.style.display = 'block';
+    empty.textContent = 'Not enough joint pain entries yet to chart a trend (need 2+ per joint).';
+    return;
+  }
+
+  svg.innerHTML = paths.join('');
+  legend.innerHTML = JOINTS.map(function (j) {
+    return '<span style="color:' + j.color + '">● ' + j.label + '</span>';
+  }).join('');
 })();
 </script>
 </body>
