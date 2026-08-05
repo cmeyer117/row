@@ -4383,7 +4383,14 @@ img, video, canvas, svg { max-width: 100%; }
       });
     });
 
-    var allEx = (state.exercises || []).concat(getAllAdhocExercises());
+    // Dedup by id, matching renderProgress()'s existing guard — an adhoc
+    // exercise's id is generated fresh per creation so this is defensive
+    // (not a known-active collision path), but costs nothing and keeps
+    // this function's adhoc-merging behavior consistent with Progress's.
+    var allEx = (state.exercises || []).slice();
+    getAllAdhocExercises().forEach(function(ex) {
+      if (!allEx.find(function(e) { return e.id === ex.id; })) allEx.push(ex);
+    });
     var weeks = window.GymVolumeLogic.weeklyVolumeByDay(allEx, state.logs || {}, volFilter, 10);
     var vals = weeks.map(function(w) { return w.totalVol; });
     var nonZeroWeeks = weeks.filter(function(w) { return w.totalVol > 0; });
