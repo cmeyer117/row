@@ -36,4 +36,9 @@ assertDeepEqual(weightToPlates(35, 45), { perSide: [], leftover: 0 }, 'below bar
 // Odd total that can't be split evenly leaves a leftover (1lb/side, no plate that small).
 assertDeepEqual(weightToPlates(227, 45), { perSide: [45, 45], leftover: 1 }, '227 total leaves 1lb unaccounted per side');
 
+// Sub-integer residual: 226 total, 45 bar -> 181 to load -> 90.5/side -> 45+45=90,
+// 0.5lb/side left over. Must NOT be floored to 0 -- that would silently report
+// this as an exact match when it's actually 1lb short across the whole bar.
+assertDeepEqual(weightToPlates(226, 45), { perSide: [45, 45], leftover: 0.5 }, '226 total leaves a 0.5lb/side residual, not silently rounded to exact');
+
 console.log('plate-calc.selfcheck.cjs: all assertions passed');

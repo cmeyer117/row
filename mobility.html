@@ -1205,13 +1205,21 @@ html, body {
   }
 
   var W = 300, H = 80, pad = 6;
+  // Points are placed by actual date within the 12-week window, not by array
+  // index -- otherwise two entries a day apart and a third eleven weeks later
+  // would render evenly spaced, misrepresenting the trend's real timing.
+  var cutoffTime = cutoff.getTime();
+  var windowMs = Date.now() - cutoffTime;
   var paths = [];
   JOINTS.forEach(function (joint) {
     var pts = entries.filter(function (e) { return e.joint === joint.key; })
       .sort(function (a, b) { return a.date.localeCompare(b.date); });
     if (pts.length < 2) return;
-    var coords = pts.map(function (p, i) {
-      var x = pad + (W - pad * 2) * (i / (pts.length - 1));
+    var coords = pts.map(function (p) {
+      var entryTime = new Date(p.date + 'T12:00:00').getTime();
+      var frac = windowMs > 0 ? (entryTime - cutoffTime) / windowMs : 0;
+      frac = Math.max(0, Math.min(1, frac));
+      var x = pad + (W - pad * 2) * frac;
       var y = H - pad - (H - pad * 2) * (p.severity / 10);
       return x.toFixed(1) + ' ' + y.toFixed(1);
     });

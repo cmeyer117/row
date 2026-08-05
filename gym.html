@@ -2160,18 +2160,6 @@ img, video, canvas, svg { max-width: 100%; }
   opacity: 1;
   transition: opacity 0.4s;
 }
-.po-rest-timer {
-  position: fixed; left: 50%; bottom: 84px; transform: translateX(-50%);
-  display: flex; align-items: center; gap: 10px;
-  background: var(--bg-card); border: 1px solid var(--border-strong);
-  border-radius: 999px; padding: 8px 14px; z-index: 8000;
-  font-family: var(--font-mono); font-size: 14px; color: var(--text-1);
-}
-.po-rest-timer button {
-  background: none; border: none; color: var(--text-2); font-size: 13px;
-  padding: 2px 6px; cursor: pointer;
-}
-.po-rest-timer.flash { border-color: var(--accent); color: var(--accent); }
 .po-quick-feedback.error { color: var(--bad); }
 .po-quick-feedback.ql-hidden { opacity: 0; }
 
@@ -2462,14 +2450,6 @@ img, video, canvas, svg { max-width: 100%; }
       <button class="import-btn" id="importBtn" type="button">Paste</button>
     </div>
     <div class="po-quick-feedback ql-hidden" id="quickLogFeedback"></div>
-  </div>
-
-  <!-- Rest Timer (hidden until a set is logged) -->
-  <div class="po-rest-timer" id="restTimer" style="display:none">
-    <span id="restTimerLabel">2:30</span>
-    <button type="button" id="restTimerMinus">−30s</button>
-    <button type="button" id="restTimerPlus">+30s</button>
-    <button type="button" id="restTimerDismiss">×</button>
   </div>
 
   <!-- Plate Calculator Modal -->
@@ -4703,21 +4683,42 @@ img, video, canvas, svg { max-width: 100%; }
       reset();
     });
     $('checkinSave').addEventListener('click', function() {
-      // Only record fields the user actually tapped/filled — a partial
-      // check-in (e.g. pain + recovery, no pump opinion) is still useful data.
+      // Only record fields the user actually tapped/filled this time — merge
+      // into any existing same-day entry so reopening the modal later (e.g.
+      // just to add steps) doesn't clobber an already-saved pain/recovery/pump
+      // rating back to null.
       const stepsVal = $('checkinSteps').value;
       const steps = stepsVal ? parseInt(stepsVal, 10) : null;
-      if (selections.pain || selections.recovery || selections.pump || steps) {
+      if (selections.pain != null || selections.recovery != null || selections.pump != null || steps != null) {
         const dateKey = getActiveDate();
+        const existing = state.checkins[dateKey] || {};
         state.checkins[dateKey] = {
-          pain: selections.pain, recovery: selections.recovery, pump: selections.pump, steps: steps
+          pain: selections.pain != null ? selections.pain : (existing.pain != null ? existing.pain : null),
+          recovery: selections.recovery != null ? selections.recovery : (existing.recovery != null ? existing.recovery : null),
+          pump: selections.pump != null ? selections.pump : (existing.pump != null ? existing.pump : null),
+          steps: steps != null ? steps : (existing.steps != null ? existing.steps : null)
         };
         saveState();
       }
       bg.classList.remove('show');
       reset();
     });
-    window.__gym_openCheckinModal = function() { bg.classList.add('show'); };
+    window.__gym_openCheckinModal = function() {
+      // Pre-populate from any existing same-day entry so reopening shows
+      // what's already saved instead of a blank form.
+      const existing = state.checkins[getActiveDate()];
+      if (existing) {
+        ['pain', 'recovery', 'pump'].forEach(function(field) {
+          if (existing[field] == null) return;
+          selections[field] = existing[field];
+          const row = bg.querySelector('.po-checkin-row[data-checkin-field="' + field + '"]');
+          const btn = row && row.querySelector('.po-checkin-btn[data-val="' + existing[field] + '"]');
+          if (btn) btn.classList.add('selected');
+        });
+        if (existing.steps != null) $('checkinSteps').value = existing.steps;
+      }
+      bg.classList.add('show');
+    };
   })();
   $('poTwPastToggle').addEventListener('click', () => {
     const body = $('poTwPastBody');
@@ -5685,10 +5686,13 @@ img, video, canvas, svg { max-width: 100%; }
     state.currentEx = ex.id;
     saveState(); renderAll();
     if (typeof wtRender === 'function') wtRender();
-    if (window.GymWorkoutEvents && window.__gym && typeof window.__gym.logWorkoutEvent === 'function') {
-      var eventType = window.GymWorkoutEvents.classifyWorkoutEvent({ weight: w, reps: reps }, priorLogs, ex);
-      if (eventType) window.__gym.logWorkoutEvent(ex.name, eventType, w, reps, !!ex.bw);
+    var eventType = window.GymWorkoutEvents
+      ? window.GymWorkoutEvents.classifyWorkoutEvent({ weight: w, reps: reps }, priorLogs, ex)
+      : null;
+    if (eventType && window.__gym && typeof window.__gym.logWorkoutEvent === 'function') {
+      window.__gym.logWorkoutEvent(ex.name, eventType, w, reps, !!ex.bw);
     }
+    if (typeof startRestTimer === 'function') startRestTimer(ex, eventType);
     return { ok: true, msg: '✓  ' + ex.name + '  ·  ' + formatSet(entry, ex) };
   }
 
@@ -5714,11 +5718,7 @@ img, video, canvas, svg { max-width: 100%; }
       const raw = input.value.trim();
       if (!raw) return;
       const result = quickLog(raw);
-      if (result.ok) {
-        input.value = '';
-        input.focus();
-        if (window.__gym_startRestTimer) window.__gym_startRestTimer();
-      }
+      if (result.ok) { input.value = ''; input.focus(); }
       showFeedback(result.msg, !result.ok);
     }
     btn.addEventListener('click', submit);
@@ -5791,50 +5791,6 @@ img, video, canvas, svg { max-width: 100%; }
     });
   })();
 
-  (function initRestTimer() {
-    var el = $('restTimer');
-    var label = $('restTimerLabel');
-    var DEFAULT_SECONDS = 150;
-    var remaining = DEFAULT_SECONDS;
-    var intervalId = null;
-
-    function render() {
-      var m = Math.floor(Math.max(remaining, 0) / 60);
-      var s = Math.max(remaining, 0) % 60;
-      label.textContent = m + ':' + String(s).padStart(2, '0');
-    }
-
-    function tick() {
-      remaining -= 1;
-      render();
-      if (remaining <= 0) {
-        clearInterval(intervalId);
-        intervalId = null;
-        el.classList.add('flash');
-        if (navigator.vibrate) navigator.vibrate(200);
-        setTimeout(function () { el.style.display = 'none'; el.classList.remove('flash'); }, 3000);
-      }
-    }
-
-    function start() {
-      remaining = DEFAULT_SECONDS;
-      render();
-      el.style.display = 'flex';
-      el.classList.remove('flash');
-      if (intervalId) clearInterval(intervalId);
-      intervalId = setInterval(tick, 1000);
-    }
-
-    $('restTimerPlus').addEventListener('click', function () { remaining += 30; render(); });
-    $('restTimerMinus').addEventListener('click', function () { remaining = Math.max(remaining - 30, 0); render(); });
-    $('restTimerDismiss').addEventListener('click', function () {
-      if (intervalId) clearInterval(intervalId);
-      intervalId = null;
-      el.style.display = 'none';
-    });
-
-    window.__gym_startRestTimer = start;
-  })();
   // ============================================================
 
   // ============================================================
