@@ -52,6 +52,14 @@ body {
 .mt-budget-bar-fill { height: 100%; background: #6EE7B7; transition: width 0.2s; }
 .mt-budget-bar-fill.over { background: #ff8a8a; }
 .mt-budget-value { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 13px; width: 90px; text-align: right; }
+.mt-quickadd-section { margin-bottom: 12px; }
+.mt-quickadd-label { font-size: 12px; color: rgba(255,255,255,0.6); margin-bottom: 6px; font-weight: 600; }
+.mt-quickadd-row { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; }
+.mt-quickadd-pill {
+  flex: 0 0 auto; padding: 8px 12px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.05); color: #FAFAFA; font-size: 12px; cursor: pointer; white-space: nowrap;
+}
+.mt-quickadd-pill:disabled { opacity: 0.5; cursor: default; }
 .mt-btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
 .mt-action-btn {
   padding: 14px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.12);
@@ -133,6 +141,19 @@ body {
         <div class="mt-budget-bar-track"><div class="mt-budget-bar-fill"></div></div>
         <span class="mt-budget-value">0 / 0</span>
       </div>
+    </div>
+
+    <div class="mt-quickadd-section" id="mtQuickAddRecent" style="display:none;">
+      <div class="mt-quickadd-label">Recent</div>
+      <div class="mt-quickadd-row" id="mtQuickAddRecentRow"></div>
+    </div>
+    <div class="mt-quickadd-section" id="mtQuickAddFavorites" style="display:none;">
+      <div class="mt-quickadd-label">Favorites</div>
+      <div class="mt-quickadd-row" id="mtQuickAddFavoritesRow"></div>
+    </div>
+    <div class="mt-quickadd-section" id="mtQuickAddSuggested" style="display:none;">
+      <div class="mt-quickadd-label">Suggested</div>
+      <div class="mt-quickadd-row" id="mtQuickAddSuggestedRow"></div>
     </div>
 
     <div class="mt-btn-row">
@@ -277,6 +298,17 @@ async function fetchTodayEntries() {
 // Both return { error } (error === null on success) so callers can decide
 // whether to close a modal / refresh, or show the failure instead of
 // silently behaving as if the write succeeded.
+async function fetchRecentEntries(days) {
+  const client = getSupa();
+  if (!client) return [];
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - days);
+  const cutoffKey = cutoff.getFullYear() + '-' + String(cutoff.getMonth() + 1).padStart(2, '0') + '-' + String(cutoff.getDate()).padStart(2, '0');
+  const { data, error } = await client.from('food_log').select('*').gte('log_date', cutoffKey).order('created_at', { ascending: false }).limit(300);
+  if (error) return [];
+  return data || [];
+}
+
 async function insertEntry(entry) {
   const client = getSupa();
   if (!client) return { error: new Error('Supabase not ready') };
@@ -339,6 +371,42 @@ function renderTodayList(entries) {
   });
 }
 
+function renderQuickAddRow(sectionId, rowId, items) {
+  const section = $(sectionId);
+  const row = $(rowId);
+  if (!items.length) { section.style.display = 'none'; return; }
+  section.style.display = '';
+  row.innerHTML = '';
+  items.forEach((item) => {
+    const pill = document.createElement('button');
+    pill.type = 'button';
+    pill.className = 'mt-quickadd-pill';
+    setText(pill, item.name);
+    pill.addEventListener('click', async () => {
+      pill.disabled = true;
+      const { error } = await insertEntry({
+        name: item.name,
+        protein_g: item.protein_g,
+        carb_g: item.carb_g,
+        fat_g: item.fat_g,
+        calories: item.calories,
+        source: item.source,
+        barcode: item.barcode,
+      });
+      if (error) { showEntryError('Could not add entry — try again.'); pill.disabled = false; return; }
+      refresh();
+    });
+    row.appendChild(pill);
+  });
+}
+
+async function renderQuickAdd() {
+  const entries = await fetchRecentEntries(30);
+  renderQuickAddRow('mtQuickAddRecent', 'mtQuickAddRecentRow', window.MacroCalc.dedupeByRecency(entries));
+  renderQuickAddRow('mtQuickAddFavorites', 'mtQuickAddFavoritesRow', window.MacroCalc.rankByFrequency(entries));
+  renderQuickAddRow('mtQuickAddSuggested', 'mtQuickAddSuggestedRow', window.MacroCalc.rankByFrecency(entries));
+}
+
 let currentTargets = loadTargets();
 
 async function refresh() {
@@ -347,6 +415,7 @@ async function refresh() {
   const remaining = window.MacroCalc.remainingBudget(currentTargets, entries);
   renderBudget(remaining, currentTargets);
   renderTodayList(entries);
+  renderQuickAdd();
 }
 
 // ---- Targets modal ----
