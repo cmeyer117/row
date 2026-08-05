@@ -3376,9 +3376,14 @@ img, video, canvas, svg { max-width: 100%; }
     const { repMin, repMax, step, bw } = ex;
     const upgradeAt = Math.min(CONFIG.upgradeAtReps || 8, repMax);
     let stuck = 0;
+    let stuckRirs = [];
     for (let i = logs.length - 1; i >= 0; i--) {
-      if (logs[i].weight === weight) stuck++; else break;
+      if (logs[i].weight === weight) {
+        stuck++;
+        if (logs[i].rir != null) stuckRirs.push(logs[i].rir);
+      } else break;
     }
+    const stuckAvgRir = stuckRirs.length ? stuckRirs.reduce((a, b) => a + b, 0) / stuckRirs.length : null;
     if (bw) {
       // Bodyweight exercises track reps, not weight — "stalled" here means
       // consecutive sessions logging the same rep count, not the same weight.
@@ -3394,8 +3399,19 @@ img, video, canvas, svg { max-width: 100%; }
     }
     let result;
     if (stuck >= 3 && reps < repMin) {
-      const dl = roundToStep(weight * 0.9, step);
-      result = { type: 'down', weight: dl, reps: repMax, tag: 'Deload', reason: 'Stuck at ' + weight + unit() + ' for ' + stuck + ' sessions. Drop 10%, reset, build back cleaner.', stuck: stuck };
+      // RIR context, if any of the stuck sessions logged it: a stall where
+      // the lifter is still reporting reps in reserve (RIR 3+) isn't the
+      // same signal as a stall from genuinely grinding to failure (RIR
+      // 0-2) -- the former may not be pure fatigue, so don't blindly
+      // deload. No RIR data yet (most historical sets predate the field)
+      // falls through to the original unconditional deload, unchanged.
+      if (stuckAvgRir != null && stuckAvgRir >= 3) {
+        result = { type: 'hold', weight: weight, reps: repMin, tag: 'Reassess', reason: 'Stuck at ' + weight + unit() + ' for ' + stuck + ' sessions, but you\'re logging RIR ' + stuckAvgRir.toFixed(1) + ' — not near failure. Before deloading, try genuinely pushing the last set, or check form/rep range.', stuck: stuck };
+      } else {
+        const dl = roundToStep(weight * 0.9, step);
+        const rirNote = stuckAvgRir != null ? ', grinding to RIR ' + stuckAvgRir.toFixed(1) : '';
+        result = { type: 'down', weight: dl, reps: repMax, tag: 'Deload', reason: 'Stuck at ' + weight + unit() + ' for ' + stuck + ' sessions' + rirNote + '. Drop 10%, reset, build back cleaner.', stuck: stuck };
+      }
     } else if (reps >= upgradeAt) {
       result = { type: 'up', weight: weight + step, reps: repMin, tag: 'Add weight', reason: 'You hit ' + reps + ' reps — time to add ' + step + unit() + '. Expect ' + repMin + '-' + (repMin + 1) + ' next session.', stuck: stuck };
     } else if (reps >= repMin && reps < upgradeAt) {
