@@ -3199,6 +3199,16 @@ img, video, canvas, svg { max-width: 100%; }
     s.gyms  = (Array.isArray(s.gyms)  && s.gyms.length)  ? s.gyms  : CONFIG.gyms.slice();
     s.days  = (Array.isArray(s.days)  && s.days.length)  ? s.days  : CONFIG.days.slice();
     s.exercises = Array.isArray(s.exercises) ? s.exercises : buildDefaultExercises();
+    // Backfill `muscle` onto exercises seeded before the muscle-tagging
+    // change landed (2026-08-06) — buildDefaultExercises() ids are stable
+    // (fixed SEED_EPOCH), so a seeded exercise's id exactly matches one
+    // from a fresh build here. Custom/adhoc exercises (ids that don't
+    // match) are intentionally left without a muscle field.
+    var seedLookup = {};
+    buildDefaultExercises().forEach(function (e) { seedLookup[e.id] = e.muscle; });
+    s.exercises.forEach(function (ex) {
+      if (ex && !ex.muscle && seedLookup[ex.id]) ex.muscle = seedLookup[ex.id];
+    });
     s.logs = (s.logs && typeof s.logs === 'object') ? s.logs : {};
     if (!s.sessions || typeof s.sessions !== 'object') s.sessions = {};
     // One entry per day a check-in was submitted: { pain, recovery, pump },
