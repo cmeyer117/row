@@ -24,6 +24,7 @@ Contact: rowan.wisere@gmail.com
 <script src="topbar.js" defer></script>
 <script src="macro-calc.js"></script>
 <script src="staple-foods.js"></script>
+<script src="coach-meal-plan.js"></script>
 <style>
 * { box-sizing: border-box; }
 body {
@@ -143,6 +144,11 @@ body {
       </div>
     </div>
 
+    <div class="mt-quickadd-section" id="mtCoachPlanSection">
+      <div class="mt-quickadd-label">Coach Plan</div>
+      <div class="mt-quickadd-row" id="mtCoachPlanRow"></div>
+    </div>
+
     <div class="mt-quickadd-section" id="mtQuickAddRecent" style="display:none;">
       <div class="mt-quickadd-label">Recent</div>
       <div class="mt-quickadd-row" id="mtQuickAddRecentRow"></div>
@@ -245,7 +251,7 @@ body {
 <!-- Calculator modal -->
 <div class="mt-modal-bg" id="mtCalcModalBg">
   <div class="mt-modal">
-    <h3 style="margin-top:0;">Macro Calculator</h3>
+    <h3 style="margin-top:0;" id="mtCalcTitle">Macro Calculator</h3>
     <div id="mtCalcRows"></div>
     <button class="mt-btn-secondary" id="mtCalcAddRow" type="button" style="width:100%;margin-bottom:12px;">+ Add ingredient</button>
     <div class="mt-calc-totals" id="mtCalcTotals">0p / 0c / 0f — 0cal</div>
@@ -684,7 +690,7 @@ function populateCalcFoodSelect(selectEl) {
     .forEach((f) => selectEl.appendChild(new Option(f.name, f.name)));
 }
 
-function addCalcRow() {
+function addCalcRow(prefill) {
   const id = 'calcRow' + (calcRowCount++);
   const row = document.createElement('div');
   row.className = 'mt-calc-row';
@@ -693,12 +699,14 @@ function addCalcRow() {
   const select = document.createElement('select');
   select.className = 'mt-calc-food';
   populateCalcFoodSelect(select);
+  if (prefill && prefill.foodName) select.value = prefill.foodName;
 
   const input = document.createElement('input');
   input.type = 'number';
   input.className = 'mt-calc-grams';
   input.placeholder = 'grams';
   input.min = '0';
+  if (prefill && prefill.grams) input.value = prefill.grams;
 
   const delBtn = document.createElement('button');
   delBtn.type = 'button';
@@ -736,6 +744,7 @@ function calcMealName() {
 }
 
 function openCalcModal() {
+  $('mtCalcTitle').textContent = 'Macro Calculator';
   $('mtCalcRows').innerHTML = '';
   calcRowCount = 0;
   addCalcRow();
@@ -743,6 +752,33 @@ function openCalcModal() {
   renderCalcTotals();
   $('mtCalcModalBg').classList.add('show');
 }
+
+// Opens the same Calculator modal pre-filled with a coach-plan meal's
+// default ingredients — the existing per-row food dropdown IS the picker
+// for the coach's OR choices (e.g. change "Chicken Breast" to "Tilapia"),
+// no separate picker UI needed.
+function openCalcModalWithMeal(meal) {
+  $('mtCalcTitle').textContent = meal.label;
+  $('mtCalcRows').innerHTML = '';
+  calcRowCount = 0;
+  meal.rows.forEach((row) => addCalcRow(row));
+  renderCalcTotals();
+  $('mtCalcModalBg').classList.add('show');
+}
+
+function renderCoachPlan() {
+  const row = $('mtCoachPlanRow');
+  row.innerHTML = '';
+  window.CoachMealPlan.MEALS.forEach((meal) => {
+    const pill = document.createElement('button');
+    pill.type = 'button';
+    pill.className = 'mt-quickadd-pill';
+    pill.textContent = meal.label;
+    pill.addEventListener('click', () => openCalcModalWithMeal(meal));
+    row.appendChild(pill);
+  });
+}
+
 function closeCalcModal() { $('mtCalcModalBg').classList.remove('show'); }
 
 $('mtCalcBtn').addEventListener('click', openCalcModal);
@@ -782,6 +818,7 @@ $('mtTabHistory').addEventListener('click', () => {
 });
 
 refresh();
+renderCoachPlan();
 
 // A tab left open across local midnight would otherwise keep showing
 // yesterday's budget/list until something happens to call refresh() —

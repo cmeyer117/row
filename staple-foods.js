@@ -16,6 +16,7 @@
     { name: 'Ground Beef 93/7 (cooked)', protein_100g: 26, carb_100g: 0, fat_100g: 8, calories_100g: 176 },
     { name: 'Ground Beef 85/15 (cooked)', protein_100g: 24, carb_100g: 0, fat_100g: 15, calories_100g: 250 },
     { name: 'Ground Turkey 93/7 (cooked)', protein_100g: 27, carb_100g: 0, fat_100g: 8, calories_100g: 189 },
+    { name: 'Ground Turkey 99% lean (cooked)', protein_100g: 25, carb_100g: 0, fat_100g: 1, calories_100g: 110 },
     { name: 'Sirloin Steak (cooked)', protein_100g: 29, carb_100g: 0, fat_100g: 8, calories_100g: 201 },
     { name: 'Filet Mignon (cooked)', protein_100g: 28, carb_100g: 0, fat_100g: 15, calories_100g: 267 },
     { name: 'Pork Chop (cooked, lean)', protein_100g: 27, carb_100g: 0, fat_100g: 9, calories_100g: 195 },
@@ -67,6 +68,10 @@
     { name: 'Coconut Oil', protein_100g: 0, carb_100g: 0, fat_100g: 100, calories_100g: 862 },
     { name: 'Butter', protein_100g: 0.9, carb_100g: 0.1, fat_100g: 81, calories_100g: 717 },
     { name: 'Protein Bar (generic)', protein_100g: 20, carb_100g: 25, fat_100g: 8, calories_100g: 220 },
+    // Kombucha is brand-variable (sugar content especially) — see the
+    // sauce-rule caveat in Cooking Coach vault notes. This is a generic
+    // low-sugar commercial average; swap in a label value if precision matters.
+    { name: 'Kombucha (generic, bottled)', protein_100g: 0, carb_100g: 3.5, fat_100g: 0, calories_100g: 18 },
   ];
 
   const api = { FOODS };
