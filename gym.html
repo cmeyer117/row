@@ -2995,6 +2995,10 @@ img, video, canvas, svg { max-width: 100%; }
     </div>
     <div class="prog-empty hidden" id="volEmpty">Need 2+ weeks of logged sets for a trend.</div>
     <div class="prog-list" id="volList"></div>
+    <div class="prog-header" style="margin-top:20px">
+      <span class="prog-title" style="font-size:15px">This Week vs. Evidence-Based Volume</span>
+    </div>
+    <div class="prog-list" id="volMuscleList"></div>
   </div>
 
   <!-- TAB BAR -->
@@ -4426,6 +4430,19 @@ img, video, canvas, svg { max-width: 100%; }
     listEl.innerHTML = weeks.slice().reverse().map(function(w) {
       return '<div class="prog-card"><div class="prog-card-top"><span class="prog-card-name">' + fmtPastDate(w.weekKey) + '</span></div>'
         + '<div class="prog-stat"><span class="prog-stat-label">Volume</span><span class="prog-stat-val">' + Math.round(w.totalVol).toLocaleString() + '</span></div></div>';
+    }).join('');
+
+    var muscleCounts = window.GymVolumeLogic.weeklySetsByMuscle(allEx, state.logs || {});
+    var muscleListEl = $('volMuscleList');
+    var labelText = { under: 'under MEV', mav: 'in range', mrv: 'at/above MRV' };
+    muscleListEl.innerHTML = Object.keys(muscleCounts).sort().map(function(muscle) {
+      var count = muscleCounts[muscle];
+      var band = window.GymVolumeLogic.classifyMuscleVolume(muscle, count);
+      var rangeStr = band.mavLow + '-' + band.mavHigh;
+      return '<div class="prog-card"><div class="prog-card-top"><span class="prog-card-name">' + escape(muscle) + '</span>'
+        + '<div class="prog-card-badge' + (band.label === 'mrv' ? ' prog-card-badge-stalled' : '') + '">' + labelText[band.label] + '</div></div>'
+        + '<div class="prog-stat"><span class="prog-stat-label">Sets this week</span><span class="prog-stat-val">' + count + '</span></div>'
+        + '<div class="prog-stat"><span class="prog-stat-label">MEV / MAV / MRV</span><span class="prog-stat-val" style="font-size:12px;color:var(--text-2)">' + band.mev + ' / ' + rangeStr + ' / ' + band.mrv + '</span></div></div>';
     }).join('');
   }
 
