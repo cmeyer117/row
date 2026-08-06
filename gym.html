@@ -5920,6 +5920,92 @@ img, video, canvas, svg { max-width: 100%; }
     });
   })();
 
+  (function initVoiceLog() {
+    var btn = $('voiceMicBtn');
+    var toast = $('voiceToast');
+    var toastMsg = $('voiceToastMsg');
+    var toastUndo = $('voiceToastUndo');
+    var SpeechRecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognitionCtor) return; // button stays display:none — unsupported browser
+
+    btn.style.display = 'flex';
+    var recognition = new SpeechRecognitionCtor();
+    recognition.lang = 'en-US';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+    var listening = false;
+    var toastTimer = null;
+
+    function hideToast() {
+      toast.classList.add('ql-hidden');
+      toastUndo.style.display = 'none';
+      toastUndo.onclick = null;
+    }
+
+    function showToast(msg, onUndo) {
+      clearTimeout(toastTimer);
+      toastMsg.textContent = msg;
+      toast.classList.remove('ql-hidden');
+      if (onUndo) {
+        toastUndo.style.display = 'inline-block';
+        toastUndo.onclick = function () { onUndo(); hideToast(); };
+      } else {
+        toastUndo.style.display = 'none';
+        toastUndo.onclick = null;
+      }
+      toastTimer = setTimeout(hideToast, 5000);
+    }
+
+    function setListening(on) {
+      listening = on;
+      btn.classList.toggle('is-listening', on);
+    }
+
+    btn.addEventListener('click', function () {
+      if (listening) { recognition.stop(); return; }
+      try { recognition.start(); setListening(true); }
+      catch (e) { setListening(false); } // already-started guard
+    });
+
+    recognition.addEventListener('end', function () { setListening(false); });
+    recognition.addEventListener('error', function () {
+      setListening(false);
+      showToast("Didn't catch that — try again", null);
+    });
+
+    recognition.addEventListener('result', function (e) {
+      var transcript = e.results[0][0].transcript;
+      var normalized = window.GymVoiceLogic.normalizeTranscript(transcript);
+      var parsed = parseQuickLog(normalized);
+      if (!parsed) {
+        showToast("Didn't catch that — try again", null);
+        return;
+      }
+      var candidates = getFiltered(); // today's workout: program + today's adhoc
+      var matched = window.GymVoiceLogic.restrictedFuzzyMatch(parsed.namePart, candidates);
+      if (!matched) {
+        showToast("Didn't catch the exercise — try again", null);
+        return;
+      }
+      var raw = matched.bw
+        ? matched.name + ' ' + parsed.reps + (parsed.rir != null ? ' @' + parsed.rir : '')
+        : matched.name + ' ' + parsed.weight + '×' + parsed.reps + (parsed.rir != null ? ' @' + parsed.rir : '');
+      var beforeCount = (state.logs[matched.id] || []).length;
+      var result = quickLog(raw, getActiveDate());
+      if (!result.ok) {
+        showToast(result.msg, null);
+        return;
+      }
+      var logsArr = state.logs[matched.id];
+      var canUndo = logsArr.length > beforeCount;
+      showToast(result.msg, canUndo ? function () {
+        logsArr.pop(); // just-logged entry sorts last (its date is "now")
+        saveState(); renderAll();
+        if (typeof wtRender === 'function') wtRender();
+      } : null);
+    });
+  })();
+
   (function initPlateCalc() {
     var toggle = $('plateCalcToggle');
     var bg = $('plateCalcModalBg');
