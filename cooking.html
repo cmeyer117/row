@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0a0b">
+<link rel="manifest" href="/manifest.json" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Row" />
+<title>Cooking Coach — Row</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="topbar.js" defer></script>
+<script src="staple-foods.js"></script>
+<script src="cooking-coach-data.js"></script>
+<style>
+:root {
+  --bg: #000000;
+  --bg-card: #111113;
+  --text-1: #F4F1EA;
+  --text-2: rgba(244,241,234,0.6);
+  --text-3: rgba(244,241,234,0.4);
+  --text-4: rgba(244,241,234,0.25);
+  --border: rgba(255,255,255,0.08);
+  --border-strong: rgba(255,255,255,0.16);
+  --accent: #6ee7b7;
+  --good: #6ee7b7;
+  --warn: #fbbf24;
+  --bad: #ff8a8a;
+  --font: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SF Mono, Menlo, Consolas, monospace;
+}
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; padding: 0;
+  background: radial-gradient(ellipse 80% 60% at 75% 0%, rgba(110,231,183,0.06) 0%, #0a0a0b 60%);
+  color: var(--text-1);
+  font-family: var(--font);
+  -webkit-font-smoothing: antialiased;
+  -webkit-text-size-adjust: 100%;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+.cc-shell {
+  width: 100%; max-width: min(720px, 100vw);
+  margin: 0 auto;
+  padding: 24px 16px calc(120px + env(safe-area-inset-bottom));
+  box-sizing: border-box;
+}
+.cc-shell * { min-width: 0; }
+.cc-header { margin-bottom: 20px; }
+.cc-title { font-size: 22px; font-weight: 700; letter-spacing: -0.015em; margin: 0; }
+.cc-subtitle { font-size: 12px; color: var(--text-3); margin: 2px 0 0; }
+
+.cc-section-label {
+  font-family: var(--font-mono); font-size: 10px; font-weight: 700;
+  letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-3);
+  margin: 24px 0 12px;
+}
+.cc-section-label:first-child { margin-top: 0; }
+
+.cc-meal-card {
+  background: rgba(255,255,255,0.025); border: 1px solid var(--border);
+  border-radius: 16px; padding: 16px 18px; margin-bottom: 10px;
+}
+.cc-meal-label {
+  font-family: var(--font-mono); font-size: 10px; font-weight: 700;
+  letter-spacing: 0.10em; text-transform: uppercase;
+  color: var(--accent); margin-bottom: 6px;
+}
+.cc-meal-build { font-size: 12px; color: var(--text-2); line-height: 1.5; margin-bottom: 10px; }
+.cc-chip-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.cc-chip {
+  padding: 7px 12px; border-radius: 999px; font-size: 12px; font-weight: 600;
+  color: var(--text-1); background: rgba(255,255,255,0.05);
+  border: 1px solid var(--border); cursor: pointer;
+  -webkit-tap-highlight-color: transparent; font-family: inherit;
+  transition: background 0.15s, border-color 0.15s;
+}
+.cc-chip:hover { background: rgba(110,231,183,0.10); border-color: rgba(110,231,183,0.30); }
+
+.cc-staple-list { display: flex; flex-direction: column; gap: 6px; }
+.cc-staple-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 12px 14px; background: rgba(255,255,255,0.025);
+  border: 1px solid var(--border); border-radius: 10px;
+  font-size: 13px; font-weight: 600; color: var(--text-1);
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+  font-family: inherit; text-align: left; width: 100%;
+}
+.cc-staple-row:hover { background: rgba(110,231,183,0.06); }
+.cc-staple-arrow { color: var(--text-3); }
+
+.cc-modal-bg {
+  display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+  align-items: center; justify-content: center; padding: 20px; z-index: 100;
+}
+.cc-modal-bg.show { display: flex; }
+.cc-modal {
+  background: #141416; border-radius: 16px; padding: 20px; width: 100%; max-width: 420px;
+  max-height: 88vh; overflow-y: auto;
+}
+.cc-modal-title { font-size: 17px; font-weight: 700; margin: 0 0 10px; }
+.cc-modal-row { margin-bottom: 12px; }
+.cc-modal-row-label {
+  font-family: var(--font-mono); font-size: 10px; font-weight: 700;
+  letter-spacing: 0.10em; text-transform: uppercase; color: var(--accent);
+  margin-bottom: 4px;
+}
+.cc-modal-row-body { font-size: 13px; color: var(--text-2); line-height: 1.5; }
+.cc-modal-steps { margin: 0; padding-left: 18px; }
+.cc-modal-steps li { margin-bottom: 4px; }
+.cc-modal-mistake {
+  background: rgba(251,191,36,0.06); border: 1px solid rgba(251,191,36,0.2);
+  border-radius: 12px; padding: 10px 14px; font-size: 12px; color: var(--warn); line-height: 1.5;
+}
+.cc-modal-close {
+  margin-top: 16px; width: 100%; padding: 12px; border-radius: 10px; border: none;
+  font-weight: 700; cursor: pointer; background: rgba(255,255,255,0.08); color: #FAFAFA;
+}
+
+/* ── Gym tab bar (shared with gym.html / mobility.html / posing.html) ── */
+.gym-tabbar {
+  position: fixed; left: 0; right: 0; bottom: calc(72px + env(safe-area-inset-bottom)); z-index: 60;
+  display: flex; justify-content: center;
+  padding: 10px max(16px, env(safe-area-inset-right)) 10px max(16px, env(safe-area-inset-left));
+  background: linear-gradient(180deg, rgba(5,5,6,0) 0%, rgba(5,5,6,0.82) 40%, rgba(5,5,6,0.96) 100%);
+  backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+  pointer-events: none;
+}
+.gym-tabbar-inner {
+  pointer-events: auto;
+  display: flex; width: 100%; max-width: 400px; gap: 6px;
+  padding: 6px; background: rgba(20,20,22,0.72);
+  border: 1px solid rgba(255,255,255,0.08); border-radius: 18px;
+  box-shadow: 0 12px 36px rgba(0,0,0,0.55);
+}
+.gym-tab {
+  flex: 1 1 0; display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  padding: 11px 14px; border-radius: 13px; font-size: 14px; font-weight: 600;
+  letter-spacing: 0.01em; color: var(--text-3); background: transparent;
+  border: 1px solid transparent; cursor: pointer; text-decoration: none;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
+  -webkit-tap-highlight-color: transparent; font-family: var(--font);
+}
+.gym-tab:hover { color: var(--text-1); }
+.gym-tab.active {
+  color: var(--text-1); background: rgba(255,255,255,0.07);
+  border-color: rgba(255,255,255,0.10);
+}
+@media (max-width: 400px) {
+  .gym-tab { padding: 11px 10px; font-size: 13px; }
+}
+</style>
+</head>
+<body>
+<div class="cc-shell">
+  <div class="cc-header">
+    <h1 class="cc-title">Cooking Coach</h1>
+    <p class="cc-subtitle" id="ccPhase"></p>
+  </div>
+
+  <div class="cc-section-label">My Meal Plan</div>
+  <div id="ccMealPlan"></div>
+
+  <div class="cc-section-label">All Staple Foods</div>
+  <div class="cc-staple-list" id="ccStapleList"></div>
+</div>
+
+<div class="cc-modal-bg" id="ccModalBg">
+  <div class="cc-modal">
+    <h3 class="cc-modal-title" id="ccModalTitle"></h3>
+    <div class="cc-modal-row">
+      <div class="cc-modal-row-label">Method</div>
+      <div class="cc-modal-row-body" id="ccModalMethod"></div>
+    </div>
+    <div class="cc-modal-row">
+      <div class="cc-modal-row-label">Temp / Time</div>
+      <div class="cc-modal-row-body" id="ccModalTempTime"></div>
+    </div>
+    <div class="cc-modal-row">
+      <div class="cc-modal-row-label">Steps</div>
+      <ul class="cc-modal-steps" id="ccModalSteps"></ul>
+    </div>
+    <div class="cc-modal-row">
+      <div class="cc-modal-row-label">Key Tip</div>
+      <div class="cc-modal-row-body" id="ccModalKeyTip"></div>
+    </div>
+    <div class="cc-modal-mistake" id="ccModalMistake"></div>
+    <button class="cc-modal-close" id="ccModalCloseBtn" type="button">Close</button>
+  </div>
+</div>
+
+<!-- Gym tab bar — Cooking Coach active (Health section) -->
+<nav class="gym-tabbar">
+  <div class="gym-tabbar-inner">
+    <a class="gym-tab" href="health.html">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 14s-5.5-3.4-5.5-7.2C2.5 4.5 4.2 3 6 3c.9 0 1.7.4 2 1.1C8.3 3.4 9.1 3 10 3c1.8 0 3.5 1.5 3.5 3.8C13.5 10.6 8 14 8 14z" fill="currentColor"/></svg>
+      Health
+    </a>
+    <a class="gym-tab active" href="cooking.html">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 7h10a1 1 0 011 1v1a1 1 0 01-1 1H3a1 1 0 01-1-1V8a1 1 0 011-1z" fill="currentColor"/><path d="M4 7V4.5a1.5 1.5 0 013 0V7M7 7V3a1 1 0 012 0v4M10 7V4.5a1.5 1.5 0 013 0V7" stroke="currentColor" stroke-width="1" fill="none"/><path d="M4 10v2a2 2 0 002 2h4a2 2 0 002-2v-2" stroke="currentColor" stroke-width="1.2" fill="none"/></svg>
+      Cooking Coach
+    </a>
+  </div>
+</nav>
+
+<script>
+(function () {
+  var MEAL_PLAN = window.CookingCoach.MEAL_PLAN;
+  var COOKING_GUIDES = window.CookingCoach.COOKING_GUIDES;
+  var FOODS = window.StapleFoods.FOODS;
+
+  function $(id) { return document.getElementById(id); }
+
+  function renderMealPlan() {
+    $('ccPhase').textContent = MEAL_PLAN.phase;
+    var wrap = $('ccMealPlan');
+    wrap.innerHTML = '';
+    MEAL_PLAN.meals.forEach(function (meal) {
+      var card = document.createElement('div');
+      card.className = 'cc-meal-card';
+
+      var label = document.createElement('div');
+      label.className = 'cc-meal-label';
+      label.textContent = meal.label;
+
+      var build = document.createElement('div');
+      build.className = 'cc-meal-build';
+      build.textContent = meal.build;
+
+      var chipRow = document.createElement('div');
+      chipRow.className = 'cc-chip-row';
+      meal.foods.forEach(function (foodName) {
+        var chip = document.createElement('button');
+        chip.type = 'button';
+        chip.className = 'cc-chip';
+        chip.textContent = foodName;
+        chip.addEventListener('click', function () { openGuideModal(foodName); });
+        chipRow.appendChild(chip);
+      });
+
+      card.appendChild(label);
+      card.appendChild(build);
+      card.appendChild(chipRow);
+      wrap.appendChild(card);
+    });
+  }
+
+  function renderStapleList() {
+    var list = $('ccStapleList');
+    list.innerHTML = '';
+    FOODS
+      .filter(function (f) { return Object.prototype.hasOwnProperty.call(COOKING_GUIDES, f.name); })
+      .slice()
+      .sort(function (a, b) { return a.name.localeCompare(b.name); })
+      .forEach(function (f) {
+        var row = document.createElement('button');
+        row.type = 'button';
+        row.className = 'cc-staple-row';
+        row.addEventListener('click', function () { openGuideModal(f.name); });
+
+        var name = document.createElement('span');
+        name.textContent = f.name;
+        var arrow = document.createElement('span');
+        arrow.className = 'cc-staple-arrow';
+        arrow.textContent = '›';
+
+        row.appendChild(name);
+        row.appendChild(arrow);
+        list.appendChild(row);
+      });
+  }
+
+  function openGuideModal(foodName) {
+    var guide = COOKING_GUIDES[foodName];
+    if (!guide) return;
+    $('ccModalTitle').textContent = foodName;
+    $('ccModalMethod').textContent = guide.method;
+    $('ccModalTempTime').textContent = guide.tempTime;
+    var stepsList = $('ccModalSteps');
+    stepsList.innerHTML = '';
+    guide.steps.forEach(function (step) {
+      var li = document.createElement('li');
+      li.textContent = step;
+      stepsList.appendChild(li);
+    });
+    $('ccModalKeyTip').textContent = guide.keyTip;
+    $('ccModalMistake').textContent = '⚠️ ' + guide.mistake;
+    $('ccModalBg').classList.add('show');
+  }
+  function closeGuideModal() { $('ccModalBg').classList.remove('show'); }
+
+  $('ccModalCloseBtn').addEventListener('click', closeGuideModal);
+  $('ccModalBg').addEventListener('click', function (e) {
+    if (e.target === $('ccModalBg')) closeGuideModal();
+  });
+
+  renderMealPlan();
+  renderStapleList();
+})();
+</script>
+</body>
+</html>
