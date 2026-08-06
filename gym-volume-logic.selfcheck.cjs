@@ -8,7 +8,7 @@ const path = require('path');
 const sandbox = { window: {} };
 vm.createContext(sandbox);
 vm.runInContext(fs.readFileSync(path.join(__dirname, 'gym-volume-logic.js'), 'utf8'), sandbox);
-const { mondayOfDate, weeklyVolumeByDay } = sandbox.window.GymVolumeLogic;
+const { mondayOfDate, weeklyVolumeByDay, weeklySetsByMuscle, classifyMuscleVolume } = sandbox.window.GymVolumeLogic;
 
 function assertEqual(actual, expected, label) {
   if (actual !== expected) {
@@ -74,5 +74,50 @@ assertEqual(sparseResult.find((w) => w.weekKey === priorMonday).totalVol, 0, 'we
 // weeklyVolumeByDay — weeksBack caps the returned array length.
 assertEqual(weeklyVolumeByDay(exercises, logsSameWeek, 'all', 3).length, 3, 'weeklyVolumeByDay respects weeksBack');
 assertEqual(weeklyVolumeByDay(exercises, logsSameWeek, 'all', 10).length, 10, 'weeklyVolumeByDay defaults/respects a larger weeksBack too');
+
+// weeklySetsByMuscle — counts logged SETS (not weight×reps) per muscle,
+// for the current week only.
+const musclesExercises = [
+  { id: 'chest1', muscle: 'Chest' },
+  { id: 'back1', muscle: 'Back' },
+  { id: 'notagged' }, // no muscle field — must be excluded, not crash
+];
+const musclesLogsThisWeek = {
+  chest1: [
+    { date: sameWeekA, weight: 100, reps: 10 },
+    { date: sameWeekB, weight: 105, reps: 8 },
+  ],
+  back1: [
+    { date: sameWeekA, weight: 50, reps: 10 },
+  ],
+  notagged: [
+    { date: sameWeekA, weight: 20, reps: 10 },
+  ],
+};
+const muscleCounts = weeklySetsByMuscle(musclesExercises, musclesLogsThisWeek, 4);
+assertEqual(muscleCounts.Chest, 2, 'weeklySetsByMuscle counts 2 logged sets for Chest, not weight or reps');
+assertEqual(muscleCounts.Back, 1, 'weeklySetsByMuscle counts 1 logged set for Back');
+assertEqual('Untagged' in muscleCounts, false, 'weeklySetsByMuscle excludes an untagged exercise rather than bucketing it as "Untagged"');
+
+// weeklySetsByMuscle — a muscle with zero logged sets this week is still
+// present in the result as 0, not omitted (same convention as weeklyVolumeByDay).
+assertEqual(muscleCounts.Quads, 0, 'weeklySetsByMuscle includes a zero-set muscle as 0, not omitted');
+
+// weeklySetsByMuscle — only counts THIS week, ignores prior weeks.
+const musclesLogsMixedWeeks = {
+  chest1: [
+    { date: sameWeekA, weight: 100, reps: 10 },
+    { date: priorMonday + 'T12:00:00.000Z', weight: 90, reps: 10 },
+  ],
+};
+const mixedWeekCounts = weeklySetsByMuscle([{ id: 'chest1', muscle: 'Chest' }], musclesLogsMixedWeeks, 4);
+assertEqual(mixedWeekCounts.Chest, 1, 'weeklySetsByMuscle only counts sets from the current week, ignoring prior weeks');
+
+// classifyMuscleVolume — under MEV, in MAV range, at/above MRV.
+assertEqual(classifyMuscleVolume('Chest', 3).label, 'under', 'classifyMuscleVolume: 3 sets for Chest (MEV 8) is under');
+assertEqual(classifyMuscleVolume('Chest', 15).label, 'mav', 'classifyMuscleVolume: 15 sets for Chest (MAV 12-20) is in range');
+assertEqual(classifyMuscleVolume('Chest', 25).label, 'mrv', 'classifyMuscleVolume: 25 sets for Chest (MRV 22) is at/above');
+assertEqual(classifyMuscleVolume('Chest', 8).mev, 8, 'classifyMuscleVolume returns the muscle\'s MEV value');
+assertEqual(classifyMuscleVolume('Chest', 8).mrv, 22, 'classifyMuscleVolume returns the muscle\'s MRV value');
 
 console.log('gym-volume-logic.selfcheck.cjs: all assertions passed');
