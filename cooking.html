@@ -160,6 +160,7 @@ html, body {
   <div class="cc-header">
     <h1 class="cc-title">Cooking Coach</h1>
     <p class="cc-subtitle" id="ccPhase"></p>
+    <p class="cc-subtitle">Salt (Himalayan pink or kosher) goes on everything — each card's Seasoning row is what to add beyond that.</p>
   </div>
 
   <div class="cc-section-label">My Meal Plan</div>
@@ -183,6 +184,10 @@ html, body {
     <div class="cc-modal-row">
       <div class="cc-modal-row-label">Steps</div>
       <ul class="cc-modal-steps" id="ccModalSteps"></ul>
+    </div>
+    <div class="cc-modal-row">
+      <div class="cc-modal-row-label">Seasoning (beyond salt)</div>
+      <div class="cc-modal-row-body" id="ccModalSeasoning"></div>
     </div>
     <div class="cc-modal-row">
       <div class="cc-modal-row-label">Key Tip</div>
@@ -287,6 +292,7 @@ html, body {
       li.textContent = step;
       stepsList.appendChild(li);
     });
+    $('ccModalSeasoning').textContent = guide.seasoning;
     $('ccModalKeyTip').textContent = guide.keyTip;
     $('ccModalMistake').textContent = '⚠️ ' + guide.mistake;
     $('ccModalBg').classList.add('show');

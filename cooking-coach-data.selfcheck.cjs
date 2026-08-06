@@ -46,11 +46,11 @@ assertEqual(missingMealFoods.length === 0, true, `every MEAL_PLAN food has a COO
 let malformedGuides = [];
 guideKeys.forEach((key) => {
   const g = COOKING_GUIDES[key];
-  if (!g.method || !g.tempTime || !Array.isArray(g.steps) || g.steps.length === 0 || !g.keyTip || !g.mistake) {
+  if (!g.method || !g.tempTime || !Array.isArray(g.steps) || g.steps.length === 0 || !g.keyTip || !g.mistake || !g.seasoning) {
     malformedGuides.push(key);
   }
 });
-assertEqual(malformedGuides.length === 0, true, `every COOKING_GUIDES entry has method/tempTime/steps/keyTip/mistake (malformed: ${malformedGuides.join('; ')})`);
+assertEqual(malformedGuides.length === 0, true, `every COOKING_GUIDES entry has method/tempTime/steps/keyTip/mistake/seasoning (malformed: ${malformedGuides.join('; ')})`);
 
 const NON_STAPLE_LABELS = new Set(['Fruit (200g)', 'Veggies (1 cup)', 'Kombucha (8oz)', 'Ground Turkey (99% lean)']);
 let orphanedGuides = [];

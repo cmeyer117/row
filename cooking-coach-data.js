@@ -5,6 +5,12 @@
 // started 8/2/26. Source PDF: G:\My Drive\Coaching documents\BLACK MAGMA
 // FITNESS CLIENT Carl - Macros.doc.pdf (check that folder for the newest-
 // dated file next time this needs updating — the coach updates it in place).
+//
+// Every guide's `seasoning` field assumes salt (Himalayan pink or kosher) is
+// already on everything — it lists what to add BEYOND salt. Dry rubs/herbs
+// are unaffected by the current phase's zero-sugar/no-carb/no-fat SAUCE rule
+// (see Cooking Coach — Coach Food List, Best Method for Each.md) since none
+// of these are sauces.
 (function () {
   'use strict';
 
@@ -56,6 +62,7 @@
       ],
       keyTip: 'Cook to temperature, not time or color — instant-read thermometer in the thickest part.',
       mistake: 'Trusting a rest to finish the cook. A 5-minute rest is not a guaranteed safety hold in a thin cutlet.',
+      seasoning: 'Garlic powder + smoked paprika + dried oregano (Mediterranean direction) — or the Cajun/blackening rub (paprika, cayenne, garlic powder, onion powder, oregano, thyme) for more heat.',
     },
     'Ground Beef 93/7 (cooked)': {
       method: 'Steel pan, hard sear',
@@ -67,6 +74,7 @@
       ],
       keyTip: 'The crust is the flavor difference between good and sad ground beef.',
       mistake: 'Stirring immediately steams the meat in its own liquid and turns it gray.',
+      seasoning: 'Taco/Southwest rub (cumin, chili powder, smoked paprika, garlic, oregano, coriander) — or Cajun/blackening if you want more heat than smoke.',
     },
     'Ground Beef 85/15 (cooked)': {
       method: 'Steel pan, hard sear (same as 93/7)',
@@ -78,6 +86,7 @@
       ],
       keyTip: 'Fat ratio is a macro decision, not a quality one — 80/20 tastes better, 93/7 cuts leaner.',
       mistake: 'Stirring immediately steams the meat instead of browning it.',
+      seasoning: 'Taco/Southwest rub (cumin, chili powder, smoked paprika, garlic, oregano, coriander) — the extra fat carries smoky/chili flavors well.',
     },
     'Ground Turkey (99% lean)': {
       method: 'Steel pan, hard sear, with added liquid',
@@ -89,6 +98,7 @@
       ],
       keyTip: 'Needs the sauce/seasoning more than any other protein in the rotation — dry rubs (Cajun, Taco/Southwest) hide the blandness best.',
       mistake: "A few extra minutes past done and it's chalk — the margin for error is small with zero fat.",
+      seasoning: 'Cajun/blackening (paprika, cayenne, garlic powder, onion powder, oregano, thyme) or Taco/Southwest (cumin, chili powder, smoked paprika, garlic) — this is the one protein where a strong rub is not optional.',
     },
     'Sirloin Steak (cooked)': {
       method: 'Thickness picks the method: under 1" = hot-and-fast pan sear, 1.5"+ = reverse sear',
@@ -100,6 +110,7 @@
       ],
       keyTip: 'Reverse sear keeps the overcooked gray band thinner because the temperature gradient stays shallow.',
       mistake: "Air-frying a thick steak alone — it dries the surface but never gets hot enough for real crust. Pan finish is not optional.",
+      seasoning: 'Coarse black pepper + garlic powder, plus garlic/thyme in the butter baste if pan-searing. Everything-bagel/steak blend (garlic, onion, sesame, poppy, coarse salt) works as a crust rub too.',
     },
     'Filet Mignon (cooked)': {
       method: "Reverse sear (it's a thick cut)",
@@ -111,6 +122,7 @@
       ],
       keyTip: 'Little quality rest is needed after — the gradient is already shallow.',
       mistake: 'Searing first on a thick cut shocks the outside while the center is cold, overcooking a wide gray band.',
+      seasoning: 'Coarse black pepper + garlic powder, rosemary or thyme sprig in the pan for aromatics during the sear — filet is mild, don\u2019t bury it in a heavy rub.',
     },
     'Salmon (cooked)': {
       method: 'Cold-pan sear, skin down',
@@ -123,6 +135,7 @@
       ],
       keyTip: "If the skin is stuck, it isn't done — it self-releases. Don't force it.",
       mistake: 'Starting in a hot pan skips the fat-rendering window — skin clamps, curls, sticks, tears.',
+      seasoning: 'Fresh dill + lemon zest + garlic powder (classic pairing) — or smoked paprika + garlic for a Cajun-leaning version. Add dill/lemon after cooking, not before, so they don\u2019t burn.',
     },
     'Tilapia (cooked)': {
       method: 'Hot pan or air fryer — cook fully opaque, no medium-rare zone for white fish',
@@ -134,6 +147,7 @@
       ],
       keyTip: 'Leanest protein available — the lever when fat needs to come down without touching protein.',
       mistake: 'Treating it like salmon and pulling it early. White fish has no fat safety net.',
+      seasoning: 'Lemon pepper + garlic powder, light hand — white fish is delicate and a heavy rub overpowers it. Smoked paprika for color/light smoke if wanted.',
     },
     'Cod (cooked)': {
       method: 'Hot pan or air fryer — cook fully opaque',
@@ -145,6 +159,7 @@
       ],
       keyTip: 'Spray the basket in the air fryer — lean fish glues itself to bare metal.',
       mistake: "Flipping it in the air fryer — too delicate, let it cook undisturbed.",
+      seasoning: 'Lemon pepper + garlic powder, same light hand as tilapia/halibut.',
     },
     'Halibut (cooked)': {
       method: 'Hot pan or air fryer — cook fully opaque',
@@ -156,6 +171,7 @@
       ],
       keyTip: "Lean, no fat safety net — don't chase the medium-rare texture that works for salmon.",
       mistake: 'Cooking by the clock instead of verifying with a thermometer.',
+      seasoning: 'Lemon pepper + garlic powder, same light hand as tilapia/cod.',
     },
     'Eggs, whole (cooked)': {
       method: 'Scrambled (best texture) / hard-boiled / soft-boiled — pick by use case',
@@ -167,6 +183,7 @@
       ],
       keyTip: "Cooking substantially improves protein digestion vs raw — cook them, don't leave them runny.",
       mistake: 'Runny yolks carry real Salmonella risk — FDA guidance is firm yolks and whites unless using pasteurized shell eggs.',
+      seasoning: 'Black pepper + chives, or everything-bagel seasoning (garlic, onion, sesame, poppy, coarse salt) for texture and crunch.',
     },
     'Egg Whites': {
       method: 'Nonstick pan, medium-low heat, patience — or air-fryer "boiled"',
@@ -177,6 +194,7 @@
       ],
       keyTip: 'Fold into oats or cream of rice for invisible protein volume without a separate cook step.',
       mistake: 'High heat turns them rubbery — this is the one place patience matters more than speed.',
+      seasoning: 'Black pepper + garlic powder — egg whites are bland on their own and take seasoning well since they have no fat to protect.',
     },
     'White Rice (cooked)': {
       method: 'Stovetop absorption or rice cooker',
@@ -188,6 +206,7 @@
       ],
       keyTip: 'Texture (fluffy vs gummy) comes from variety, ratio, and not stirring — rinsing is not a reliable texture fix.',
       mistake: 'Reheating cooled rice that sat at room temperature — B. cereus toxin is heat-stable once formed. Cool promptly, refrigerate within 2 hours, reheat to 165°F.',
+      seasoning: 'Garlic powder + scallion for an all-purpose base, or cilantro + lime for a Mexican-bowl direction — match whatever rub is on the protein that day.',
     },
     'Brown Rice (cooked)': {
       method: 'Stovetop absorption',
@@ -198,6 +217,7 @@
       ],
       keyTip: 'Best meal-prep keeper along with basmati and long-grain white — stays separate rather than clumping.',
       mistake: 'Same rice-safety rule as white rice: cool promptly, refrigerate within 2 hours, reheat to 165°F.',
+      seasoning: 'Garlic powder + scallion, or cilantro + lime — same directions as white rice.',
     },
     'Cream of Rice (cooked)': {
       method: 'Stovetop or microwave',
@@ -208,6 +228,7 @@
       ],
       keyTip: "Adding protein powder before it's done or while boiling makes it gluey.",
       mistake: 'Boiling the protein powder in — off-heat mixing only.',
+      seasoning: 'Cinnamon (no added sugar) — the standard move for a hot-cereal breakfast base.',
     },
     'Oats (dry, rolled)': {
       method: 'Microwave (2:1 water) or baked',
@@ -218,6 +239,7 @@
       ],
       keyTip: 'Salting the water is the single biggest reason people say they hate oats.',
       mistake: 'Never rinse oats — unlike rice, it does nothing useful here.',
+      seasoning: 'Cinnamon (no added sugar) stirred in while cooking — same move as cream of rice.',
     },
     'White Potato (baked, w/ skin)': {
       method: 'Air fryer, whole',
@@ -228,6 +250,7 @@
       ],
       keyTip: "Potatoes are weighed UNCOOKED on this plan — don't weigh after baking.",
       mistake: 'Wrapping in foil steams it instead of crisping the skin.',
+      seasoning: 'Rosemary + garlic powder + smoked paprika — classic roast-potato direction, rub on the skin before air frying.',
     },
     'Sweet Potato (baked)': {
       method: 'Air fryer, whole',
@@ -238,6 +261,7 @@
       ],
       keyTip: "Not nutritionally superior to white potato for a lifter — it's a flavor/glycemic choice, not a health upgrade.",
       mistake: 'Weighing after cooking — this plan weighs potatoes uncooked.',
+      seasoning: 'Cinnamon for a sweet direction, or smoked paprika + garlic powder for savory — sweet potato takes both well.',
     },
     'Sourdough Bread': {
       method: 'Toast dry',
@@ -248,6 +272,7 @@
       ],
       keyTip: 'A kitchen scale beats "2 slices" for hitting the 65g target.',
       mistake: 'Assuming any sourdough is fine — the plan specifically wants real fat content, not a low-fat loaf.',
+      seasoning: 'None needed — real-fat sourdough is flavorful on its own, that\u2019s the point of the plan specifying it.',
     },
     'Broccoli (cooked)': {
       method: 'Air fryer',
@@ -258,6 +283,7 @@
       ],
       keyTip: 'Best air-fryer vegetable, period — crispy edges every time.',
       mistake: 'Pouring oil instead of measuring it — a thin film (spray or 1/2-1 tsp per batch) is all browning needs.',
+      seasoning: 'Garlic powder + smoked paprika before cooking; lemon zest + black pepper added after — that combo is the vault\u2019s go-to for broccoli/asparagus.',
     },
     'Spinach (cooked)': {
       method: 'Hot pan, NOT the air fryer',
@@ -268,6 +294,7 @@
       ],
       keyTip: 'A whole bag cooks down to about one serving — buy more than seems necessary.',
       mistake: 'Air-frying it — spinach is the one vegetable exception to the air-fryer default.',
+      seasoning: 'Garlic + red pepper flakes — simple, wilts in with the residual pan fat.',
     },
     'Asparagus (cooked)': {
       method: 'Air fryer',
@@ -278,6 +305,7 @@
       ],
       keyTip: 'Lemon zest + pepper added after cooking is the go-to seasoning direction.',
       mistake: 'Leaving thin spears in the full 6-8 min — they finish faster than thick ones.',
+      seasoning: 'Garlic powder before cooking; lemon zest + black pepper after — don\u2019t add lemon before cooking, it dulls in the air fryer.',
     },
     'Green Beans (cooked)': {
       method: 'Air fryer',
@@ -288,6 +316,7 @@
       ],
       keyTip: 'Everything-bagel seasoning is the go-to for these.',
       mistake: 'Thawing frozen green beans before air-frying.',
+      seasoning: 'Everything-bagel seasoning (garlic, onion, sesame, poppy, coarse salt) — the vault\u2019s specific call for this vegetable.',
     },
     'Cauliflower (cooked)': {
       method: 'Air fryer',
@@ -298,6 +327,7 @@
       ],
       keyTip: "Takes longer than most air-fryer veggies — don't pull it early expecting broccoli's timing.",
       mistake: 'Crowding the basket — cauliflower needs real airflow to brown instead of steam.',
+      seasoning: 'Garlic powder + smoked paprika + turmeric — turmeric especially if it\u2019s standing in as a rice alternative.',
     },
     'Turkey Bacon (cooked, generic)': {
       method: 'Air fryer (no oil) or dry nonstick pan',
@@ -308,6 +338,7 @@
       ],
       keyTip: '"Fully cooked" temp requirements vary by brand — check the package, not raw-pork-bacon safety margins.',
       mistake: "Walking away — it goes from done to burnt fast because it's thin and pre-cooked-ish.",
+      seasoning: 'Black pepper only, or nothing — turkey bacon is already cured/seasoned, more is usually unnecessary.',
     },
     'Fruit (200g)': {
       method: 'No cooking — weighing technique only',
@@ -318,6 +349,7 @@
       ],
       keyTip: 'Rotate fruit choices for micronutrients rather than eating the same one every day.',
       mistake: "Weighing berries before washing/stemming — the number won't match what you actually eat.",
+      seasoning: 'None — cinnamon on apple slices is the one common addition if wanted.',
     },
     'Veggies (1 cup)': {
       method: 'Air fryer default (see the specific vegetable in All Staple Foods for exact temp/time)',
@@ -329,6 +361,7 @@
       ],
       keyTip: 'Anything but corn is approved on this plan — pick a specific vegetable in the staple list below for exact timing.',
       mistake: 'Drowning veggies in oil — that\'s where "veggies are free" quietly becomes 200+ extra calories.',
+      seasoning: 'Garlic powder + smoked paprika is the all-purpose base for any vegetable — pick a specific one in All Staple Foods for its exact pairing.',
     },
     'Kombucha (8oz)': {
       method: 'No prep',
@@ -338,6 +371,7 @@
       ],
       keyTip: "This phase's sauce rule is zero-sugar — treat kombucha with the same label-reading scrutiny.",
       mistake: 'Assuming all kombucha is low-sugar because it\'s "healthy" — flavored varieties vary a lot.',
+      seasoning: 'N/A',
     },
   };
 
