@@ -4326,9 +4326,9 @@ img, video, canvas, svg { max-width: 100%; }
       if (ex.bw) {
         prStr = (Math.max.apply(null, logs.map(function(l){ return l.reps; }))) + ' reps';
       } else if (prLog.plates != null) {
-        prStr = prLog.plates + (prLog.plates === 1 ? 'p' : 'p') + (prLog.extraLbs ? '+' + prLog.extraLbs : '') + ' × ' + prLog.reps;
+        prStr = prLog.plates + (prLog.plates === 1 ? 'p' : 'p') + (prLog.extraLbs ? '+' + prLog.extraLbs : '') + ' × ' + prLog.reps + ' · e1RM ' + Math.round(estimate1RM(prLog.weight || 0, prLog.reps));
       } else {
-        prStr = (prLog.weight || 0) + unit() + ' × ' + prLog.reps;
+        prStr = (prLog.weight || 0) + unit() + ' × ' + prLog.reps + ' · e1RM ' + Math.round(estimate1RM(prLog.weight || 0, prLog.reps));
       }
 
       // Mini sparkline SVG
