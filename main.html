@@ -1709,7 +1709,18 @@ body::after {
     skipBtn.addEventListener('click', mlHandleSkip);
     actions.appendChild(skipBtn);
     wrap.appendChild(actions);
+    wrap.appendChild(mlFounderLink());
     return wrap;
+  }
+
+  function mlFounderLink() {
+    const link = el('a', 'ml-sub', '→ Plan your Founder day in Vessel');
+    link.href = 'https://vessel-carl-meyer-s-projects.vercel.app/founder.html';
+    link.target = '_blank';
+    link.rel = 'noopener';
+    link.style.display = 'block';
+    link.style.marginTop = '10px';
+    return link;
   }
 
   function mlBuildSkipped(session) {
@@ -1724,6 +1735,7 @@ body::after {
       mlSessionSave(session);
     });
     wrap.appendChild(resumeBtn);
+    wrap.appendChild(mlFounderLink());
     return wrap;
   }
 
