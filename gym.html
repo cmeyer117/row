@@ -4432,6 +4432,10 @@ img, video, canvas, svg { max-width: 100%; }
         + '<div class="prog-stat"><span class="prog-stat-label">Volume</span><span class="prog-stat-val">' + Math.round(w.totalVol).toLocaleString() + '</span></div></div>';
     }).join('');
 
+    // Deliberately NOT passed volFilter — MEV/MAV/MRV bands are a whole-week
+    // total across every training day a muscle gets hit, not a per-day
+    // metric, so this section always reflects the full week regardless of
+    // which day pill above is selected.
     var muscleCounts = window.GymVolumeLogic.weeklySetsByMuscle(allEx, state.logs || {});
     var muscleListEl = $('volMuscleList');
     var labelText = { under: 'under MEV', mav: 'in range', mrv: 'at/above MRV' };

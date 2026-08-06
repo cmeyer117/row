@@ -94,7 +94,7 @@ const musclesLogsThisWeek = {
     { date: sameWeekA, weight: 20, reps: 10 },
   ],
 };
-const muscleCounts = weeklySetsByMuscle(musclesExercises, musclesLogsThisWeek, 4);
+const muscleCounts = weeklySetsByMuscle(musclesExercises, musclesLogsThisWeek);
 assertEqual(muscleCounts.Chest, 2, 'weeklySetsByMuscle counts 2 logged sets for Chest, not weight or reps');
 assertEqual(muscleCounts.Back, 1, 'weeklySetsByMuscle counts 1 logged set for Back');
 assertEqual('Untagged' in muscleCounts, false, 'weeklySetsByMuscle excludes an untagged exercise rather than bucketing it as "Untagged"');
@@ -110,7 +110,7 @@ const musclesLogsMixedWeeks = {
     { date: priorMonday + 'T12:00:00.000Z', weight: 90, reps: 10 },
   ],
 };
-const mixedWeekCounts = weeklySetsByMuscle([{ id: 'chest1', muscle: 'Chest' }], musclesLogsMixedWeeks, 4);
+const mixedWeekCounts = weeklySetsByMuscle([{ id: 'chest1', muscle: 'Chest' }], musclesLogsMixedWeeks);
 assertEqual(mixedWeekCounts.Chest, 1, 'weeklySetsByMuscle only counts sets from the current week, ignoring prior weeks');
 
 // classifyMuscleVolume — under MEV, in MAV range, at/above MRV.
