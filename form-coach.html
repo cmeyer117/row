@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0a0b">
+<link rel="manifest" href="/manifest.json" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Row" />
+<title>Form Coach — Row</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="topbar.js" defer></script>
+<style>
+:root {
+  --bg: #000000;
+  --bg-card: #111113;
+  --text-1: #F4F1EA;
+  --text-2: rgba(244,241,234,0.6);
+  --text-3: rgba(244,241,234,0.4);
+  --text-4: rgba(244,241,234,0.25);
+  --border: rgba(255,255,255,0.08);
+  --border-strong: rgba(255,255,255,0.16);
+  --accent: #6ee7b7;
+  --good: #6ee7b7;
+  --warn: #fbbf24;
+  --bad: #ff8a8a;
+  --font: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SF Mono, Menlo, Consolas, monospace;
+}
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; padding: 0;
+  background: radial-gradient(ellipse 80% 60% at 75% 0%, rgba(110,231,183,0.06) 0%, #0a0a0b 60%);
+  color: var(--text-1);
+  font-family: var(--font);
+  -webkit-font-smoothing: antialiased;
+  -webkit-text-size-adjust: 100%;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+.mob-shell {
+  width: 100%; max-width: min(720px, 100vw);
+  margin: 0 auto;
+  padding: 24px 16px calc(120px + env(safe-area-inset-bottom));
+  box-sizing: border-box;
+}
+.mob-shell * { min-width: 0; }
+.mob-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+.mob-title { font-size: 22px; font-weight: 700; letter-spacing: -0.015em; margin: 0; }
+.mob-subtitle { font-size: 12px; color: var(--text-3); margin: 2px 0 0; }
+.mob-tabs { display: flex; gap: 6px; margin-bottom: 20px; overflow-x: auto; scrollbar-width: none; }
+.mob-tabs::-webkit-scrollbar { display: none; }
+.mob-tab-btn {
+  flex-shrink: 0; padding: 8px 16px; border-radius: 999px;
+  font-size: 13px; font-weight: 600; letter-spacing: 0.01em;
+  color: var(--text-3); background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08); cursor: pointer;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
+  -webkit-tap-highlight-color: transparent; font-family: inherit;
+}
+.mob-tab-btn:hover { color: var(--text-1); }
+.mob-tab-btn.active { color: var(--text-1); background: rgba(110,231,183,0.10); border-color: rgba(110,231,183,0.30); }
+.mob-section { display: none; }
+.mob-section.active { display: block; }
+.mob-card { background: rgba(255,255,255,0.025); border: 1px solid var(--border); border-radius: 16px; padding: 16px 18px; margin-bottom: 10px; }
+.mob-card-body { font-size: 13px; color: var(--text-2); line-height: 1.55; }
+.mob-card-body strong { color: var(--text-1); font-weight: 600; }
+.mob-rule { background: rgba(110,231,183,0.06); border: 1px solid rgba(110,231,183,0.18); border-radius: 12px; padding: 12px 14px; font-size: 13px; color: var(--text-2); line-height: 1.5; margin-bottom: 16px; }
+.mob-rule strong { color: var(--accent); }
+.mob-divider { height: 1px; background: var(--border); margin: 20px 0; }
+
+/* ── Camera + capture ── */
+.fc-camera-wrap { position: relative; width: 100%; aspect-ratio: 3 / 4; background: #050506; border-radius: 16px; overflow: hidden; margin-bottom: 12px; }
+.fc-camera-wrap video, .fc-camera-wrap canvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.fc-camera-wrap canvas { pointer-events: none; }
+.fc-hold-ring { position: absolute; top: 12px; right: 12px; width: 44px; height: 44px; }
+.fc-hold-ring circle { fill: none; stroke-width: 4; }
+.fc-hold-ring .bg { stroke: rgba(255,255,255,0.15); }
+.fc-hold-ring .fg { stroke: var(--accent); stroke-linecap: round; transform: rotate(-90deg); transform-origin: 50% 50%; transition: stroke-dashoffset 0.1s linear; }
+.fc-status-banner { position: absolute; left: 12px; right: 12px; bottom: 12px; padding: 8px 12px; border-radius: 10px; background: rgba(0,0,0,0.65); font-size: 12px; color: var(--text-2); text-align: center; }
+.fc-status-banner.warn { color: var(--warn); }
+.fc-status-banner.bad { color: var(--bad); }
+.fc-compare { display: flex; gap: 8px; margin-bottom: 12px; }
+.fc-compare > div { flex: 1; }
+.fc-compare img, .fc-compare canvas { width: 100%; border-radius: 10px; display: block; }
+.fc-compare .fc-compare-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-3); margin-bottom: 4px; }
+.fc-pose-picker { display: flex; gap: 6px; overflow-x: auto; margin-bottom: 12px; scrollbar-width: none; }
+.fc-pose-picker::-webkit-scrollbar { display: none; }
+.fc-pose-chip { flex-shrink: 0; padding: 8px 14px; border-radius: 999px; font-size: 12px; font-weight: 600; color: var(--text-2); background: rgba(255,255,255,0.04); border: 1px solid var(--border); cursor: pointer; -webkit-tap-highlight-color: transparent; font-family: inherit; }
+.fc-pose-chip.active { color: var(--text-1); background: rgba(110,231,183,0.10); border-color: rgba(110,231,183,0.30); }
+.fc-symmetry-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+.fc-symmetry-row:last-child { border-bottom: none; }
+.fc-rep-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+.fc-rep-row:last-child { border-bottom: none; }
+.fc-rep-flag { font-size: 11px; padding: 3px 8px; border-radius: 999px; background: rgba(255,138,138,0.12); color: var(--bad); }
+.fc-btn { width: 100%; padding: 14px; border-radius: 12px; font-size: 14px; font-weight: 700; font-family: inherit; border: none; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.fc-btn-primary { background: var(--accent); color: #04150e; }
+.fc-btn-secondary { background: rgba(255,255,255,0.06); color: var(--text-1); border: 1px solid var(--border); }
+.fc-input { width: 100%; padding: 12px 14px; border-radius: 10px; background: rgba(255,255,255,0.04); border: 1px solid var(--border); color: var(--text-1); font-family: inherit; font-size: 14px; margin-bottom: 12px; }
+
+/* ── Gym tab bar (same as gym.html/posing.html) ── */
+.gym-tabbar { position: fixed; left: 0; right: 0; bottom: calc(72px + env(safe-area-inset-bottom)); z-index: 60; display: flex; justify-content: center; padding: 10px max(16px, env(safe-area-inset-right)) 10px max(16px, env(safe-area-inset-left)); background: linear-gradient(180deg, rgba(5,5,6,0) 0%, rgba(5,5,6,0.82) 40%, rgba(5,5,6,0.96) 100%); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); pointer-events: none; }
+.gym-tabbar-inner { pointer-events: auto; display: flex; width: 100%; max-width: 400px; gap: 6px; padding: 6px; background: rgba(20,20,22,0.72); border: 1px solid rgba(255,255,255,0.08); border-radius: 18px; box-shadow: 0 12px 36px rgba(0,0,0,0.55); }
+.gym-tab { flex: 1 1 0; display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 11px 14px; border-radius: 13px; font-size: 14px; font-weight: 600; letter-spacing: 0.01em; color: var(--text-3); background: transparent; border: 1px solid transparent; cursor: pointer; text-decoration: none; transition: color 0.15s, background 0.15s, border-color 0.15s; -webkit-tap-highlight-color: transparent; font-family: var(--font); }
+.gym-tab:hover { color: var(--text-1); }
+.gym-tab.active { color: var(--text-1); background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.10); }
+@media (max-width: 400px) { .gym-tab { padding: 11px 10px; font-size: 13px; } }
+</style>
+</head>
+<body>
+<div class="mob-shell">
+  <div class="mob-header">
+    <div>
+      <h1 class="mob-title">Form Coach</h1>
+      <div class="mob-subtitle">Camera-based posing and lift feedback</div>
+    </div>
+  </div>
+
+  <div class="mob-tabs">
+    <button class="mob-tab-btn active" data-section="posing" type="button">Posing Coach</button>
+    <button class="mob-tab-btn" data-section="lift" type="button">Lift-Form Coach</button>
+  </div>
+
+  <div class="mob-section active" id="section-posing">
+    <div class="mob-rule"><strong>How it works:</strong> pick a pose, hold it steady for ~1.5s and the camera auto-captures a still to compare against the reference photo.</div>
+    <div class="mob-card"><div class="mob-card-body">Posing Coach camera UI goes here (Task 8).</div></div>
+  </div>
+
+  <div class="mob-section" id="section-lift">
+    <div class="mob-rule"><strong>How it works:</strong> name the exercise, record a set, get a rep-by-rep readout of ROM/tempo/stability scored against your own average for that set.</div>
+    <div class="mob-card"><div class="mob-card-body">Lift-Form Coach camera UI goes here (Task 9).</div></div>
+  </div>
+</div>
+
+<nav class="gym-tabbar">
+  <div class="gym-tabbar-inner">
+    <a class="gym-tab" href="gym.html">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="3" width="12" height="2" rx="1" fill="currentColor"/><rect x="2" y="7" width="8" height="2" rx="1" fill="currentColor"/><rect x="2" y="11" width="10" height="2" rx="1" fill="currentColor"/></svg>
+      Fitness
+    </a>
+    <a class="gym-tab" href="posing.html">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="8" cy="2.5" r="1.5" fill="currentColor"/><path d="M8 4v4M8 8l-2-3M6 5l-1.5-.5M8 8l2-3M10 5l1.5-.5M8 8l-1.5 5M8 8l1.5 5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
+      Posing
+    </a>
+    <a class="gym-tab active" href="form-coach.html">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="2" width="12" height="9" rx="1.5" stroke="currentColor" stroke-width="1.3" fill="none"/><circle cx="8" cy="6.5" r="1.6" stroke="currentColor" stroke-width="1.2" fill="none"/><path d="M2 13h12" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+      Form Coach
+    </a>
+  </div>
+</nav>
+
+<script src="form-coach-logic.js"></script>
+<script>
+(function () {
+  var tabs = document.querySelectorAll('.mob-tab-btn');
+  tabs.forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      tabs.forEach(function (b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      document.querySelectorAll('.mob-section').forEach(function (s) { s.classList.remove('active'); });
+      document.getElementById('section-' + btn.dataset.section).classList.add('active');
+    });
+  });
+})();
+</script>
+</body>
+</html>
