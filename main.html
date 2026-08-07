@@ -2086,12 +2086,8 @@ body::after {
     return wrap;
   }
 
-  function mlBuildCompleted(session) {
+  function mlBuildMoverList(session) {
     const ML = window.MorningLaunchLogic;
-    const wrap = el('div', 'ml-phase');
-    const summary = ML.summarize(session);
-    wrap.appendChild(el('div', 'ml-phase-title', 'Win: ' + (summary.winCondition || '—')));
-
     const goalsByDateKey = mlGoalsByDateKey();
     const list = el('ul', 'ml-outcome-list');
     session.needleMovers.slice().sort((a, b) => a.order - b.order).forEach(m => {
@@ -2124,7 +2120,15 @@ body::after {
       }
       list.appendChild(row);
     });
-    wrap.appendChild(list);
+    return list;
+  }
+
+  function mlBuildCompleted(session) {
+    const ML = window.MorningLaunchLogic;
+    const wrap = el('div', 'ml-phase');
+    const summary = ML.summarize(session);
+    wrap.appendChild(el('div', 'ml-phase-title', 'Win: ' + (summary.winCondition || '—')));
+    wrap.appendChild(mlBuildMoverList(session));
 
     wrap.appendChild(el('div', 'ml-sub', 'First action: ' + (summary.currentFirstAction || 'All movers complete.')));
     wrap.appendChild(el('div', 'ml-ifthen', summary.ifThen));
