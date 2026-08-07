@@ -311,6 +311,18 @@ body::after {
   color: var(--text-secondary); text-decoration: none;
 }
 
+.coach-read-card {
+  padding: 14px 16px; border-radius: 16px; margin: 0 0 20px;
+  background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06);
+}
+.coach-read-label {
+  font-family: var(--font-mono); font-size: 11px; font-weight: 700;
+  letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent);
+  margin-bottom: 6px;
+}
+.coach-read-week { color: var(--text-tertiary); font-weight: 500; text-transform: none; letter-spacing: normal; }
+.coach-read-text { font-size: 14px; line-height: 1.5; color: var(--text-secondary); }
+
 /* ===== Responsive ===== */
 @media (max-width: 720px) {
   .bento {
@@ -366,6 +378,11 @@ body::after {
     <a href="health.html" class="ops-chip"><span id="opsMacroChip">Macros</span></a>
     <a href="health.html" class="ops-chip"><span id="opsStackChip">Stack</span></a>
     <a href="gym.html" class="ops-chip"><span id="opsCheckinChip">Check-in</span></a>
+  </div>
+
+  <div class="coach-read-card" id="coachReadCard" style="display:none">
+    <div class="coach-read-label">Coach's Read <span class="coach-read-week" id="coachReadWeek"></span></div>
+    <div class="coach-read-text" id="coachReadText"></div>
   </div>
 
   <div class="bento">
@@ -547,6 +564,29 @@ body::after {
       if (raw) { try { targets = Object.assign({}, DEFAULT_TARGETS, JSON.parse(raw)); } catch (e) {} }
       const remaining = window.MacroCalc.remainingBudget(targets, data || []);
       document.getElementById('opsMacroChip').textContent = Math.round(remaining.calories) + ' cal left';
+    } catch (e) {}
+  })();
+
+  // Coach's Read — Jarvis's weekly stall/volume/Faith+Iron narrative, read
+  // straight from the app_state row Jarvis's coach-read tool already writes.
+  // Row never computes or writes this data, only displays it.
+  (async function initCoachRead() {
+    try {
+      if (!window.supabase) return;
+      const client = window.supabase.createClient(
+        'https://vikpcejlyxieguorwysf.supabase.co',
+        'sb_publishable_EvWPtfW1FBW5Vf-H6w0yHw_PcXK4imv'
+      );
+      const { data, error } = await client.from('app_state').select('data').eq('key', 'jarvis:coach_read').maybeSingle();
+      if (error || !data || !data.data || !data.data.narrative) return;
+      const read = data.data;
+      document.getElementById('coachReadText').textContent = read.narrative;
+      const weekEl = document.getElementById('coachReadWeek');
+      if (read.weekOf) {
+        const days = Math.round((Date.now() - new Date(read.weekOf + 'T00:00:00Z').getTime()) / 86400000);
+        weekEl.textContent = days > 10 ? '· stale (week of ' + read.weekOf + ')' : '· week of ' + read.weekOf;
+      }
+      document.getElementById('coachReadCard').style.display = '';
     } catch (e) {}
   })();
 
