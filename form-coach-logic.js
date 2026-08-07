@@ -163,6 +163,69 @@
     };
   }
 
+  // Zig-zag turning-point extraction: walks `samples` ({t, value},
+  // sorted by t ascending) and records a point only when the signal
+  // has reversed direction by at least minAmplitude since the last
+  // recorded point. Filters out camera/landmark jitter that isn't a
+  // real rep phase. Always includes the first and last sample.
+  function findExtrema(samples, minAmplitude) {
+    var extrema = [];
+    if (!samples.length) return extrema;
+    var extremeIdx = 0;
+    var direction = 0; // 0 = undetermined yet, 1 = rising, -1 = falling
+    for (var i = 1; i < samples.length; i++) {
+      var diff = samples[i].value - samples[extremeIdx].value;
+      if (direction === 0) {
+        if (Math.abs(diff) >= minAmplitude) {
+          extrema.push(samples[extremeIdx]);
+          direction = diff > 0 ? 1 : -1;
+          extremeIdx = i;
+        }
+      } else if (direction === 1) {
+        if (samples[i].value >= samples[extremeIdx].value) {
+          extremeIdx = i;
+        } else if (samples[extremeIdx].value - samples[i].value >= minAmplitude) {
+          extrema.push(samples[extremeIdx]);
+          direction = -1;
+          extremeIdx = i;
+        }
+      } else {
+        if (samples[i].value <= samples[extremeIdx].value) {
+          extremeIdx = i;
+        } else if (samples[i].value - samples[extremeIdx].value >= minAmplitude) {
+          extrema.push(samples[extremeIdx]);
+          direction = 1;
+          extremeIdx = i;
+        }
+      }
+    }
+    extrema.push(samples[extremeIdx]);
+    return extrema;
+  }
+
+  // samples: [{t: ms, value: number}, ...] sorted by t ascending — the
+  // primary tracked joint's position/angle across a recorded set.
+  // minAmplitude: the smallest value swing that counts as a real rep
+  // phase rather than jitter (caller picks this relative to the
+  // joint's expected range for that exercise). Returns
+  // [{ startT, midT, endT, rom, durationMs }, ...] — one entry per
+  // full down-up (or up-down) cycle.
+  function segmentReps(samples, minAmplitude) {
+    var extrema = findExtrema(samples, minAmplitude);
+    var reps = [];
+    for (var i = 0; i + 2 < extrema.length; i += 2) {
+      var start = extrema[i], mid = extrema[i + 1], end = extrema[i + 2];
+      reps.push({
+        startT: start.t,
+        midT: mid.t,
+        endT: end.t,
+        rom: Math.abs(mid.value - start.value),
+        durationMs: end.t - start.t
+      });
+    }
+    return reps;
+  }
+
   var api = {
     angleDeg: angleDeg,
     LANDMARK: LANDMARK,
@@ -170,7 +233,8 @@
     trackedAngles: trackedAngles,
     computeSymmetry: computeSymmetry,
     createHoldTracker: createHoldTracker,
-    updateHoldTracker: updateHoldTracker
+    updateHoldTracker: updateHoldTracker,
+    segmentReps: segmentReps
   };
   if (typeof window !== 'undefined') window.FormCoachLogic = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

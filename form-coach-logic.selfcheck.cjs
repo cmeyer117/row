@@ -103,4 +103,35 @@ assertClose(afterJump.elapsedMs, 0, 1, 'updateHoldTracker: elapsedMs resets to 0
 var nullFrame = FCL.updateHoldTracker(stepC.tracker, [90, null], 1700, 5, 1500);
 assertEqual(nullFrame.ready, false, 'updateHoldTracker: a null angle (partial detection) breaks an active hold rather than crashing');
 
+// segmentReps — a clean 2-rep signal (0 -> 10 -> 0 -> 10 -> 0) with a
+// generous minAmplitude produces exactly 2 reps with the right ROM.
+var cleanSamples = [
+  { t: 0, value: 0 }, { t: 100, value: 5 }, { t: 200, value: 10 },
+  { t: 300, value: 5 }, { t: 400, value: 0 },
+  { t: 500, value: 5 }, { t: 600, value: 10 },
+  { t: 700, value: 5 }, { t: 800, value: 0 }
+];
+var cleanReps = FCL.segmentReps(cleanSamples, 2);
+assertEqual(cleanReps.length, 2, 'segmentReps: a clean 2-rep signal produces 2 reps');
+assertClose(cleanReps[0].rom, 10, 0.01, 'segmentReps: rep 1 ROM matches the 0->10 swing');
+assertClose(cleanReps[1].rom, 10, 0.01, 'segmentReps: rep 2 ROM matches the 0->10 swing');
+assertEqual(cleanReps[0].durationMs, 400, 'segmentReps: rep 1 duration spans its full down-up cycle');
+
+// segmentReps — small jitter below minAmplitude does not create phantom reps.
+var jitterySamples = [
+  { t: 0, value: 0 }, { t: 50, value: 0.3 }, { t: 100, value: 0.1 },
+  { t: 150, value: 0.4 }, { t: 200, value: 0 }
+];
+assertEqual(FCL.segmentReps(jitterySamples, 2).length, 0, 'segmentReps: sub-threshold jitter produces no reps');
+
+// segmentReps — a short rep (half the ROM of a normal one) is still
+// captured as its own rep with the smaller ROM value, not merged away.
+var unevenSamples = [
+  { t: 0, value: 0 }, { t: 100, value: 10 }, { t: 200, value: 0 },
+  { t: 300, value: 5 }, { t: 400, value: 0 }
+];
+var unevenReps = FCL.segmentReps(unevenSamples, 2);
+assertEqual(unevenReps.length, 2, 'segmentReps: a full rep followed by a half rep still produces 2 reps');
+assertClose(unevenReps[1].rom, 5, 0.01, 'segmentReps: the shorter second rep reports its own smaller ROM');
+
 console.log('form-coach-logic.selfcheck.cjs: all assertions passed (so far)');
