@@ -61,6 +61,11 @@
     { name: 'Mixed Greens / Lettuce (raw)', protein_100g: 1.4, carb_100g: 2.9, fat_100g: 0.2, calories_100g: 15 },
     { name: 'Almonds', protein_100g: 21, carb_100g: 22, fat_100g: 50, calories_100g: 579 },
     { name: 'Peanut Butter', protein_100g: 25, carb_100g: 20, fat_100g: 50, calories_100g: 588 },
+    // Powdered PB (e.g. PB2) reconstituted with water + stevia — log the DRY POWDER
+    // grams only, same convention as Oats/Cream of Rice. Water and stevia are both
+    // ~0 calories, so they don't change the macros; weighing the finished paste would
+    // just dilute the number for no reason.
+    { name: 'Peanut Butter, Powdered (dry)', protein_100g: 33, carb_100g: 42, fat_100g: 13, calories_100g: 375 },
     { name: 'Walnuts', protein_100g: 15, carb_100g: 14, fat_100g: 65, calories_100g: 654 },
     { name: 'Cashews', protein_100g: 18, carb_100g: 30, fat_100g: 44, calories_100g: 553 },
     { name: 'Avocado', protein_100g: 2, carb_100g: 8.5, fat_100g: 14.7, calories_100g: 160 },
