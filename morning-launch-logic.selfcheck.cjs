@@ -131,4 +131,33 @@ assertEqual(projection.movers.length, 3, 'vault export projection includes three
 assertEqual(projection.ifThen, 'If I get distracted, then I will refocus.', 'vault export projection includes formatted if-then sentence');
 assertEqual(L.vaultExportProjection(L.newSession('2026-08-06')), null, 'vault export projection is null for a non-completed, non-skipped session');
 
+// --- evening shutdown ---
+assertEqual(L.validateEveningClose(null).ok, false, 'validateEveningClose fails on null');
+assertEqual(L.validateEveningClose({}).ok, false, 'validateEveningClose fails with no verdict');
+assertEqual(L.validateEveningClose({ verdict: 'nope' }).ok, false, 'validateEveningClose fails on an invalid verdict value');
+assertEqual(L.validateEveningClose({ verdict: 'win' }).ok, true, 'validateEveningClose succeeds with verdict win');
+assertEqual(L.validateEveningClose({ verdict: 'push' }).ok, true, 'validateEveningClose succeeds with verdict push');
+assertEqual(L.validateEveningClose({ verdict: 'miss' }).ok, true, 'validateEveningClose succeeds with verdict miss');
+
+const launchSession = { needleMovers: completeMovers, evening: null };
+const launchProj = L.buildEveningShutdown(launchSession, [{ id: 'g1', text: 'unrelated today item' }]);
+assertEqual(launchProj.source, 'launch', 'buildEveningShutdown uses launch movers when a session has needleMovers');
+assertEqual(launchProj.movers.length, 3, 'buildEveningShutdown returns all three movers for a launch session');
+assertEqual(launchProj.todayGoals.length, 0, 'buildEveningShutdown does not return todayGoals when movers exist');
+
+const noLaunchSession = { needleMovers: [], evening: null };
+const todayFallback = [{ id: 'g1', text: 'Ad-hoc task' }];
+const fallbackProj = L.buildEveningShutdown(noLaunchSession, todayFallback);
+assertEqual(fallbackProj.source, 'today', 'buildEveningShutdown falls back to today when there are no movers');
+assertEqual(fallbackProj.movers.length, 0, 'buildEveningShutdown returns no movers in the today fallback');
+assertEqual(fallbackProj.todayGoals.length, 1, 'buildEveningShutdown returns todayGoals in the fallback case');
+
+assertEqual(L.buildEveningShutdown(L.newSession('2026-08-06'), []).source, 'today', 'a fresh (absent-day) session falls back to today with zero items, not an error');
+
+// old records without verdict/verdictNote still export cleanly (backward compatibility)
+const oldStyleSession = Object.assign({}, result.session, { evening: { moved: 'a', interference: 'b', tomorrowChange: 'c', completedAt: '2026-08-01T22:00:00.000Z' } });
+const oldProjection = L.vaultExportProjection(oldStyleSession);
+assertEqual(oldProjection.evening.moved, 'a', 'vault export projection still includes evening fields from an old-format record with no verdict');
+assertEqual(oldProjection.evening.verdict, undefined, 'old-format evening record has no verdict field, and none is fabricated');
+
 console.log('morning-launch-logic.selfcheck.cjs: all assertions passed');

@@ -189,6 +189,31 @@
     };
   }
 
+  var EVENING_VERDICTS = ['win', 'push', 'miss'];
+
+  function validateEveningClose(evening) {
+    var errors = [];
+    if (!evening || EVENING_VERDICTS.indexOf(evening.verdict) === -1) {
+      errors.push('A Win/Push/Miss verdict is required.');
+    }
+    return { ok: errors.length === 0, errors: errors };
+  }
+
+  // Projection of what the Evening Shutdown panel shows: the day's movers
+  // when a launch exists, otherwise today's Goals list as a fallback so the
+  // ritual still works on skipped/no-launch days. vaultExportProjection
+  // needs no separate change for verdict/verdictNote -- it already exports
+  // the whole evening object, so any new fields on it ride along for free.
+  function buildEveningShutdown(session, todayGoals) {
+    var hasMovers = !!(session && Array.isArray(session.needleMovers) && session.needleMovers.length > 0);
+    return {
+      source: hasMovers ? 'launch' : 'today',
+      movers: hasMovers ? session.needleMovers : [],
+      todayGoals: hasMovers ? [] : (todayGoals || []),
+      evening: (session && session.evening) || null
+    };
+  }
+
   var api = {
     newSession: newSession,
     validateOutcomes: validateOutcomes,
@@ -202,7 +227,9 @@
     reconcileFromToday: reconcileFromToday,
     completeSession: completeSession,
     summarize: summarize,
-    vaultExportProjection: vaultExportProjection
+    vaultExportProjection: vaultExportProjection,
+    validateEveningClose: validateEveningClose,
+    buildEveningShutdown: buildEveningShutdown
   };
   if (typeof window !== 'undefined') window.MorningLaunchLogic = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
