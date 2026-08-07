@@ -173,7 +173,54 @@ html, body {
   </div>
 </nav>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="form-coach-logic.js"></script>
+<script>
+// History logging — fire-and-forget capture of each completed session so
+// Carl can judge scoring accuracy across real sessions later. No read path,
+// no UI here on purpose (see docs/superpowers/specs/
+// 2026-08-06-form-coach-history-logging-design.md) -- capture only. A
+// failed write never surfaces to the user; the on-screen result (which the
+// user already sees) is the primary feature, this is optional data capture
+// riding alongside it. Same shared Supabase project as gym.html/posing.html,
+// its own client since this page intentionally doesn't touch gym.html's
+// sync machinery.
+(function () {
+  var FC_SUPABASE_URL = 'https://vikpcejlyxieguorwysf.supabase.co';
+  var FC_SUPABASE_KEY = 'sb_publishable_EvWPtfW1FBW5Vf-H6w0yHw_PcXK4imv';
+  var FC_HISTORY_KEY = 'row:form-coach-history';
+  var fcSupa = null;
+
+  function getFcSupa() {
+    if (!fcSupa && window.supabase) fcSupa = window.supabase.createClient(FC_SUPABASE_URL, FC_SUPABASE_KEY);
+    return fcSupa;
+  }
+
+  window.FormCoachHistory = {
+    logSession: function (type, data) {
+      var supa = getFcSupa();
+      if (!supa) return;
+      var record = window.FormCoachLogic.buildHistoryRecord(type, data);
+      if (!record) return;
+      supa.from('app_state').select('data').eq('key', FC_HISTORY_KEY).maybeSingle()
+        .then(function (res) {
+          var sessions = (res.data && res.data.data && Array.isArray(res.data.data.sessions)) ? res.data.data.sessions : [];
+          sessions.push(record);
+          return supa.from('app_state').upsert(
+            { key: FC_HISTORY_KEY, data: { sessions: sessions }, updated_at: new Date().toISOString() },
+            { onConflict: 'key' }
+          );
+        })
+        .then(function (res) {
+          if (res && res.error) console.warn('[form-coach-history] write failed:', res.error.message);
+        })
+        .catch(function (err) {
+          console.warn('[form-coach-history] write threw:', err && err.message);
+        });
+    }
+  };
+})();
+</script>
 <script type="module">
 import { PoseLandmarker, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest";
 
@@ -340,6 +387,7 @@ window.FormCoachActiveMode = 'posing';
     canvas.height = video.videoHeight;
     canvas.getContext('2d').drawImage(video, 0, 0);
     var symmetry = window.FormCoachLogic.computeSymmetry(lastLandmarks, activeSlug);
+    window.FormCoachHistory.logSession('posing', { pose: activeSlug, holdTimeMs: holdMs, symmetry: symmetry });
     document.getElementById('posingResult').innerHTML =
       '<div class="fc-compare">' +
         '<div><div class="fc-compare-label">You</div></div>' +
@@ -483,7 +531,9 @@ window.FormCoachActiveMode = 'posing';
       var stabilitySamples = buildStabilitySamples(buffer);
       var minAmplitude = primary.range * 0.15; // 15% of the set's own observed range filters jitter without hiding a real short rep
       var scored = window.FormCoachLogic.scoreSet(primary.samples, stabilitySamples, minAmplitude);
-      renderResult(scored, document.getElementById('liftExerciseName').value.trim());
+      var exerciseName = document.getElementById('liftExerciseName').value.trim();
+      if (scored.length) window.FormCoachHistory.logSession('lift', { exercise: exerciseName, reps: scored });
+      renderResult(scored, exerciseName);
     }
   });
 })();

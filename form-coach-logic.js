@@ -300,6 +300,23 @@
     });
   }
 
+  // Shapes a completed session's result into the record format written to
+  // the 'row:form-coach-history' app_state key (see form-coach.html). Pure
+  // — just stamps a timestamp and wraps the caller's already-computed
+  // result (computeSymmetry's or scoreSet's output) rather than reshaping
+  // it, so this stays a thin adapter, not a second source of truth for
+  // field names. nowIso is injectable for testing; defaults to real time.
+  function buildHistoryRecord(type, data, nowIso) {
+    var timestamp = nowIso || new Date().toISOString();
+    if (type === 'posing') {
+      return { type: 'posing', timestamp: timestamp, pose: data.pose, holdTimeMs: data.holdTimeMs, symmetry: data.symmetry };
+    }
+    if (type === 'lift') {
+      return { type: 'lift', timestamp: timestamp, exercise: data.exercise, reps: data.reps };
+    }
+    return null;
+  }
+
   var api = {
     angleDeg: angleDeg,
     LANDMARK: LANDMARK,
@@ -311,7 +328,8 @@
     segmentReps: segmentReps,
     scoreReps: scoreReps,
     scoreStability: scoreStability,
-    scoreSet: scoreSet
+    scoreSet: scoreSet,
+    buildHistoryRecord: buildHistoryRecord
   };
   if (typeof window !== 'undefined') window.FormCoachLogic = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

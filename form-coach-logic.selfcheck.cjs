@@ -187,4 +187,25 @@ var e2eResult = FCL.scoreSet(e2eSamples, e2eStability, 2);
 assertEqual(e2eResult.length, 2, 'scoreSet: end-to-end produces one entry per detected rep');
 assertEqual(e2eResult[1].romFlag, true, 'scoreSet: end-to-end correctly flags the short second rep');
 
+// buildHistoryRecord — posing shape wraps caller data with a type tag and timestamp.
+var posingRecord = FCL.buildHistoryRecord('posing', { pose: 'front-double-biceps', holdTimeMs: 1620, symmetry: symResult }, '2026-08-07T00:00:00.000Z');
+assertEqual(posingRecord.type, 'posing', 'buildHistoryRecord: posing record has type "posing"');
+assertEqual(posingRecord.pose, 'front-double-biceps', 'buildHistoryRecord: posing record carries the pose slug through');
+assertEqual(posingRecord.holdTimeMs, 1620, 'buildHistoryRecord: posing record carries holdTimeMs through');
+assertEqual(posingRecord.symmetry, symResult, 'buildHistoryRecord: posing record carries the symmetry array through unmodified');
+assertEqual(posingRecord.timestamp, '2026-08-07T00:00:00.000Z', 'buildHistoryRecord: uses the injected timestamp when provided');
+
+// buildHistoryRecord — lift shape wraps caller data the same way.
+var liftRecord = FCL.buildHistoryRecord('lift', { exercise: 'Hack Squat', reps: e2eResult }, '2026-08-07T00:00:00.000Z');
+assertEqual(liftRecord.type, 'lift', 'buildHistoryRecord: lift record has type "lift"');
+assertEqual(liftRecord.exercise, 'Hack Squat', 'buildHistoryRecord: lift record carries the exercise name through');
+assertEqual(liftRecord.reps, e2eResult, 'buildHistoryRecord: lift record carries the scored reps array through unmodified');
+
+// buildHistoryRecord — an unknown type returns null rather than a malformed record.
+assertEqual(FCL.buildHistoryRecord('bogus', {}), null, 'buildHistoryRecord: an unrecognized type returns null');
+
+// buildHistoryRecord — omitting nowIso falls back to a real ISO timestamp, not undefined.
+var autoStamped = FCL.buildHistoryRecord('posing', { pose: 'side-chest', holdTimeMs: 1500, symmetry: [] });
+assertEqual(typeof autoStamped.timestamp, 'string', 'buildHistoryRecord: timestamp defaults to a real ISO string when not injected');
+
 console.log('form-coach-logic.selfcheck.cjs: all assertions passed');
