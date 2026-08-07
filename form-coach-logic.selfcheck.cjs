@@ -134,4 +134,57 @@ var unevenReps = FCL.segmentReps(unevenSamples, 2);
 assertEqual(unevenReps.length, 2, 'segmentReps: a full rep followed by a half rep still produces 2 reps');
 assertClose(unevenReps[1].rom, 5, 0.01, 'segmentReps: the shorter second rep reports its own smaller ROM');
 
-console.log('form-coach-logic.selfcheck.cjs: all assertions passed (so far)');
+// scoreReps — a clearly short rep (well under 70% of the set average
+// ROM) is flagged; normal reps are not.
+var repsForScoring = [
+  { rom: 10, durationMs: 1000 },
+  { rom: 10, durationMs: 1000 },
+  { rom: 4, durationMs: 1000 }
+];
+var romScored = FCL.scoreReps(repsForScoring);
+assertEqual(romScored[0].romFlag, false, 'scoreReps: a rep at the set average ROM is not flagged');
+assertEqual(romScored[2].romFlag, true, 'scoreReps: a rep well under the set average ROM (4 vs ~8) is flagged short');
+
+// scoreReps — a rushed rep (much faster than the set average) is
+// flagged for tempo; a normal-speed rep is not.
+var tempoReps = [
+  { rom: 10, durationMs: 1000 },
+  { rom: 10, durationMs: 1000 },
+  { rom: 10, durationMs: 300 }
+];
+var tempoScored = FCL.scoreReps(tempoReps);
+assertEqual(tempoScored[0].tempoFlag, false, 'scoreReps: a rep at the set average tempo is not flagged');
+assertEqual(tempoScored[2].tempoFlag, true, 'scoreReps: a rep much faster than the set average is flagged for rushed tempo');
+
+// scoreStability — a rep whose window has much higher jitter than the
+// set average is flagged; calm reps are not.
+var stabilityReps = [
+  { startT: 0, endT: 100 },
+  { startT: 100, endT: 200 },
+  { startT: 200, endT: 300 }
+];
+var stabilitySamples = [
+  { t: 50, jitter: 1 }, { t: 150, jitter: 1 }, { t: 250, jitter: 10 }
+];
+var stabilityScored = FCL.scoreStability(stabilitySamples, stabilityReps);
+assertEqual(stabilityScored[0].stabilityFlag, false, 'scoreStability: a calm rep is not flagged');
+assertEqual(stabilityScored[2].stabilityFlag, true, 'scoreStability: a rep with much higher jitter than the set average is flagged');
+
+// scoreStability — no stability samples at all (e.g. tracker lost the
+// stability landmark) degrades to unflagged rather than crashing.
+var noStability = FCL.scoreStability([], stabilityReps);
+assertEqual(noStability[0].stabilityFlag, false, 'scoreStability: missing stability samples degrades to unflagged, not a crash');
+assertEqual(noStability[0].avgJitter, null, 'scoreStability: missing stability samples reports avgJitter null');
+
+// scoreSet — end-to-end wiring: a 2-rep signal with one flagged-short
+// rep produces one flagged entry in the final combined result.
+var e2eSamples = [
+  { t: 0, value: 0 }, { t: 100, value: 10 }, { t: 200, value: 0 },
+  { t: 300, value: 3 }, { t: 400, value: 0 }
+];
+var e2eStability = [{ t: 50, jitter: 1 }, { t: 350, jitter: 1 }];
+var e2eResult = FCL.scoreSet(e2eSamples, e2eStability, 2);
+assertEqual(e2eResult.length, 2, 'scoreSet: end-to-end produces one entry per detected rep');
+assertEqual(e2eResult[1].romFlag, true, 'scoreSet: end-to-end correctly flags the short second rep');
+
+console.log('form-coach-logic.selfcheck.cjs: all assertions passed');

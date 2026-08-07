@@ -226,6 +226,80 @@
     return reps;
   }
 
+  function round2(n) { return Math.round(n * 100) / 100; }
+
+  // Scores each rep's ROM and tempo against the set's own average.
+  // romFlagPct: a rep with ROM below this fraction of the set average
+  // is flagged short (default 0.7 = 70%). tempoFlagRatio: a rep whose
+  // duration is more than this many times the average, OR less than
+  // 1/this-many times the average, is flagged as rushed or bounced
+  // (default 1.5x either direction). Empty input returns [].
+  function scoreReps(reps, romFlagPct, tempoFlagRatio) {
+    romFlagPct = romFlagPct || 0.7;
+    tempoFlagRatio = tempoFlagRatio || 1.5;
+    if (!reps.length) return [];
+    var avgRom = reps.reduce(function (s, r) { return s + r.rom; }, 0) / reps.length;
+    var avgDuration = reps.reduce(function (s, r) { return s + r.durationMs; }, 0) / reps.length;
+    return reps.map(function (r, idx) {
+      var romPct = avgRom > 0 ? r.rom / avgRom : 1;
+      var tempoRatio = avgDuration > 0 ? r.durationMs / avgDuration : 1;
+      return {
+        index: idx + 1,
+        rom: round2(r.rom),
+        romPct: round2(romPct),
+        romFlag: romPct < romFlagPct,
+        durationMs: r.durationMs,
+        tempoRatio: round2(tempoRatio),
+        tempoFlag: tempoRatio > tempoFlagRatio || tempoRatio < (1 / tempoFlagRatio)
+      };
+    });
+  }
+
+  // stabilitySamples: [{t: ms, jitter: number}, ...] — per-frame
+  // magnitude of a stability landmark's (e.g. hip midpoint) frame-to-
+  // frame movement, supplied by the caller. Flags a rep whose average
+  // jitter during its [startT, endT] window is notably higher than
+  // the set's average jitter (default: more than 1.5x).
+  function scoreStability(stabilitySamples, reps, flagRatio) {
+    flagRatio = flagRatio || 1.5;
+    if (!reps.length) return [];
+    if (!stabilitySamples.length) {
+      return reps.map(function (_, idx) { return { index: idx + 1, avgJitter: null, stabilityFlag: false }; });
+    }
+    var perRepJitter = reps.map(function (r) {
+      var inWindow = stabilitySamples.filter(function (s) { return s.t >= r.startT && s.t <= r.endT; });
+      if (!inWindow.length) return 0;
+      return inWindow.reduce(function (s, x) { return s + x.jitter; }, 0) / inWindow.length;
+    });
+    var avgAll = perRepJitter.reduce(function (s, v) { return s + v; }, 0) / perRepJitter.length;
+    return perRepJitter.map(function (j, idx) {
+      var ratio = avgAll > 0 ? j / avgAll : 1;
+      return { index: idx + 1, avgJitter: round2(j), stabilityFlag: ratio > flagRatio };
+    });
+  }
+
+  // Combines segmentReps + scoreReps + scoreStability into one
+  // rep-by-rep result array: [{ index, rom, romPct, romFlag,
+  // durationMs, tempoRatio, tempoFlag, avgJitter, stabilityFlag }, ...]
+  function scoreSet(samples, stabilitySamples, minAmplitude) {
+    var reps = segmentReps(samples, minAmplitude);
+    var romTempo = scoreReps(reps);
+    var stability = scoreStability(stabilitySamples, reps);
+    return romTempo.map(function (r, idx) {
+      return {
+        index: r.index,
+        rom: r.rom,
+        romPct: r.romPct,
+        romFlag: r.romFlag,
+        durationMs: r.durationMs,
+        tempoRatio: r.tempoRatio,
+        tempoFlag: r.tempoFlag,
+        avgJitter: stability[idx].avgJitter,
+        stabilityFlag: stability[idx].stabilityFlag
+      };
+    });
+  }
+
   var api = {
     angleDeg: angleDeg,
     LANDMARK: LANDMARK,
@@ -234,7 +308,10 @@
     computeSymmetry: computeSymmetry,
     createHoldTracker: createHoldTracker,
     updateHoldTracker: updateHoldTracker,
-    segmentReps: segmentReps
+    segmentReps: segmentReps,
+    scoreReps: scoreReps,
+    scoreStability: scoreStability,
+    scoreSet: scoreSet
   };
   if (typeof window !== 'undefined') window.FormCoachLogic = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
