@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0a0b">
+<title>Road to Pro — Carl Meyer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="road-to-pro-data.js"></script>
+<style>
+:root {
+  --bg: #000000;
+  --text-1: #F4F1EA;
+  --text-2: rgba(244,241,234,0.6);
+  --text-3: rgba(244,241,234,0.4);
+  --border: rgba(255,255,255,0.08);
+  --accent: #6ee7b7;
+  --font: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SF Mono, Menlo, Consolas, monospace;
+}
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; padding: 0;
+  background: var(--bg);
+  color: var(--text-1);
+  font-family: var(--font);
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+}
+body { max-width: 640px; margin: 0 auto; padding: max(40px, env(safe-area-inset-top)) 20px 80px; }
+h1 { font-family: 'Instrument Serif', Georgia, serif; font-size: 40px; margin: 0 0 4px; }
+.tagline { color: var(--text-2); font-size: 15px; margin: 0 0 40px; }
+.entry { border-left: 2px solid var(--border); padding: 0 0 32px 20px; position: relative; }
+.entry::before {
+  content: ''; position: absolute; left: -6px; top: 4px;
+  width: 10px; height: 10px; border-radius: 50%; background: var(--accent);
+}
+.entry-date { font-family: var(--font-mono); font-size: 12px; color: var(--accent); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 6px; }
+.entry-title { font-size: 20px; font-weight: 700; margin: 0 0 6px; }
+.entry-body { color: var(--text-2); font-size: 15px; line-height: 1.5; margin: 0; }
+.entry-metric { display: inline-block; margin-top: 10px; font-family: var(--font-mono); font-size: 13px; color: var(--text-1); background: rgba(110,231,183,0.1); border: 1px solid rgba(110,231,183,0.3); border-radius: 999px; padding: 4px 12px; }
+.empty-state { color: var(--text-3); font-size: 14px; padding: 40px 0; text-align: center; }
+</style>
+</head>
+<body>
+<h1>Road to Pro</h1>
+<p class="tagline">The public record — Carl Meyer's journey to a Pro card.</p>
+<div id="timeline"></div>
+
+<script>
+(function () {
+  'use strict';
+
+  function el(tag, cls, text) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;
+    return e;
+  }
+
+  function render() {
+    var timeline = document.getElementById('timeline');
+    var entries = (window.RoadToProData && Array.isArray(window.RoadToProData.ENTRIES))
+      ? window.RoadToProData.ENTRIES
+      : [];
+
+    if (!entries.length) {
+      timeline.appendChild(el('div', 'empty-state', 'More to come.'));
+      return;
+    }
+
+    var sorted = entries.slice().sort(function (a, b) { return b.date.localeCompare(a.date); });
+    sorted.forEach(function (entry) {
+      var card = el('div', 'entry');
+      card.appendChild(el('div', 'entry-date', entry.date));
+      card.appendChild(el('div', 'entry-title', entry.title));
+      card.appendChild(el('p', 'entry-body', entry.body));
+      if (entry.metric) card.appendChild(el('span', 'entry-metric', entry.metric));
+      timeline.appendChild(card);
+    });
+  }
+
+  render();
+})();
+</script>
+</body>
+</html>
