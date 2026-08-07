@@ -143,7 +143,16 @@ html, body {
 
   <div class="mob-section" id="section-lift">
     <div class="mob-rule"><strong>How it works:</strong> name the exercise, record a set, get a rep-by-rep readout of ROM/tempo/stability scored against your own average for that set.</div>
-    <div class="mob-card"><div class="mob-card-body">Lift-Form Coach camera UI goes here (Task 9).</div></div>
+
+    <input class="fc-input" id="liftExerciseName" type="text" placeholder="Exercise name (e.g. Hack Squat)">
+
+    <div class="fc-camera-wrap" id="liftCameraWrap">
+      <video id="liftVideo" autoplay playsinline muted></video>
+      <div class="fc-status-banner" id="liftStatus">Requesting camera…</div>
+    </div>
+
+    <button class="fc-btn fc-btn-primary" id="recordSetBtn" type="button">Record Set</button>
+    <div id="liftResult"></div>
   </div>
 </div>
 
@@ -333,6 +342,106 @@ window.dispatchEvent(new Event('form-coach-camera-ready'));
         if (step.ready) captureFreeze(step.elapsedMs);
       }, 120);
     });
+  });
+})();
+</script>
+<script>
+(function () {
+  var video = document.getElementById('liftVideo');
+  var statusEl = document.getElementById('liftStatus');
+  var recordBtn = document.getElementById('recordSetBtn');
+  var resultEl = document.getElementById('liftResult');
+  var recording = false;
+  var buffer = []; // [{ t, landmarks }]
+  var lastLandmarks = null;
+  var cameraStarted = false;
+  var LIFT_LANDMARK = window.FormCoachLogic.LANDMARK;
+
+  function midpoint(a, b) { return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }; }
+
+  // Picks the tracked point with the greatest y-range across the
+  // buffered recording as the primary rep-segmentation axis — a
+  // wrist for a press pattern, a hip for a squat pattern, etc.,
+  // without needing to know the exercise in advance.
+  function buildPrimarySignal(frames) {
+    var candidates = {
+      wristAvgY: function (lm) { return (lm[LIFT_LANDMARK.L_WRIST].y + lm[LIFT_LANDMARK.R_WRIST].y) / 2; },
+      hipAvgY: function (lm) { return (lm[LIFT_LANDMARK.L_HIP].y + lm[LIFT_LANDMARK.R_HIP].y) / 2; },
+      kneeAvgY: function (lm) { return (lm[LIFT_LANDMARK.L_KNEE].y + lm[LIFT_LANDMARK.R_KNEE].y) / 2; }
+    };
+    var best = null, bestRange = -1;
+    Object.keys(candidates).forEach(function (name) {
+      var values = frames.map(function (f) { return candidates[name](f.landmarks); });
+      var range = Math.max.apply(null, values) - Math.min.apply(null, values);
+      if (range > bestRange) { bestRange = range; best = name; }
+    });
+    var samples = frames.map(function (f) { return { t: f.t, value: candidates[best](f.landmarks) }; });
+    return { samples: samples, range: bestRange };
+  }
+
+  function buildStabilitySamples(frames) {
+    var out = [];
+    for (var i = 1; i < frames.length; i++) {
+      var prevHip = midpoint(frames[i - 1].landmarks[LIFT_LANDMARK.L_HIP], frames[i - 1].landmarks[LIFT_LANDMARK.R_HIP]);
+      var currHip = midpoint(frames[i].landmarks[LIFT_LANDMARK.L_HIP], frames[i].landmarks[LIFT_LANDMARK.R_HIP]);
+      var dx = currHip.x - prevHip.x, dy = currHip.y - prevHip.y;
+      out.push({ t: frames[i].t, jitter: Math.sqrt(dx * dx + dy * dy) });
+    }
+    return out;
+  }
+
+  function renderResult(scored, exerciseName) {
+    if (!scored.length) {
+      resultEl.innerHTML = '<div class="mob-card"><div class="mob-card-body">No clear reps detected — make sure your full body stays in frame through the whole set.</div></div>';
+      return;
+    }
+    var rows = scored.map(function (r) {
+      var flags = [];
+      if (r.romFlag) flags.push('<span class="fc-rep-flag">Short ROM</span>');
+      if (r.tempoFlag) flags.push('<span class="fc-rep-flag">Rushed/bounced</span>');
+      if (r.stabilityFlag) flags.push('<span class="fc-rep-flag">Unstable</span>');
+      return '<div class="fc-rep-row"><span>Rep ' + r.index + ' — ' + Math.round(r.romPct * 100) + '% ROM</span><span>' + (flags.join(' ') || 'Good') + '</span></div>';
+    }).join('');
+    resultEl.innerHTML = '<div class="mob-card"><div class="mob-card-body"><strong>' + (exerciseName || 'Set') + '</strong> — ' + scored.length + ' reps</div></div><div class="mob-card">' + rows + '</div>';
+  }
+
+  window.addEventListener('form-coach-camera-ready', function () {
+    // Reuses the same camera stream Task 8 requested — only one
+    // getUserMedia prompt for the whole page. If Posing Coach hasn't
+    // initialized yet (e.g. Carl opens directly on the Lift-Form tab),
+    // initCamera() is safe to call again; it re-requests the stream.
+    window.FormCoachCamera.initCamera(video, statusEl).then(function (ok) {
+      cameraStarted = ok;
+      if (!ok) return;
+      window.FormCoachCamera.startDetectionLoop(video, function (landmarks, nowMs) {
+        lastLandmarks = landmarks;
+        if (recording && landmarks) buffer.push({ t: nowMs, landmarks: landmarks });
+      }, 100);
+    });
+  });
+
+  recordBtn.addEventListener('click', function () {
+    if (!cameraStarted) return;
+    if (!recording) {
+      recording = true;
+      buffer = [];
+      resultEl.innerHTML = '';
+      recordBtn.textContent = 'Stop Recording';
+      recordBtn.className = 'fc-btn fc-btn-secondary';
+    } else {
+      recording = false;
+      recordBtn.textContent = 'Record Set';
+      recordBtn.className = 'fc-btn fc-btn-primary';
+      if (buffer.length < 10) {
+        resultEl.innerHTML = '<div class="mob-card"><div class="mob-card-body">Recording too short — try a longer set.</div></div>';
+        return;
+      }
+      var primary = buildPrimarySignal(buffer);
+      var stabilitySamples = buildStabilitySamples(buffer);
+      var minAmplitude = primary.range * 0.15; // 15% of the set's own observed range filters jitter without hiding a real short rep
+      var scored = window.FormCoachLogic.scoreSet(primary.samples, stabilitySamples, minAmplitude);
+      renderResult(scored, document.getElementById('liftExerciseName').value.trim());
+    }
   });
 })();
 </script>
