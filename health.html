@@ -850,10 +850,10 @@ main {
 
   const MEALS = [
     { id: 'meal1', name: 'Meal 1',
-      items: '2 whole eggs · 45g egg whites · 2 slices turkey bacon · 200g fruit\n30g oats or 20g cream of rice · 1 cup green veggies',
+      items: '2 whole eggs · 45g egg whites · 2 slices turkey bacon · 200g fruit\n20g oats or 30g cream of rice · 1 cup green veggies',
       note: 'Meat measured cooked · eggs as-is' },
     { id: 'meal2', name: 'Meal 2',
-      items: '6oz chicken / tilapia / 99% ground turkey\n200g rice or 525g potatoes · 1 cup veggies',
+      items: '6oz chicken / tilapia / 99% ground turkey\n250g rice or 375g potatoes · 1 cup veggies',
       note: 'Potatoes uncooked · rice & pasta cooked' },
     { id: 'meal3', name: 'Meal 3',
       items: '6oz chicken / tilapia / 99% ground turkey\n200g rice or 525g potatoes · 1 cup veggies', note: '' },
@@ -861,7 +861,7 @@ main {
       items: '15g EAAs · 1g salt · 10g creatine',
       note: 'Lift days only — skip on rest days' },
     { id: 'meal4', name: 'Meal 4',
-      items: '6oz chicken / tilapia / 99% ground turkey\n200g rice or 525g potatoes · 1 cup veggies', note: '' },
+      items: '6oz chicken / tilapia / 99% ground turkey\n250g rice or 375g potatoes · 1 cup veggies', note: '' },
     { id: 'meal5', name: 'Meal 5',
       items: '6oz 93/7 ground beef or salmon · 65g sourdough bread\n1 cup veggies · 8oz kombucha · 200g fruit',
       note: 'No low-fat bread' },
@@ -1234,17 +1234,20 @@ main {
     return `${y}-${m}-${d}`;
   }
 
-  const TEMPLATE_VERSION = 7;
+  const TEMPLATE_VERSION = 8;
 
   const STACK_DEFAULTS = [
     // Morning
-    { id: 'reta',     name: 'Retatrutide',                  dose: '0.5mg',        window: 'morning', note: 'Mon & Fri only — inject morning',                      tag: null, ordered: true },
+    { id: 'reta',     name: 'Retatrutide',                  dose: '1mg',          window: 'morning', note: 'Mon & Thu only — inject morning',                      tag: null, ordered: true },
+    { id: 'clen',     name: 'Clen',                          dose: '20mcg',        window: 'morning', note: 'Daily',                                                tag: null, ordered: true },
+    { id: 'kidney',   name: 'Kidney (Morphogen)',            dose: '4 pills',      window: 'morning', note: 'AM',                                                    tag: null, ordered: true },
     { id: 'enzymes',  name: 'Digestive Enzymes (Morphogen)', dose: '1 pill',       window: 'morning', note: 'Take with meals 1, 2, and 5',                          tag: null, ordered: true },
     // During day
-    { id: 'testc',    name: 'Test C',                        dose: '100mg/shot',   window: 'anytime', note: '4x/week: Mon, Wed, Fri, Sat — space shots evenly',     tag: null, ordered: true },
-    { id: 'eq',       name: 'EQ (Boldenone)',                dose: '50mg/shot',    window: 'anytime', note: '4x/week: Mon, Wed, Fri, Sat — can pin with Test C',    tag: null, ordered: true },
+    { id: 'testc',    name: 'Test C',                        dose: '100mg/shot',   window: 'anytime', note: 'At least 6x/week (600mg/week) — space shots evenly',  tag: null, ordered: true },
+    { id: 'eq',       name: 'EQ (Boldenone)',                dose: '50mg/shot',    window: 'anytime', note: 'At least 4x/week (200mg/week) — can pin with Test C', tag: null, ordered: true },
+    { id: 'liver',    name: 'Liver Support / TUDCA (Morphogen)', dose: '',         window: 'anytime', note: '',                                                     tag: null, ordered: true },
     // Afternoon
-    { id: 'hgh',      name: 'HGH',                          dose: '3 IU',         window: 'lunch',   note: '3 PM — at least 30 min after Meal 5',                  tag: null, ordered: true },
+    { id: 'hgh',      name: 'HGH',                          dose: '4 IU',         window: 'lunch',   note: '3 PM — at least 30 min after Meal 5',                  tag: null, ordered: true },
     // Evening / before bed
     { id: 'fishoil',  name: 'Fish Oil',                     dose: '3000mg',       window: 'evening', note: 'Take at night',                                        tag: null, ordered: true },
     { id: 'magnesium',name: 'Calm Magnesium (Glycinate)',   dose: '500–1000mg',   window: 'evening', note: 'Before bed',                                           tag: null, ordered: true },
