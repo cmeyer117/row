@@ -82,4 +82,25 @@ if (Math.abs(unevenResult[0].diffDeg) < 5) {
 // computeSymmetry — a side pose (side-chest) has no bilateral comparison, returns empty.
 assertEqual(FCL.computeSymmetry(lmSymmetric, 'side-chest').length, 0, 'computeSymmetry: side-chest has no symmetryPairs, returns empty array');
 
+// updateHoldTracker — a pose held steady across several frames
+// accumulates elapsed time and eventually reports ready.
+var holdTracker = FCL.createHoldTracker();
+var stepA = FCL.updateHoldTracker(holdTracker, [90, 90], 0, 5, 1500);
+assertEqual(stepA.ready, false, 'updateHoldTracker: not ready on the very first frame');
+var stepB = FCL.updateHoldTracker(stepA.tracker, [91, 89], 500, 5, 1500);
+assertEqual(stepB.ready, false, 'updateHoldTracker: not ready after 500ms of a 1500ms hold requirement');
+assertClose(stepB.elapsedMs, 500, 1, 'updateHoldTracker: elapsedMs tracks time held so far');
+var stepC = FCL.updateHoldTracker(stepB.tracker, [90, 90], 1600, 5, 1500);
+assertEqual(stepC.ready, true, 'updateHoldTracker: ready once elapsedMs reaches holdDurationMs');
+
+// updateHoldTracker — a big angle jump (pose broken) resets the hold clock.
+var jumpTracker = FCL.updateHoldTracker(stepB.tracker, [90, 90], 1000, 5, 1500).tracker;
+var afterJump = FCL.updateHoldTracker(jumpTracker, [40, 90], 1100, 5, 1500);
+assertEqual(afterJump.ready, false, 'updateHoldTracker: a large angle jump resets readiness');
+assertClose(afterJump.elapsedMs, 0, 1, 'updateHoldTracker: elapsedMs resets to 0 right after a broken hold');
+
+// updateHoldTracker — a null angle (person partly out of frame) breaks the hold, doesn't crash.
+var nullFrame = FCL.updateHoldTracker(stepC.tracker, [90, null], 1700, 5, 1500);
+assertEqual(nullFrame.ready, false, 'updateHoldTracker: a null angle (partial detection) breaks an active hold rather than crashing');
+
 console.log('form-coach-logic.selfcheck.cjs: all assertions passed (so far)');

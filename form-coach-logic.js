@@ -129,12 +129,48 @@
     });
   }
 
+  function createHoldTracker() {
+    return { holdStartMs: null, lastValues: null };
+  }
+
+  // True if every angle in `a` is within toleranceDeg of the same-
+  // index angle in `b`. False (not stable) if lengths differ or any
+  // angle is null (person stepped partly out of frame).
+  function anglesStable(a, b, toleranceDeg) {
+    if (!a || !b || a.length !== b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] === null || b[i] === null) return false;
+      if (Math.abs(a[i] - b[i]) > toleranceDeg) return false;
+    }
+    return true;
+  }
+
+  // Advances the hold tracker by one frame. `values` is this frame's
+  // trackedAngles(...).values for the active pose. Returns
+  // { tracker, elapsedMs, ready } — tracker is a new object (the
+  // input tracker is never mutated), elapsedMs is how long the pose
+  // has been held at its current stable position, ready is true once
+  // elapsedMs >= holdDurationMs (the caller should trigger the freeze
+  // capture on the frame this first goes true).
+  function updateHoldTracker(tracker, values, timestampMs, toleranceDeg, holdDurationMs) {
+    var stable = anglesStable(tracker.lastValues, values, toleranceDeg);
+    var holdStartMs = stable && tracker.holdStartMs !== null ? tracker.holdStartMs : timestampMs;
+    var elapsedMs = timestampMs - holdStartMs;
+    return {
+      tracker: { holdStartMs: holdStartMs, lastValues: values },
+      elapsedMs: elapsedMs,
+      ready: elapsedMs >= holdDurationMs
+    };
+  }
+
   var api = {
     angleDeg: angleDeg,
     LANDMARK: LANDMARK,
     POSE_CONFIGS: POSE_CONFIGS,
     trackedAngles: trackedAngles,
-    computeSymmetry: computeSymmetry
+    computeSymmetry: computeSymmetry,
+    createHoldTracker: createHoldTracker,
+    updateHoldTracker: updateHoldTracker
   };
   if (typeof window !== 'undefined') window.FormCoachLogic = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
