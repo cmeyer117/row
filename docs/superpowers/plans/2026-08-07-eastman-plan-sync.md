@@ -47,8 +47,11 @@ for f in sorted(os.listdir(FOLDER)):
     prev = state["files"].get(f)
     if prev and prev["size"] == st.st_size and abs(prev["mtime"] - st.st_mtime) < 2:
         continue  # unchanged by stat — skip hashing
-    h = hashlib.sha256(open(p, 'rb').read()).hexdigest()
-    if prev and prev.get("sha256") == h:
+    try:
+        h = hashlib.sha256(open(p, 'rb').read()).hexdigest()
+    except OSError:
+        h = "UNREADABLE"  # Google-native pointer files (.gsheet) have no local bytes — track by size+mtime only
+    if prev and prev.get("sha256") == h and h != "UNREADABLE":
         state["files"][f] = {"size": st.st_size, "mtime": st.st_mtime, "sha256": h}
         continue  # touched but identical content — refresh stat silently
     changed.append(f)
