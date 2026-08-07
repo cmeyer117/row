@@ -629,6 +629,9 @@ body::after {
 .ml-mover-row { border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 12px; margin-bottom: 12px; display: flex; flex-direction: column; gap: 8px; }
 .ml-skip-btn { background: transparent; border: 1px solid rgba(255,255,255,0.14); color: var(--text-tertiary); border-radius: 10px; padding: 8px 14px; font-size: 12px; cursor: pointer; }
 .ml-evening { margin-top: 16px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.08); display: flex; flex-direction: column; gap: 8px; }
+.ml-verdict-row { display: flex; gap: 8px; margin: 10px 0; }
+.ml-verdict-btn { flex: 1; background: transparent; border: 1px solid rgba(255,255,255,0.14); color: var(--text-secondary); border-radius: 10px; padding: 10px; font-size: 13px; font-weight: 600; cursor: pointer; }
+.ml-verdict-btn.active { background: rgba(110,231,183,0.14); border-color: rgba(110,231,183,0.4); color: var(--accent); }
   .gm-progress-num { font-size: 36px; }
 }
 
@@ -2144,9 +2147,6 @@ body::after {
       wrap.appendChild(el('div', 'ml-sub', 'Focus outcome: ' + (focus ? focus.text : '—')));
     }
 
-    const eveningEl = mlBuildEvening(session);
-    if (eveningEl) wrap.appendChild(eveningEl);
-
     return wrap;
   }
   let mlExpandedReview = false;
@@ -2155,22 +2155,69 @@ body::after {
 
   function mlBuildEvening(session) {
     if (!mlEveningDue()) return null;
+    const ML = window.MorningLaunchLogic;
+    const proj = ML.buildEveningShutdown(session, getGoals(todayKey()));
     const wrap = el('div', 'ml-evening');
-    wrap.appendChild(el('div', 'ml-phase-title', 'Evening Close (optional)'));
-    if (session.evening && session.evening.completedAt) {
-      wrap.appendChild(el('div', 'ml-sub', 'Moved: ' + session.evening.moved));
-      wrap.appendChild(el('div', 'ml-sub', 'Interfered: ' + session.evening.interference));
-      wrap.appendChild(el('div', 'ml-sub', 'Tomorrow: ' + session.evening.tomorrowChange));
+    wrap.appendChild(el('div', 'ml-phase-title', 'Evening Shutdown'));
+
+    if (proj.source === 'launch') {
+      wrap.appendChild(mlBuildMoverList(session));
+    } else if (proj.todayGoals.length) {
+      const list = el('ul', 'ml-outcome-list');
+      proj.todayGoals.forEach((g, i) => list.appendChild(buildGoalRow(g, i, todayKey(), false, () => { loadToday(); mlRender(); })));
+      wrap.appendChild(list);
+    } else {
+      wrap.appendChild(el('div', 'ml-sub', 'No tasks logged today.'));
+    }
+
+    const evening = session.evening;
+    if (evening && evening.completedAt) {
+      const verdictLabel = evening.verdict ? evening.verdict.toUpperCase() : '—';
+      wrap.appendChild(el('div', 'ml-sub', 'Verdict: ' + verdictLabel + (evening.verdictNote ? ' — ' + evening.verdictNote : '')));
+      wrap.appendChild(el('div', 'ml-sub', 'Moved: ' + evening.moved));
+      wrap.appendChild(el('div', 'ml-sub', 'Interfered: ' + evening.interference));
+      wrap.appendChild(el('div', 'ml-sub', 'Tomorrow: ' + evening.tomorrowChange));
       return wrap;
     }
+
+    let selectedVerdict = evening ? evening.verdict : null;
+    const verdictRow = el('div', 'ml-verdict-row');
+    [['win', 'Win'], ['push', 'Push'], ['miss', 'Miss']].forEach(pair => {
+      const val = pair[0], label = pair[1];
+      const btn = el('button', 'ml-verdict-btn' + (selectedVerdict === val ? ' active' : ''), label);
+      btn.type = 'button';
+      btn.addEventListener('click', () => {
+        selectedVerdict = val;
+        verdictRow.querySelectorAll('.ml-verdict-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+      });
+      verdictRow.appendChild(btn);
+    });
+    wrap.appendChild(verdictRow);
+
+    const verdictErr = el('div', 'ml-error', '');
+    verdictErr.style.display = 'none';
+
+    const noteInput = document.createElement('input');
+    noteInput.type = 'text'; noteInput.className = 'gm-input'; noteInput.placeholder = 'One-line note (optional)';
+    if (evening && evening.verdictNote) noteInput.value = evening.verdictNote;
+    wrap.appendChild(noteInput);
+
     const moved = document.createElement('input'); moved.type = 'text'; moved.className = 'gm-input'; moved.placeholder = 'What moved today?';
     const interf = document.createElement('input'); interf.type = 'text'; interf.className = 'gm-input'; interf.placeholder = 'What interfered?';
     const change = document.createElement('input'); change.type = 'text'; change.className = 'gm-input'; change.placeholder = 'What changes tomorrow?';
+    if (evening) { moved.value = evening.moved || ''; interf.value = evening.interference || ''; change.value = evening.tomorrowChange || ''; }
     [moved, interf, change].forEach(i => wrap.appendChild(i));
+    wrap.appendChild(verdictErr);
+
     const saveBtn = el('button', 'gm-add', 'Save evening close');
     saveBtn.type = 'button';
     saveBtn.addEventListener('click', () => {
-      session.evening = { moved: moved.value.trim(), interference: interf.value.trim(), tomorrowChange: change.value.trim(), completedAt: new Date().toISOString() };
+      const candidate = { verdict: selectedVerdict, verdictNote: noteInput.value.trim(), moved: moved.value.trim(), interference: interf.value.trim(), tomorrowChange: change.value.trim() };
+      const check = ML.validateEveningClose(candidate);
+      if (!check.ok) { verdictErr.textContent = check.errors[0]; verdictErr.style.display = 'block'; return; }
+      candidate.completedAt = new Date().toISOString();
+      session.evening = candidate;
       mlSessionSave(session);
     });
     wrap.appendChild(saveBtn);
@@ -2184,21 +2231,29 @@ body::after {
     const session = mlSessionLoad();
     card.innerHTML = '';
 
-    if (session.status === 'skipped') { card.appendChild(mlBuildSkipped(session)); return; }
-    if (session.status === 'completed') { card.appendChild(mlBuildCompleted(session)); return; }
-    if (!mlExpanded) { card.appendChild(mlBuildEntry(session)); return; }
-
-    if (session.currentPhase === 'align') {
-      mlAlignRevealed = mlAlignRevealed || (Array.isArray(session.recalledOutcomes) && session.recalledOutcomes.length === 5);
+    let primary;
+    if (session.status === 'skipped') {
+      primary = mlBuildSkipped(session);
+    } else if (session.status === 'completed') {
+      primary = mlBuildCompleted(session);
+    } else if (!mlExpanded) {
+      primary = mlBuildEntry(session);
     } else {
-      mlAlignRevealed = false;
+      if (session.currentPhase === 'align') {
+        mlAlignRevealed = mlAlignRevealed || (Array.isArray(session.recalledOutcomes) && session.recalledOutcomes.length === 5);
+      } else {
+        mlAlignRevealed = false;
+      }
+      if (session.currentPhase === 'clear') primary = mlBuildClear(session);
+      else if (session.currentPhase === 'align') primary = mlBuildAlign(session, outcomesState);
+      else if (session.currentPhase === 'visualize') primary = mlBuildVisualize(session);
+      else if (session.currentPhase === 'commit') primary = mlBuildCommit(session, outcomesState);
+      else primary = mlBuildEntry(session);
     }
+    card.appendChild(primary);
 
-    if (session.currentPhase === 'clear') card.appendChild(mlBuildClear(session));
-    else if (session.currentPhase === 'align') card.appendChild(mlBuildAlign(session, outcomesState));
-    else if (session.currentPhase === 'visualize') card.appendChild(mlBuildVisualize(session));
-    else if (session.currentPhase === 'commit') card.appendChild(mlBuildCommit(session, outcomesState));
-    else card.appendChild(mlBuildEntry(session));
+    const eveningEl = mlBuildEvening(session);
+    if (eveningEl) card.appendChild(eveningEl);
   }
 
   // ---------- Boot ----------
