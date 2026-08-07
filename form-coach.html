@@ -245,5 +245,96 @@ window.dispatchEvent(new Event('form-coach-camera-ready'));
   });
 })();
 </script>
+<script>
+(function () {
+  var POSE_SLUGS = Object.keys(window.FormCoachLogic.POSE_CONFIGS);
+  var activeSlug = POSE_SLUGS[0];
+  var holdTracker = window.FormCoachLogic.createHoldTracker();
+  var HOLD_TOLERANCE_DEG = 6;
+  var HOLD_DURATION_MS = 1500;
+  var frozen = false;
+
+  var picker = document.getElementById('posePicker');
+  POSE_SLUGS.forEach(function (slug) {
+    var chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'fc-pose-chip' + (slug === activeSlug ? ' active' : '');
+    chip.textContent = window.FormCoachLogic.POSE_CONFIGS[slug].label;
+    chip.dataset.slug = slug;
+    chip.addEventListener('click', function () {
+      activeSlug = slug;
+      holdTracker = window.FormCoachLogic.createHoldTracker();
+      frozen = false;
+      document.querySelectorAll('.fc-pose-chip').forEach(function (c) { c.classList.toggle('active', c.dataset.slug === activeSlug); });
+      document.getElementById('posingResult').innerHTML = '';
+    });
+    picker.appendChild(chip);
+  });
+
+  var video = document.getElementById('posingVideo');
+  var statusEl = document.getElementById('posingStatus');
+  var ring = document.querySelector('#holdRing .fg');
+  var RING_CIRCUMFERENCE = 113;
+
+  function renderSymmetry(symmetry) {
+    if (!symmetry.length) return '<div class="mob-card-body">No side-to-side comparison for this pose — hold time confirmed above.</div>';
+    return symmetry.map(function (s) {
+      if (s.diffDeg === null) return '<div class="fc-symmetry-row"><span>' + s.joint + '</span><span>Not fully visible</span></div>';
+      var side = s.diffDeg > 0 ? 'left higher' : (s.diffDeg < 0 ? 'right higher' : 'even');
+      return '<div class="fc-symmetry-row"><span>' + s.joint + '</span><span>' + Math.abs(s.diffDeg) + '&deg; ' + side + '</span></div>';
+    }).join('');
+  }
+
+  function captureFreeze(holdMs) {
+    frozen = true;
+    var canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext('2d').drawImage(video, 0, 0);
+    var symmetry = window.FormCoachLogic.computeSymmetry(lastLandmarks, activeSlug);
+    document.getElementById('posingResult').innerHTML =
+      '<div class="fc-compare">' +
+        '<div><div class="fc-compare-label">You</div></div>' +
+        '<div><div class="fc-compare-label">Reference</div><img src="assets/mobility/' + activeSlug + '.png" alt=""></div>' +
+      '</div>' +
+      '<div class="mob-card"><div class="mob-card-body"><strong>Held ' + (holdMs / 1000).toFixed(1) + 's</strong></div></div>' +
+      '<div class="mob-card">' + renderSymmetry(symmetry) + '</div>' +
+      '<button class="fc-btn fc-btn-secondary" id="tryAgainBtn" type="button">Try Again</button>';
+    document.querySelector('.fc-compare > div:first-child').appendChild(canvas);
+    document.getElementById('tryAgainBtn').addEventListener('click', function () {
+      frozen = false;
+      holdTracker = window.FormCoachLogic.createHoldTracker();
+      document.getElementById('posingResult').innerHTML = '';
+    });
+  }
+
+  var lastLandmarks = null;
+
+  window.addEventListener('form-coach-camera-ready', function () {
+    window.FormCoachCamera.initCamera(video, statusEl).then(function (ok) {
+      if (!ok) return;
+      window.FormCoachCamera.startDetectionLoop(video, function (landmarks, nowMs) {
+        if (frozen) return;
+        lastLandmarks = landmarks;
+        if (!landmarks) {
+          statusEl.textContent = 'Step back so your full body is visible';
+          statusEl.classList.add('warn');
+          holdTracker = window.FormCoachLogic.createHoldTracker();
+          ring.style.strokeDashoffset = RING_CIRCUMFERENCE;
+          return;
+        }
+        statusEl.textContent = '';
+        statusEl.classList.remove('warn');
+        var tracked = window.FormCoachLogic.trackedAngles(landmarks, activeSlug);
+        var step = window.FormCoachLogic.updateHoldTracker(holdTracker, tracked.values, nowMs, HOLD_TOLERANCE_DEG, HOLD_DURATION_MS);
+        holdTracker = step.tracker;
+        var progress = Math.min(1, step.elapsedMs / HOLD_DURATION_MS);
+        ring.style.strokeDashoffset = String(RING_CIRCUMFERENCE * (1 - progress));
+        if (step.ready) captureFreeze(step.elapsedMs);
+      }, 120);
+    });
+  });
+})();
+</script>
 </body>
 </html>
