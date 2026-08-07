@@ -101,11 +101,11 @@ git add coach-meal-plan.js && git commit -m "feat(coach-sync): propose coach pla
 4. **Duplicate guard:** `gh pr list --repo cmeyer117/row --state open --search "coach-sync"` — if an open coach-sync PR's body contains `<!-- source-sha256: <this file's hash> -->`, skip creation and reuse that PR's URL in Step 5.
 5. Create the PR (`gh pr create --repo cmeyer117/row --head coach-sync/$(date +%F)`) titled `Coach plan sync — <phase> (<PDF date>)`. Body = the report:
    - `<!-- source-sha256: <hash> -->` (dedup marker)
-   - **Phase delta:** PDF's phase/start vs current `po_coach_season` — read it: `curl -s "<SUPABASE_URL>/rest/v1/app_state?key=eq.po_coach_season&select=data" -H "apikey: <ANON_KEY>" -H "Authorization: Bearer <ANON_KEY>"` (both constants are at the top of `C:\Users\gregm\row\sync.js`).
+   - **Phase delta:** PDF's phase/start vs current season — the season object lives at `data.po_coach_season` **nested inside** the `app_state` row keyed `po-coach` (NOT a top-level `po_coach_season` row — verified 2026-08-07): `curl -s "<SUPABASE_URL>/rest/v1/app_state?key=eq.po-coach&select=data" -H "apikey: <ANON_KEY>" -H "Authorization: Bearer <ANON_KEY>"` then read `.data.po_coach_season` (`{phase, startDate}`) from the response (both constants are at the top of `C:\Users\gregm\row\gym.html` near line 6656 — `sync.js`'s file-level constants are a different sync path and do NOT store this key).
    - **Per-meal changes:** old → new, one line per changed row.
    - **⚠ VERIFY list:** unmapped/guessed foods.
    - **Unplaced guidance:** coach lines with no Row home yet (cardio, supplements, sauce rules).
-   - **On approval, also run:** the exact `po_coach_season` REST PATCH (or "no phase change").
+   - **On approval, also run:** the exact PATCH to `app_state` row `po-coach`, updating only the nested `po_coach_season` field within `data` (merge, don't overwrite the rest of that row's `data`) (or "no phase change").
    - **Vault flag:** if phase or meals changed, note that the vault Cooking Coach master note transcription is now stale (session work, not this task's).
 6. Write the same report to `G:\My Drive\Claude\Claude Outputs\eastman-sync-proposal-<today>.md` and set `lastProposal` in the state file.
 7. End with: `🤖 Generated with [Claude Code](https://claude.com/claude-code)` in the PR body.
