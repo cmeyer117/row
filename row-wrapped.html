@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0a0b">
+<link rel="manifest" href="/manifest.json" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Row" />
+<title>Wrapped — Row</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="row-wrapped-logic.js"></script>
+<script src="topbar.js" defer></script>
+<style>
+:root {
+  --bg: #000000;
+  --text-1: #F4F1EA;
+  --text-2: rgba(244,241,234,0.6);
+  --border: rgba(255,255,255,0.08);
+  --accent: #6ee7b7;
+  --font: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SF Mono, Menlo, Consolas, monospace;
+}
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; padding: 0;
+  background: var(--bg);
+  color: var(--text-1);
+  font-family: var(--font);
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+}
+body { padding: max(24px, env(safe-area-inset-top)) 20px 80px; }
+h1 { font-family: 'Instrument Serif', Georgia, serif; font-size: 28px; margin: 0 0 4px; }
+.subtitle { color: var(--text-2); font-size: 13px; margin: 0 0 20px; }
+.card-preview {
+  max-width: 340px; margin: 0 auto 20px;
+  border-radius: 20px; overflow: hidden; border: 1px solid var(--border);
+}
+.card-preview img { display: block; width: 100%; height: auto; }
+.wrapped-empty {
+  max-width: 340px; margin: 0 auto 20px; padding: 40px 20px; text-align: center;
+  border: 1px solid var(--border); border-radius: 20px; color: var(--text-2); font-size: 13px;
+}
+.actions { display: flex; justify-content: center; gap: 10px; }
+.wrapped-download {
+  background: var(--accent); color: #000; border: none; border-radius: 999px;
+  padding: 12px 24px; font-weight: 700; font-size: 14px; text-decoration: none; display: inline-block;
+}
+</style>
+</head>
+<body>
+<h1 id="wrappedTitle">Wrapped</h1>
+<p class="subtitle" id="wrappedSubtitle">Loading your quarter…</p>
+<div id="wrappedContent"></div>
+
+<script>
+(function () {
+  'use strict';
+
+  var CARD_W = 1080, CARD_H = 1920;
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  function loadGymState() {
+    try { return JSON.parse(localStorage.getItem('po_coach_v1') || '{}'); } catch (e) { return {}; }
+  }
+  function loadWeights() {
+    try { return JSON.parse(localStorage.getItem('po_coach_weights') || '[]'); } catch (e) { return []; }
+  }
+
+  // Same sparkline-path convention as gym.html's buildSparkPath (kept as
+  // a local copy -- no shared module between these two large HTML files
+  // in this codebase, matching gym-volume-logic.js's own precedent for
+  // mondayOfDate being duplicated rather than imported).
+  function buildSparkPath(vals, w, h) {
+    if (vals.length < 2) return '';
+    var min = Math.min.apply(null, vals), max = Math.max.apply(null, vals);
+    var range = max - min || 1;
+    var pts = vals.map(function (v, i) {
+      var x = (i / (vals.length - 1)) * w;
+      var y = h - ((v - min) / range) * (h - 4) - 2;
+      return x + ',' + y;
+    });
+    return 'M' + pts.join('L');
+  }
+
+  function buildCardSVG(stats) {
+    var prLines = stats.prs.length
+      ? stats.prs.slice(0, 3).map(function (p) { return esc(p.name); }).join(' · ')
+      : 'Building the base this quarter';
+    var prCountLabel = stats.prs.length ? (stats.prs.length + (stats.prs.length === 1 ? ' New PR' : ' New PRs')) : 'New PRs';
+
+    var streakLabel = stats.streak > 0 ? (stats.streak + (stats.streak === 1 ? ' Day' : ' Days')) : 'Log your first day';
+
+    var arcSection = '';
+    if (stats.bodyweightSeries.length >= 2) {
+      var vals = stats.bodyweightSeries.map(function (w) { return w.weight; });
+      var path = buildSparkPath(vals, 900, 200);
+      var first = stats.bodyweightSeries[0].weight;
+      var last = stats.bodyweightSeries[stats.bodyweightSeries.length - 1].weight;
+      arcSection =
+        '<text x="90" y="1560" fill="#6ee7b7" font-family="JetBrains Mono, monospace" font-size="24" font-weight="700" letter-spacing="2">BODYWEIGHT</text>' +
+        '<g transform="translate(90,1590)"><path d="' + path + '" fill="none" stroke="#6ee7b7" stroke-width="4"/></g>' +
+        '<text x="90" y="1820" fill="#F4F1EA" font-family="Inter, sans-serif" font-size="22">' + first + ' → ' + last + ' lbs</text>';
+    }
+
+    return '' +
+      '<svg xmlns="http://www.w3.org/2000/svg" width="' + CARD_W + '" height="' + CARD_H + '" viewBox="0 0 ' + CARD_W + ' ' + CARD_H + '">' +
+      '<rect width="' + CARD_W + '" height="' + CARD_H + '" fill="#000000"/>' +
+      '<text x="90" y="180" fill="#F4F1EA" font-family="Instrument Serif, Georgia, serif" font-size="72">' + esc(stats.label) + '</text>' +
+      '<text x="90" y="230" fill="rgba(244,241,234,0.5)" font-family="Inter, sans-serif" font-size="28">Row Wrapped</text>' +
+
+      '<text x="90" y="420" fill="#6ee7b7" font-family="JetBrains Mono, monospace" font-size="24" font-weight="700" letter-spacing="2">' + esc(prCountLabel.toUpperCase()) + '</text>' +
+      '<text x="90" y="470" fill="#F4F1EA" font-family="Inter, sans-serif" font-size="30">' + prLines + '</text>' +
+
+      '<text x="90" y="640" fill="#6ee7b7" font-family="JetBrains Mono, monospace" font-size="24" font-weight="700" letter-spacing="2">VOLUME THIS QUARTER</text>' +
+      '<text x="90" y="720" fill="#F4F1EA" font-family="Instrument Serif, Georgia, serif" font-size="64">' + stats.volume.toLocaleString() + ' lbs</text>' +
+
+      '<text x="90" y="900" fill="#6ee7b7" font-family="JetBrains Mono, monospace" font-size="24" font-weight="700" letter-spacing="2">LONGEST STREAK</text>' +
+      '<text x="90" y="980" fill="#F4F1EA" font-family="Instrument Serif, Georgia, serif" font-size="64">' + esc(streakLabel) + '</text>' +
+
+      arcSection +
+      '</svg>';
+  }
+
+  function renderPNG(svgString, onReady, onError) {
+    var svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+    var url = URL.createObjectURL(svgBlob);
+    var img = new Image();
+    img.onload = function () {
+      var canvas = document.createElement('canvas');
+      canvas.width = CARD_W; canvas.height = CARD_H;
+      canvas.getContext('2d').drawImage(img, 0, 0, CARD_W, CARD_H);
+      URL.revokeObjectURL(url);
+      try { onReady(canvas.toDataURL('image/png')); } catch (e) { onError(e); }
+    };
+    img.onerror = function (e) { URL.revokeObjectURL(url); onError(e); };
+    img.src = url;
+  }
+
+  function render() {
+    if (!window.RowWrappedLogic) { onFatal(); return; }
+    var L = window.RowWrappedLogic;
+    var gymState = loadGymState();
+    var bounds = L.quarterBounds(new Date());
+    var stats = {
+      label: bounds.label,
+      prs: L.quarterPRs(gymState.exercises || [], gymState.logs || {}, bounds),
+      volume: L.quarterVolume(gymState.logs || {}, bounds),
+      streak: L.longestStreak(gymState.logs || {}, bounds),
+      bodyweightSeries: L.quarterBodyweightSeries(loadWeights(), bounds)
+    };
+
+    document.getElementById('wrappedTitle').textContent = stats.label + ' Wrapped';
+    document.getElementById('wrappedSubtitle').textContent = 'Your quarter so far.';
+
+    var svg = buildCardSVG(stats);
+    renderPNG(svg, function (dataUrl) {
+      var content = document.getElementById('wrappedContent');
+      content.innerHTML = '';
+      var preview = document.createElement('div');
+      preview.className = 'card-preview';
+      var img = document.createElement('img');
+      img.src = dataUrl;
+      img.alt = stats.label + ' Wrapped recap card';
+      preview.appendChild(img);
+      content.appendChild(preview);
+
+      var actions = document.createElement('div');
+      actions.className = 'actions';
+      var dl = document.createElement('a');
+      dl.className = 'wrapped-download';
+      dl.href = dataUrl;
+      dl.download = 'row-wrapped-' + stats.label.replace(/\s+/g, '-').toLowerCase() + '.png';
+      dl.textContent = 'Save Image';
+      actions.appendChild(dl);
+      content.appendChild(actions);
+    }, onFatal);
+  }
+
+  function onFatal() {
+    document.getElementById('wrappedSubtitle').textContent = "Couldn't render the shareable image.";
+    var content = document.getElementById('wrappedContent');
+    content.innerHTML = '';
+    var box = document.createElement('div');
+    box.className = 'wrapped-empty';
+    box.textContent = 'The card image failed to render this time. Your data is safe -- try reloading this page.';
+    content.appendChild(box);
+  }
+
+  render();
+})();
+</script>
+</body>
+</html>
