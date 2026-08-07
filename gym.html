@@ -3458,7 +3458,16 @@ img, video, canvas, svg { max-width: 100%; }
     const last = logs[logs.length - 1];
     const { weight, reps } = last;
     const { repMin, repMax, step, bw } = ex;
-    const upgradeAt = Math.min(CONFIG.upgradeAtReps || 8, repMax);
+    // Read po_coach_season directly rather than calling the Season Engine's
+    // loadSeason() -- that function lives in its own IIFE in a separate
+    // <script> block further down the file and isn't in scope here.
+    let seasonPhase = null;
+    try { const s = JSON.parse(localStorage.getItem('po_coach_season') || 'null'); seasonPhase = s ? s.phase : null; } catch (e) {}
+    const thresholds = window.GymRxPhaseLogic
+      ? window.GymRxPhaseLogic.phaseAdjustedThresholds(Math.min(CONFIG.upgradeAtReps || 8, repMax), 3, seasonPhase, repMax)
+      : { upgradeAt: Math.min(CONFIG.upgradeAtReps || 8, repMax), stuckThreshold: 3 };
+    const upgradeAt = thresholds.upgradeAt;
+    const stuckThreshold = thresholds.stuckThreshold;
     let stuck = 0;
     let stuckRirs = [];
     for (let i = logs.length - 1; i >= 0; i--) {
@@ -3482,7 +3491,7 @@ img, video, canvas, svg { max-width: 100%; }
       return applyCheckinOverride(bwResult, last, ex, bwStuck);
     }
     let result;
-    if (stuck >= 3 && reps < repMin) {
+    if (stuck >= stuckThreshold && reps < repMin) {
       // RIR context, if any of the stuck sessions logged it: a stall where
       // the lifter is still reporting reps in reserve (RIR 3+) isn't the
       // same signal as a stall from genuinely grinding to failure (RIR
@@ -6592,6 +6601,7 @@ img, video, canvas, svg { max-width: 100%; }
 </script>
 <script src="gym-weight-photos.js"></script>
 <script src="gym-workout-events.js"></script>
+<script src="gym-rx-phase-logic.js"></script>
 <script src="gym-season-logic.js"></script>
 <script src="gym-volume-logic.js"></script>
 <script src="plate-calc.js"></script>

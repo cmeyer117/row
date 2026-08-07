@@ -10,7 +10,7 @@ Row Upgrades ranking #4. `getRx()` in `gym.html` already prescribes per-exercise
 
 ## Ground truth (verified in-session, 2026-08-07)
 
-- `getRx(ex, logs)` (`gym.html:3456`) is called from 3 sites (lines 3970, 4365, 5447), all within the same module scope. `loadSeason()` (`gym.html:7089`) already reads `po_coach_season` from localStorage and is in scope everywhere `getRx()` is.
+- `getRx(ex, logs)` (`gym.html:3456`) is called from 3 sites (lines 3970, 4365, 5447), all within the same module scope. `loadSeason()` (`gym.html:7089`) reads `po_coach_season` from localStorage but is **not** in scope where `getRx()` lives — it's defined inside a separate IIFE in a later `<script>` block. **Correction found during implementation:** `getRx()` reads `po_coach_season` directly via its own one-line `localStorage.getItem`/`JSON.parse` instead of calling `loadSeason()`, rather than exposing a new cross-block global for a single field read.
 - Current non-bw logic: `upgradeAt = Math.min(CONFIG.upgradeAtReps || 8, repMax)`; deload/reassess triggers at `stuck >= 3` consecutive same-weight sessions.
 - Jarvis's own `coach-read.ts` (`checkExerciseStall`) already groups phases the same way this design does: `cut`/`show_prep` share one branch, `growth` and `reverse_diet` are each distinct, `peak`/null return no check. This design reuses that exact grouping rather than inventing a new one.
 - No existing pure-logic module covers Rx thresholds — `gym-season-logic.js` is unrelated (pure date math for the season banner only).
@@ -39,11 +39,11 @@ function phaseAdjustedThresholds(baseUpgradeAt, baseStuckThreshold, phase, repMa
 ```
 
 `getRx()` changes:
-1. Compute `phase = loadSeason() ? loadSeason().phase : null` once at the top.
-2. Replace the existing `const upgradeAt = Math.min(CONFIG.upgradeAtReps || 8, repMax);` line with a call to `phaseAdjustedThresholds(Math.min(CONFIG.upgradeAtReps || 8, repMax), 3, phase, repMax)`, destructuring `upgradeAt`/`stuckThreshold`.
+1. Read `po_coach_season` directly (try/catch JSON parse) into `seasonPhase` at the top — not via `loadSeason()` (out of scope, see above).
+2. Compute `thresholds` via `window.GymRxPhaseLogic.phaseAdjustedThresholds(Math.min(CONFIG.upgradeAtReps || 8, repMax), 3, seasonPhase, repMax)`, guarded with an inline fallback to today's exact defaults if the script somehow hasn't loaded (defensive, matches this codebase's existing `window.X ? ... : ...` guard pattern elsewhere).
 3. Replace the hardcoded `stuck >= 3` condition (the deload/reassess branch) with `stuck >= stuckThreshold`.
 4. The bodyweight branch reuses the same phase-adjusted `upgradeAt` (already shared) — no other bw change, since bw has no stall/deload branch to adjust.
-5. No signature change to `getRx(ex, logs)` and no call-site edits — `loadSeason()` is already in scope everywhere `getRx()` is called.
+5. No signature change to `getRx(ex, logs)` and no call-site edits.
 
 ## Error handling
 
