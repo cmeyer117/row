@@ -1,7 +1,11 @@
 // coach-meal-plan.js — default ingredient rows for the coach's prescribed
 // 5-meal plan, one row per StapleFoods entry + grams. NOT a live sync from
-// the vault — reflects the coaching phase as of 2026-08-06: Black Magma
-// Fitness, Coach Chris Eastman, "Recomp Phase," started 8/2/26. Source PDF:
+// the vault — reflects the coaching phase as of 2026-08-07: Black Magma
+// Fitness, Coach Chris Eastman. PDF header says "Reverse Phase," PDF body
+// text says "Recomp Phase" (own document is inconsistent) with a start
+// date of 8/2/26 — Row's own po-coach season record already carries
+// phase=reverse_diet, startDate=2026-08-05 (set 2026-08-05 per HANDOFF).
+// Meal content itself is unchanged from the prior transcription. Source PDF:
 // G:\My Drive\Coaching documents\BLACK MAGMA FITNESS CLIENT Carl - Macros.doc.pdf
 // (check that folder for the newest-dated file next time this needs updating).
 //
