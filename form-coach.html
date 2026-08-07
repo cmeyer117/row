@@ -126,7 +126,19 @@ html, body {
 
   <div class="mob-section active" id="section-posing">
     <div class="mob-rule"><strong>How it works:</strong> pick a pose, hold it steady for ~1.5s and the camera auto-captures a still to compare against the reference photo.</div>
-    <div class="mob-card"><div class="mob-card-body">Posing Coach camera UI goes here (Task 8).</div></div>
+
+    <div class="fc-pose-picker" id="posePicker"></div>
+
+    <div class="fc-camera-wrap" id="posingCameraWrap">
+      <video id="posingVideo" autoplay playsinline muted></video>
+      <svg class="fc-hold-ring" id="holdRing" viewBox="0 0 44 44">
+        <circle class="bg" cx="22" cy="22" r="18"></circle>
+        <circle class="fg" cx="22" cy="22" r="18" stroke-dasharray="113" stroke-dashoffset="113"></circle>
+      </svg>
+      <div class="fc-status-banner" id="posingStatus">Requesting camera…</div>
+    </div>
+
+    <div id="posingResult"></div>
   </div>
 
   <div class="mob-section" id="section-lift">
@@ -153,6 +165,73 @@ html, body {
 </nav>
 
 <script src="form-coach-logic.js"></script>
+<script type="module">
+import { PoseLandmarker, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest";
+
+var FormCoachCamera = {
+  landmarker: null,
+  stream: null,
+  ready: false,
+  error: null
+};
+window.FormCoachCamera = FormCoachCamera;
+
+async function initCamera(videoEl, statusEl) {
+  try {
+    var vision = await FilesetResolver.forVisionTasks(
+      "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
+    );
+    FormCoachCamera.landmarker = await PoseLandmarker.createFromOptions(vision, {
+      baseOptions: {
+        modelAssetPath: "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task",
+        delegate: "GPU"
+      },
+      runningMode: "VIDEO",
+      numPoses: 1
+    });
+  } catch (err) {
+    FormCoachCamera.error = 'model-load-failed';
+    if (statusEl) { statusEl.textContent = 'Pose detection failed to load — check your connection and reload.'; statusEl.classList.add('bad'); }
+    return false;
+  }
+
+  try {
+    FormCoachCamera.stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
+  } catch (err) {
+    FormCoachCamera.error = 'camera-denied';
+    if (statusEl) { statusEl.textContent = 'Camera access denied. Allow camera access in your browser settings, then reload.'; statusEl.classList.add('bad'); }
+    return false;
+  }
+
+  videoEl.srcObject = FormCoachCamera.stream;
+  await new Promise(function (resolve) { videoEl.onloadedmetadata = resolve; });
+  FormCoachCamera.ready = true;
+  if (statusEl) { statusEl.textContent = ''; statusEl.classList.remove('bad', 'warn'); }
+  return true;
+}
+
+// Runs the pose landmarker against one video element on a throttled
+// interval and calls onResult(landmarks|null, timestampMs) each time.
+// landmarks is null when no person is detected in frame — callers
+// must handle that (show a "step back" message), not assume a result.
+function startDetectionLoop(videoEl, onResult, intervalMs) {
+  var lastRun = 0;
+  function tick(nowMs) {
+    if (FormCoachCamera.ready && FormCoachCamera.landmarker && nowMs - lastRun >= intervalMs) {
+      lastRun = nowMs;
+      var result = FormCoachCamera.landmarker.detectForVideo(videoEl, performance.now());
+      var landmarks = (result.landmarks && result.landmarks.length) ? result.landmarks[0] : null;
+      onResult(landmarks, nowMs);
+    }
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
+
+window.FormCoachCamera.initCamera = initCamera;
+window.FormCoachCamera.startDetectionLoop = startDetectionLoop;
+window.dispatchEvent(new Event('form-coach-camera-ready'));
+</script>
 <script>
 (function () {
   var tabs = document.querySelectorAll('.mob-tab-btn');
