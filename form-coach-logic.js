@@ -22,8 +22,119 @@
     return Math.acos(cos) * (180 / Math.PI);
   }
 
+  // Subset of MediaPipe's 33-point BlazePose topology this feature uses.
+  var LANDMARK = {
+    L_SHOULDER: 11, R_SHOULDER: 12,
+    L_ELBOW: 13, R_ELBOW: 14,
+    L_WRIST: 15, R_WRIST: 16,
+    L_HIP: 23, R_HIP: 24,
+    L_KNEE: 25, R_KNEE: 26,
+    L_ANKLE: 27, R_ANKLE: 28
+  };
+
+  // One entry per posing.html Competition-gallery slug. trackedJoints
+  // are the angles this pose cares about (used for hold-stability
+  // detection); symmetryPairs names two trackedJoints entries to
+  // compare left vs right. Poses shot from the side (side-chest,
+  // side-triceps) or deliberately asymmetric (abdominal-thigh) have no
+  // meaningful bilateral comparison — symmetryPairs is empty for
+  // those, and the UI shows hold-time only, not a symmetry readout.
+  var POSE_CONFIGS = {
+    'front-double-biceps': {
+      label: 'Front Double Biceps',
+      trackedJoints: [
+        { name: 'L elbow', triple: [LANDMARK.L_SHOULDER, LANDMARK.L_ELBOW, LANDMARK.L_WRIST] },
+        { name: 'R elbow', triple: [LANDMARK.R_SHOULDER, LANDMARK.R_ELBOW, LANDMARK.R_WRIST] }
+      ],
+      symmetryPairs: [{ joint: 'elbow', left: 'L elbow', right: 'R elbow' }]
+    },
+    'front-lat-spread': {
+      label: 'Front Lat Spread',
+      trackedJoints: [
+        { name: 'L elbow', triple: [LANDMARK.L_SHOULDER, LANDMARK.L_ELBOW, LANDMARK.L_WRIST] },
+        { name: 'R elbow', triple: [LANDMARK.R_SHOULDER, LANDMARK.R_ELBOW, LANDMARK.R_WRIST] }
+      ],
+      symmetryPairs: [{ joint: 'elbow', left: 'L elbow', right: 'R elbow' }]
+    },
+    'back-double-biceps': {
+      label: 'Back Double Biceps',
+      trackedJoints: [
+        { name: 'L elbow', triple: [LANDMARK.L_SHOULDER, LANDMARK.L_ELBOW, LANDMARK.L_WRIST] },
+        { name: 'R elbow', triple: [LANDMARK.R_SHOULDER, LANDMARK.R_ELBOW, LANDMARK.R_WRIST] }
+      ],
+      symmetryPairs: [{ joint: 'elbow', left: 'L elbow', right: 'R elbow' }]
+    },
+    'back-lat-spread': {
+      label: 'Back Lat Spread',
+      trackedJoints: [
+        { name: 'L elbow', triple: [LANDMARK.L_SHOULDER, LANDMARK.L_ELBOW, LANDMARK.L_WRIST] },
+        { name: 'R elbow', triple: [LANDMARK.R_SHOULDER, LANDMARK.R_ELBOW, LANDMARK.R_WRIST] }
+      ],
+      symmetryPairs: [{ joint: 'elbow', left: 'L elbow', right: 'R elbow' }]
+    },
+    'side-chest': {
+      label: 'Side Chest',
+      trackedJoints: [
+        { name: 'front elbow', triple: [LANDMARK.L_SHOULDER, LANDMARK.L_ELBOW, LANDMARK.L_WRIST] },
+        { name: 'front knee', triple: [LANDMARK.L_HIP, LANDMARK.L_KNEE, LANDMARK.L_ANKLE] }
+      ],
+      symmetryPairs: []
+    },
+    'side-triceps': {
+      label: 'Side Triceps',
+      trackedJoints: [
+        { name: 'near elbow', triple: [LANDMARK.L_SHOULDER, LANDMARK.L_ELBOW, LANDMARK.L_WRIST] }
+      ],
+      symmetryPairs: []
+    },
+    'abdominal-thigh': {
+      label: 'Abdominal & Thigh',
+      trackedJoints: [
+        { name: 'extended knee', triple: [LANDMARK.L_HIP, LANDMARK.L_KNEE, LANDMARK.L_ANKLE] }
+      ],
+      symmetryPairs: []
+    }
+  };
+
+  function round1(n) { return Math.round(n * 10) / 10; }
+
+  // Returns { values: [deg, ...], byName: { jointName: deg, ... } } for
+  // every trackedJoints entry of the given pose slug. Unknown slug
+  // returns an empty result rather than throwing.
+  function trackedAngles(landmarks, poseSlug) {
+    var config = POSE_CONFIGS[poseSlug];
+    if (!config) return { values: [], byName: {} };
+    var byName = {};
+    var values = config.trackedJoints.map(function (j) {
+      var deg = angleDeg(landmarks[j.triple[0]], landmarks[j.triple[1]], landmarks[j.triple[2]]);
+      byName[j.name] = deg;
+      return deg;
+    });
+    return { values: values, byName: byName };
+  }
+
+  // Returns [{ joint, leftDeg, rightDeg, diffDeg }, ...] for every
+  // symmetryPairs entry of the given pose. Empty array for poses with
+  // no meaningful bilateral comparison (side poses, abdominal-thigh).
+  function computeSymmetry(landmarks, poseSlug) {
+    var config = POSE_CONFIGS[poseSlug];
+    if (!config || !config.symmetryPairs.length) return [];
+    var byName = trackedAngles(landmarks, poseSlug).byName;
+    return config.symmetryPairs.map(function (pair) {
+      var leftDeg = byName[pair.left], rightDeg = byName[pair.right];
+      if (leftDeg == null || rightDeg == null) {
+        return { joint: pair.joint, leftDeg: null, rightDeg: null, diffDeg: null };
+      }
+      return { joint: pair.joint, leftDeg: round1(leftDeg), rightDeg: round1(rightDeg), diffDeg: round1(leftDeg - rightDeg) };
+    });
+  }
+
   var api = {
-    angleDeg: angleDeg
+    angleDeg: angleDeg,
+    LANDMARK: LANDMARK,
+    POSE_CONFIGS: POSE_CONFIGS,
+    trackedAngles: trackedAngles,
+    computeSymmetry: computeSymmetry
   };
   if (typeof window !== 'undefined') window.FormCoachLogic = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
