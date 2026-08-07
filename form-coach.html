@@ -185,36 +185,63 @@ var FormCoachCamera = {
 };
 window.FormCoachCamera = FormCoachCamera;
 
+// Both Posing Coach and Lift-Form Coach call initCamera() on page load
+// (each owns its own <video> element). Without this lock they'd each
+// call getUserMedia + load the MediaPipe model independently — two
+// camera streams, two WASM loads, and the second call overwriting
+// FormCoachCamera.landmarker out from under the first mode's already-
+// running detection loop. This promise is created once by whichever
+// caller runs first; every caller (including the first) awaits it and
+// then attaches the single resulting stream to its own video element.
+var initPromise = null;
+
+function doInit(statusEl) {
+  return (async function () {
+    try {
+      var vision = await FilesetResolver.forVisionTasks(
+        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
+      );
+      FormCoachCamera.landmarker = await PoseLandmarker.createFromOptions(vision, {
+        baseOptions: {
+          modelAssetPath: "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task",
+          delegate: "GPU"
+        },
+        runningMode: "VIDEO",
+        numPoses: 1
+      });
+    } catch (err) {
+      FormCoachCamera.error = 'model-load-failed';
+      if (statusEl) { statusEl.textContent = 'Pose detection failed to load — check your connection and reload.'; statusEl.classList.add('bad'); }
+      return false;
+    }
+
+    try {
+      FormCoachCamera.stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
+    } catch (err) {
+      FormCoachCamera.error = 'camera-denied';
+      if (statusEl) { statusEl.textContent = 'Camera access denied. Allow camera access in your browser settings, then reload.'; statusEl.classList.add('bad'); }
+      return false;
+    }
+
+    FormCoachCamera.ready = true;
+    return true;
+  })();
+}
+
 async function initCamera(videoEl, statusEl) {
-  try {
-    var vision = await FilesetResolver.forVisionTasks(
-      "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
-    );
-    FormCoachCamera.landmarker = await PoseLandmarker.createFromOptions(vision, {
-      baseOptions: {
-        modelAssetPath: "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task",
-        delegate: "GPU"
-      },
-      runningMode: "VIDEO",
-      numPoses: 1
-    });
-  } catch (err) {
-    FormCoachCamera.error = 'model-load-failed';
-    if (statusEl) { statusEl.textContent = 'Pose detection failed to load — check your connection and reload.'; statusEl.classList.add('bad'); }
+  if (!initPromise) initPromise = doInit(statusEl);
+  var ok = await initPromise;
+  if (!ok) {
+    if (statusEl) {
+      statusEl.textContent = FormCoachCamera.error === 'camera-denied'
+        ? 'Camera access denied. Allow camera access in your browser settings, then reload.'
+        : 'Pose detection failed to load — check your connection and reload.';
+      statusEl.classList.add('bad');
+    }
     return false;
   }
-
-  try {
-    FormCoachCamera.stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
-  } catch (err) {
-    FormCoachCamera.error = 'camera-denied';
-    if (statusEl) { statusEl.textContent = 'Camera access denied. Allow camera access in your browser settings, then reload.'; statusEl.classList.add('bad'); }
-    return false;
-  }
-
   videoEl.srcObject = FormCoachCamera.stream;
   await new Promise(function (resolve) { videoEl.onloadedmetadata = resolve; });
-  FormCoachCamera.ready = true;
   if (statusEl) { statusEl.textContent = ''; statusEl.classList.remove('bad', 'warn'); }
   return true;
 }
@@ -223,10 +250,16 @@ async function initCamera(videoEl, statusEl) {
 // interval and calls onResult(landmarks|null, timestampMs) each time.
 // landmarks is null when no person is detected in frame — callers
 // must handle that (show a "step back" message), not assume a result.
-function startDetectionLoop(videoEl, onResult, intervalMs) {
+// isActiveFn: detection work (and onResult) is skipped entirely while
+// it returns false — both modes share one PoseLandmarker instance, so
+// only one mode's loop may call detectForVideo at a time (calling it
+// concurrently from two loops against two videos is not something the
+// MediaPipe Tasks Vision API supports), and there's no reason to spend
+// battery/CPU running detection against a hidden tab anyway.
+function startDetectionLoop(videoEl, onResult, intervalMs, isActiveFn) {
   var lastRun = 0;
   function tick(nowMs) {
-    if (FormCoachCamera.ready && FormCoachCamera.landmarker && nowMs - lastRun >= intervalMs) {
+    if (isActiveFn() && FormCoachCamera.ready && FormCoachCamera.landmarker && nowMs - lastRun >= intervalMs) {
       lastRun = nowMs;
       var result = FormCoachCamera.landmarker.detectForVideo(videoEl, performance.now());
       var landmarks = (result.landmarks && result.landmarks.length) ? result.landmarks[0] : null;
@@ -242,6 +275,11 @@ window.FormCoachCamera.startDetectionLoop = startDetectionLoop;
 window.dispatchEvent(new Event('form-coach-camera-ready'));
 </script>
 <script>
+// Which mode's tab is currently visible — read by each mode's
+// detection-loop isActiveFn (see the camera module above) so only the
+// visible mode's loop ever calls detectForVideo on the shared
+// PoseLandmarker instance.
+window.FormCoachActiveMode = 'posing';
 (function () {
   var tabs = document.querySelectorAll('.mob-tab-btn');
   tabs.forEach(function (btn) {
@@ -250,6 +288,7 @@ window.dispatchEvent(new Event('form-coach-camera-ready'));
       btn.classList.add('active');
       document.querySelectorAll('.mob-section').forEach(function (s) { s.classList.remove('active'); });
       document.getElementById('section-' + btn.dataset.section).classList.add('active');
+      window.FormCoachActiveMode = btn.dataset.section;
     });
   });
 })();
@@ -340,13 +379,17 @@ window.dispatchEvent(new Event('form-coach-camera-ready'));
         var progress = Math.min(1, step.elapsedMs / HOLD_DURATION_MS);
         ring.style.strokeDashoffset = String(RING_CIRCUMFERENCE * (1 - progress));
         if (step.ready) captureFreeze(step.elapsedMs);
-      }, 120);
+      }, 120, function () { return window.FormCoachActiveMode === 'posing'; });
     });
   });
 })();
 </script>
 <script>
 (function () {
+  function escape(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; });
+  }
+
   var video = document.getElementById('liftVideo');
   var statusEl = document.getElementById('liftStatus');
   var recordBtn = document.getElementById('recordSetBtn');
@@ -402,21 +445,21 @@ window.dispatchEvent(new Event('form-coach-camera-ready'));
       if (r.stabilityFlag) flags.push('<span class="fc-rep-flag">Unstable</span>');
       return '<div class="fc-rep-row"><span>Rep ' + r.index + ' — ' + Math.round(r.romPct * 100) + '% ROM</span><span>' + (flags.join(' ') || 'Good') + '</span></div>';
     }).join('');
-    resultEl.innerHTML = '<div class="mob-card"><div class="mob-card-body"><strong>' + (exerciseName || 'Set') + '</strong> — ' + scored.length + ' reps</div></div><div class="mob-card">' + rows + '</div>';
+    resultEl.innerHTML = '<div class="mob-card"><div class="mob-card-body"><strong>' + escape(exerciseName || 'Set') + '</strong> — ' + scored.length + ' reps</div></div><div class="mob-card">' + rows + '</div>';
   }
 
   window.addEventListener('form-coach-camera-ready', function () {
-    // Reuses the same camera stream Task 8 requested — only one
-    // getUserMedia prompt for the whole page. If Posing Coach hasn't
-    // initialized yet (e.g. Carl opens directly on the Lift-Form tab),
-    // initCamera() is safe to call again; it re-requests the stream.
+    // initCamera() is idempotent — whichever mode's listener fires
+    // first actually requests getUserMedia + loads the model; this
+    // call just awaits that same in-flight/completed init and attaches
+    // the one resulting stream to this mode's own video element.
     window.FormCoachCamera.initCamera(video, statusEl).then(function (ok) {
       cameraStarted = ok;
       if (!ok) return;
       window.FormCoachCamera.startDetectionLoop(video, function (landmarks, nowMs) {
         lastLandmarks = landmarks;
         if (recording && landmarks) buffer.push({ t: nowMs, landmarks: landmarks });
-      }, 100);
+      }, 100, function () { return window.FormCoachActiveMode === 'lift'; });
     });
   });
 
