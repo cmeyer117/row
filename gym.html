@@ -5999,7 +5999,11 @@ img, video, canvas, svg { max-width: 100%; }
       var logsArr = state.logs[matched.id];
       var canUndo = logsArr.length > beforeCount;
       showToast(result.msg, canUndo ? function () {
-        logsArr.pop(); // just-logged entry sorts last (its date is "now")
+        // quickLog() pins every same-day entry to a fixed noon timestamp
+        // (not real time), so same-day entries tie on `.date` — Array.sort
+        // is stable, and we pushed this entry last before sorting, so the
+        // tie-break preserves push order and it's still last here.
+        logsArr.pop();
         saveState(); renderAll();
         if (typeof wtRender === 'function') wtRender();
       } : null);
