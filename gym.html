@@ -3977,6 +3977,7 @@ img, video, canvas, svg { max-width: 100%; }
     if (!ex) { wrap.innerHTML = '<div class="po-rx-empty">Pick a gym and day above.</div>'; return; }
     const logs = getLogs();
     const rx = getRx(ex, logs);
+    const displayName = getSession(ex.id).activeVariant || ex.name;
     if (!rx) {
       const sw = ex.startWeight, sr = ex.repMin;
       const head = ex.bw
@@ -3985,7 +3986,7 @@ img, video, canvas, svg { max-width: 100%; }
       const reason = ex.bw
         ? 'Aim for ' + ex.repMin + '-' + ex.repMax + ' clean reps. Once you hit ' + ex.repMax + '+, push for more.'
         : 'Hit ' + ex.repMin + '-' + ex.repMax + ' reps. Once logged, the coach will start prescribing.';
-      wrap.innerHTML = '<div class="po-rx-card po-rx-tappable" data-tap-reps="' + sr + '"' + (ex.bw ? ' data-tap-bw="1"' : ' data-tap-weight="' + (sw || 0) + '"') + '><div class="po-rx-label">' + escape(ex.name) + ' · starting point</div><div class="po-rx-headline">' + head + '</div><span class="po-rx-tag hold">Start here</span><p class="po-rx-reason">' + reason + ' Tap to log it.</p></div>';
+      wrap.innerHTML = '<div class="po-rx-card po-rx-tappable" data-tap-reps="' + sr + '"' + (ex.bw ? ' data-tap-bw="1"' : ' data-tap-weight="' + (sw || 0) + '"') + '><div class="po-rx-label">' + escape(displayName) + ' · starting point</div><div class="po-rx-headline">' + head + '</div><span class="po-rx-tag hold">Start here</span><p class="po-rx-reason">' + reason + ' Tap to log it.</p></div>';
       return;
     }
     const head = rx.bw
@@ -3999,7 +4000,7 @@ img, video, canvas, svg { max-width: 100%; }
     const pumpNote = lastCheckin && lastCheckin.pump
       ? '<p class="po-rx-reason" style="opacity:0.7;font-size:11px;">Pump last time: ' + lastCheckin.pump + '</p>'
       : '';
-    wrap.innerHTML = '<div class="po-rx-card po-rx-' + rx.type + ' po-rx-tappable" ' + tapAttrs + '><div class="po-rx-label">' + escape(ex.name) + '</div><div class="po-rx-headline">' + head + '</div><span class="po-rx-tag ' + rx.type + '">' + rx.tag + '</span><p class="po-rx-reason">' + rx.reason + ' Tap to log it.</p>' + pumpNote + '</div>';
+    wrap.innerHTML = '<div class="po-rx-card po-rx-' + rx.type + ' po-rx-tappable" ' + tapAttrs + '><div class="po-rx-label">' + escape(displayName) + '</div><div class="po-rx-headline">' + head + '</div><span class="po-rx-tag ' + rx.type + '">' + rx.tag + '</span><p class="po-rx-reason">' + rx.reason + ' Tap to log it.</p>' + pumpNote + '</div>';
   }
   function renderStats() {
     const ex = getCurrentEx();
@@ -5594,7 +5595,7 @@ img, video, canvas, svg { max-width: 100%; }
       body.textContent = (await askJarvis(message)) || 'No response.';
     } catch (e) {
       body.textContent = e && e.status === 401
-        ? 'Jarvis rejected the request (401 — passphrase mismatch). This is a config issue, not a signal issue: check JARVIS_PASSPHRASE on the row Vercel project.'
+        ? 'Jarvis rejected the request (401 — session secret mismatch). This is a config issue, not a signal issue: check JARVIS_SESSION_SECRET on the row Vercel project.'
         : e && e.status
         ? 'Jarvis returned an error (' + e.status + (e.message ? ': ' + e.message : '') + ').'
         : 'Could not reach Jarvis. Signal may be weak — try again.';
