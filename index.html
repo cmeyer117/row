@@ -374,6 +374,13 @@ body::after {
     <span class="steps-quick-saved" id="stepsQuickSaved">Saved</span>
   </div>
 
+  <div class="steps-quick" id="sleepQuick">
+    <span class="steps-quick-label">Sleep last night</span>
+    <input type="number" inputmode="decimal" step="0.1" id="sleepQuickInput" placeholder="7.5">
+    <button type="button" id="sleepQuickSave">Save</button>
+    <span class="steps-quick-saved" id="sleepQuickSaved">Saved</span>
+  </div>
+
   <div class="ops-strip" id="opsStrip">
     <a href="health.html" class="ops-chip"><span id="opsMacroChip">Macros</span></a>
     <a href="health.html" class="ops-chip"><span id="opsStackChip">Stack</span></a>
@@ -653,6 +660,40 @@ body::after {
         saved.classList.add('show');
         setTimeout(function () { saved.classList.remove('show'); }, 2000);
       } catch (e) {}
+    });
+    loadExisting();
+  })();
+
+  (function initSleepQuick() {
+    const input = document.getElementById('sleepQuickInput');
+    const saveBtn = document.getElementById('sleepQuickSave');
+    const saved = document.getElementById('sleepQuickSaved');
+    function todayKey() {
+      const d = new Date();
+      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    }
+    function loadSleep() {
+      try { return JSON.parse(localStorage.getItem('health:sleep') || '[]'); } catch (e) { return []; }
+    }
+    function saveSleep(list) {
+      try { localStorage.setItem('health:sleep', JSON.stringify(list)); } catch (e) {}
+    }
+    function loadExisting() {
+      const list = loadSleep();
+      const today = list.find(function (e) { return e.date === todayKey(); });
+      if (today && today.hours != null) input.value = today.hours;
+    }
+    saveBtn.addEventListener('click', function () {
+      const val = parseFloat(input.value);
+      if (!val || val <= 0) return;
+      const list = loadSleep();
+      const dk = todayKey();
+      const idx = list.findIndex(function (e) { return e.date === dk; });
+      const entry = idx >= 0 ? Object.assign({}, list[idx], { hours: val }) : { date: dk, hours: val, quality: null };
+      if (idx >= 0) list[idx] = entry; else list.push(entry);
+      saveSleep(list);
+      saved.classList.add('show');
+      setTimeout(function () { saved.classList.remove('show'); }, 2000);
     });
     loadExisting();
   })();
