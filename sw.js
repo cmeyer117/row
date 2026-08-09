@@ -22,10 +22,15 @@ self.addEventListener('fetch', e => {
 self.addEventListener('push', e => {
   let data = { title: 'Row', body: 'New notification' };
   try { if (e.data) data = e.data.json(); } catch (_) {}
-  e.waitUntil(self.registration.showNotification(data.title, { body: data.body, icon: '/icons/icon-192.png' }));
+  e.waitUntil(self.registration.showNotification(data.title, {
+    body: data.body,
+    icon: '/icons/icon-192.png',
+    data: { url: data.url },
+  }));
 });
 
 self.addEventListener('notificationclick', e => {
   e.notification.close();
-  e.waitUntil(clients.openWindow('/gym.html'));
+  const url = (e.notification.data && e.notification.data.url) || '/gym.html';
+  e.waitUntil(clients.openWindow(url));
 });
