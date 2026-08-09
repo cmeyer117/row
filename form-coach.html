@@ -349,6 +349,34 @@ window.FormCoachActiveMode = 'posing';
   var HOLD_DURATION_MS = 1500;
   var frozen = false;
 
+  // Same trust tier as gym.html's own ROW_APP_SECRET -- ships in client JS,
+  // just raises the bar on /api/vision-pose-critique from "any bot that
+  // finds the URL burns Vision usage" to "requires reading page source".
+  // Must match the ROW_APP_SECRET Vercel env var checked by
+  // api/_lib/verify-app-secret.js.
+  var ROW_APP_SECRET = '007007';
+
+  async function fetchPoseCritique(imageBase64) {
+    var controller = new AbortController();
+    var timer = setTimeout(function () { controller.abort(); }, 25000);
+    try {
+      var res = await fetch('/api/vision-pose-critique', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + ROW_APP_SECRET },
+        body: JSON.stringify({ imageBase64: imageBase64, mediaType: 'image/jpeg' }),
+        signal: controller.signal,
+      });
+      if (!res.ok) return null;
+      var data = await res.json();
+      return (data && typeof data.critique === 'string') ? data : null;
+    } catch (err) {
+      console.warn('[form-coach] pose critique fetch failed:', err && err.message);
+      return null;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
   var picker = document.getElementById('posePicker');
   POSE_SLUGS.forEach(function (slug) {
     var chip = document.createElement('button');
@@ -387,7 +415,6 @@ window.FormCoachActiveMode = 'posing';
     canvas.height = video.videoHeight;
     canvas.getContext('2d').drawImage(video, 0, 0);
     var symmetry = window.FormCoachLogic.computeSymmetry(lastLandmarks, activeSlug);
-    window.FormCoachHistory.logSession('posing', { pose: activeSlug, holdTimeMs: holdMs, symmetry: symmetry });
     document.getElementById('posingResult').innerHTML =
       '<div class="fc-compare">' +
         '<div><div class="fc-compare-label">You</div></div>' +
@@ -395,12 +422,27 @@ window.FormCoachActiveMode = 'posing';
       '</div>' +
       '<div class="mob-card"><div class="mob-card-body"><strong>Held ' + (holdMs / 1000).toFixed(1) + 's</strong></div></div>' +
       '<div class="mob-card">' + renderSymmetry(symmetry) + '</div>' +
+      '<div class="mob-card" id="poseCritiqueCard"><div class="mob-card-body">Getting AI critique&hellip;</div></div>' +
       '<button class="fc-btn fc-btn-secondary" id="tryAgainBtn" type="button">Try Again</button>';
     document.querySelector('.fc-compare > div:first-child').appendChild(canvas);
     document.getElementById('tryAgainBtn').addEventListener('click', function () {
       frozen = false;
       holdTracker = window.FormCoachLogic.createHoldTracker();
       document.getElementById('posingResult').innerHTML = '';
+    });
+
+    var imageBase64 = canvas.toDataURL('image/jpeg', 0.85).replace(/^data:image\/jpeg;base64,/, '');
+    fetchPoseCritique(imageBase64).then(function (result) {
+      var card = document.getElementById('poseCritiqueCard');
+      if (result) {
+        if (card) card.querySelector('.mob-card-body').textContent = result.pose ? (result.pose + ': ' + result.critique) : result.critique;
+        window.FormCoachHistory.logSession('posing', { pose: activeSlug, holdTimeMs: holdMs, symmetry: symmetry, poseCritique: result });
+      } else {
+        // Symmetry card above is unaffected -- this card just disappears
+        // rather than showing an error on top of an already-successful capture.
+        if (card) card.remove();
+        window.FormCoachHistory.logSession('posing', { pose: activeSlug, holdTimeMs: holdMs, symmetry: symmetry });
+      }
     });
   }
 
