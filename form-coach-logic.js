@@ -309,7 +309,9 @@
   function buildHistoryRecord(type, data, nowIso) {
     var timestamp = nowIso || new Date().toISOString();
     if (type === 'posing') {
-      return { type: 'posing', timestamp: timestamp, pose: data.pose, holdTimeMs: data.holdTimeMs, symmetry: data.symmetry };
+      var record = { type: 'posing', timestamp: timestamp, pose: data.pose, holdTimeMs: data.holdTimeMs, symmetry: data.symmetry };
+      if (data.poseCritique) record.poseCritique = data.poseCritique;
+      return record;
     }
     if (type === 'lift') {
       return { type: 'lift', timestamp: timestamp, exercise: data.exercise, reps: data.reps };

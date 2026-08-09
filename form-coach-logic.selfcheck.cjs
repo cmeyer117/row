@@ -195,6 +195,13 @@ assertEqual(posingRecord.holdTimeMs, 1620, 'buildHistoryRecord: posing record ca
 assertEqual(posingRecord.symmetry, symResult, 'buildHistoryRecord: posing record carries the symmetry array through unmodified');
 assertEqual(posingRecord.timestamp, '2026-08-07T00:00:00.000Z', 'buildHistoryRecord: uses the injected timestamp when provided');
 
+// buildHistoryRecord — posing shape carries an optional poseCritique through when present.
+var withCritique = FCL.buildHistoryRecord('posing', { pose: 'front-double-biceps', holdTimeMs: 1620, symmetry: symResult, poseCritique: { pose: 'Front Double Biceps', critique: 'Lock your lats down harder.' } }, '2026-08-07T00:00:00.000Z');
+assertEqual(withCritique.poseCritique.critique, 'Lock your lats down harder.', 'buildHistoryRecord: posing record carries poseCritique through when provided');
+
+// buildHistoryRecord — posing shape omits poseCritique (not a null placeholder) when absent, matching the existing fields' behavior.
+assertEqual('poseCritique' in posingRecord, false, 'buildHistoryRecord: posing record has no poseCritique key when the caller did not provide one');
+
 // buildHistoryRecord — lift shape wraps caller data the same way.
 var liftRecord = FCL.buildHistoryRecord('lift', { exercise: 'Hack Squat', reps: e2eResult }, '2026-08-07T00:00:00.000Z');
 assertEqual(liftRecord.type, 'lift', 'buildHistoryRecord: lift record has type "lift"');
