@@ -410,15 +410,21 @@ window.FormCoachActiveMode = 'posing';
 
   function captureFreeze(holdMs) {
     frozen = true;
+    // Captured now, not read fresh from the outer scope inside the async
+    // .then() below -- activeSlug can change (pose picker, Try Again) while
+    // the AI critique fetch is still in flight, which would otherwise
+    // mislabel this capture's history record with whatever pose is active
+    // by the time the fetch resolves, not the one actually captured.
+    var capturedSlug = activeSlug;
     var canvas = document.createElement('canvas');
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
     canvas.getContext('2d').drawImage(video, 0, 0);
-    var symmetry = window.FormCoachLogic.computeSymmetry(lastLandmarks, activeSlug);
+    var symmetry = window.FormCoachLogic.computeSymmetry(lastLandmarks, capturedSlug);
     document.getElementById('posingResult').innerHTML =
       '<div class="fc-compare">' +
         '<div><div class="fc-compare-label">You</div></div>' +
-        '<div><div class="fc-compare-label">Reference</div><img src="assets/mobility/' + activeSlug + '.png" alt=""></div>' +
+        '<div><div class="fc-compare-label">Reference</div><img src="assets/mobility/' + capturedSlug + '.png" alt=""></div>' +
       '</div>' +
       '<div class="mob-card"><div class="mob-card-body"><strong>Held ' + (holdMs / 1000).toFixed(1) + 's</strong></div></div>' +
       '<div class="mob-card">' + renderSymmetry(symmetry) + '</div>' +
@@ -436,12 +442,12 @@ window.FormCoachActiveMode = 'posing';
       var card = document.getElementById('poseCritiqueCard');
       if (result) {
         if (card) card.querySelector('.mob-card-body').textContent = result.pose ? (result.pose + ': ' + result.critique) : result.critique;
-        window.FormCoachHistory.logSession('posing', { pose: activeSlug, holdTimeMs: holdMs, symmetry: symmetry, poseCritique: result });
+        window.FormCoachHistory.logSession('posing', { pose: capturedSlug, holdTimeMs: holdMs, symmetry: symmetry, poseCritique: result });
       } else {
         // Symmetry card above is unaffected -- this card just disappears
         // rather than showing an error on top of an already-successful capture.
         if (card) card.remove();
-        window.FormCoachHistory.logSession('posing', { pose: activeSlug, holdTimeMs: holdMs, symmetry: symmetry });
+        window.FormCoachHistory.logSession('posing', { pose: capturedSlug, holdTimeMs: holdMs, symmetry: symmetry });
       }
     });
   }
