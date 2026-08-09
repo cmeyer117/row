@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0a0b">
+<link rel="manifest" href="/manifest.json" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Row" />
+<title>State of Me — Row</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="gym-volume-logic.js"></script>
+<script src="macro-calc.js"></script>
+<script src="topbar.js" defer></script>
+<style>
+:root {
+  --bg: #000000;
+  --text-1: #F4F1EA;
+  --text-2: rgba(244,241,234,0.6);
+  --border: rgba(255,255,255,0.08);
+  --accent: #6ee7b7;
+  --danger: #ff6b6b;
+  --font: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SF Mono, Menlo, Consolas, monospace;
+}
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; padding: 0;
+  background: var(--bg);
+  color: var(--text-1);
+  font-family: var(--font);
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+}
+body { padding: max(24px, env(safe-area-inset-top)) 20px 80px; }
+h1 { font-family: 'Instrument Serif', Georgia, serif; font-size: 28px; margin: 0 0 4px; }
+.subtitle { color: var(--text-2); font-size: 13px; margin: 0 0 24px; }
+.som-card {
+  border: 1px solid var(--border); border-radius: 16px; padding: 16px 18px; margin: 0 0 12px;
+}
+.som-label { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.1em; color: var(--text-2); text-transform: uppercase; margin: 0 0 6px; }
+.som-value { font-size: 22px; font-weight: 700; margin: 0 0 4px; }
+.som-sub { font-size: 12px; color: var(--text-2); }
+.som-delta-up { color: var(--accent); }
+.som-delta-down { color: var(--danger); }
+</style>
+</head>
+<body>
+<h1>State of Me</h1>
+<p class="subtitle">This week, at a glance.</p>
+<div id="somContent"></div>
+
+<script>
+(function () {
+  'use strict';
+
+  var SUPABASE_URL = 'https://vikpcejlyxieguorwysf.supabase.co';
+  var SUPABASE_KEY = 'sb_publishable_EvWPtfW1FBW5Vf-H6w0yHw_PcXK4imv';
+  var supa = null;
+  function getSupa() {
+    if (!supa && window.supabase) supa = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    return supa;
+  }
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  function card(label, valueHtml, subHtml) {
+    return '<div class="som-card"><div class="som-label">' + esc(label) + '</div>' +
+      '<div class="som-value">' + valueHtml + '</div>' +
+      '<div class="som-sub">' + subHtml + '</div></div>';
+  }
+
+  function loadGymState() {
+    try { return JSON.parse(localStorage.getItem('po_coach_v1') || '{}'); } catch (e) { return {}; }
+  }
+  function loadWeights() {
+    try { return JSON.parse(localStorage.getItem('po_coach_weights') || '[]'); } catch (e) { return []; }
+  }
+  function loadSleep() {
+    try { return JSON.parse(localStorage.getItem('health:sleep') || '[]'); } catch (e) { return []; }
+  }
+  function loadTargets() {
+    var DEFAULT_TARGETS = { proteinG: 280, carbG: 397, fatG: 58, calories: 3201 };
+    try {
+      var raw = localStorage.getItem('macro_targets');
+      if (!raw) return DEFAULT_TARGETS;
+      return Object.assign({}, DEFAULT_TARGETS, JSON.parse(raw));
+    } catch (e) { return DEFAULT_TARGETS; }
+  }
+
+  function renderVolume() {
+    var state = loadGymState();
+    var weeks = window.GymVolumeLogic.weeklyVolumeByDay(state.exercises || [], state.logs || {}, 'all', 2);
+    var thisWeek = weeks[1] ? weeks[1].totalVol : 0;
+    var lastWeek = weeks[0] ? weeks[0].totalVol : 0;
+    var deltaHtml = '';
+    if (lastWeek > 0) {
+      var pct = Math.round(((thisWeek - lastWeek) / lastWeek) * 100);
+      deltaHtml = '<span class="' + (pct >= 0 ? 'som-delta-up' : 'som-delta-down') + '">' + (pct >= 0 ? '+' : '') + pct + '% vs last week</span>';
+    } else {
+      deltaHtml = 'No volume logged last week to compare';
+    }
+    return card('Training Volume (this week)', Math.round(thisWeek).toLocaleString() + ' lbs', deltaHtml);
+  }
+
+  function renderWeight() {
+    var weights = loadWeights();
+    if (!weights.length) return card('Weight Trend', '—', 'No weigh-ins logged yet');
+    var sorted = weights.slice().sort(function (a, b) { return a.dateKey.localeCompare(b.dateKey); });
+    var cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 30);
+    var cutoffKey = cutoff.toISOString().slice(0, 10);
+    var inWindow = sorted.filter(function (w) { return w.dateKey >= cutoffKey; });
+    if (inWindow.length < 2) return card('Weight Trend', sorted[sorted.length - 1].weight + ' lbs', 'Not enough data in the last 30 days for a trend');
+    var first = inWindow[0], last = inWindow[inWindow.length - 1];
+    var delta = Math.round((last.weight - first.weight) * 10) / 10;
+    var dir = delta < 0 ? 'down' : (delta > 0 ? 'up' : 'flat');
+    return card('Weight Trend (30 days)', last.weight + ' lbs',
+      dir === 'flat' ? 'Holding steady' : (Math.abs(delta) + ' lbs ' + dir + ' over 30 days'));
+  }
+
+  function renderSleep() {
+    var entries = loadSleep();
+    var cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 7);
+    var cutoffKey = cutoff.toISOString().slice(0, 10);
+    var recent = entries.filter(function (e) { return e.date >= cutoffKey && e.hours != null; });
+    if (!recent.length) return card('Sleep (last 7 days)', '—', 'No sleep data logged yet — use the quick-entry on the hub');
+    var avg = recent.reduce(function (sum, e) { return sum + e.hours; }, 0) / recent.length;
+    return card('Sleep (last 7 days)', (Math.round(avg * 10) / 10) + ' hrs avg', recent.length + '/7 nights logged');
+  }
+
+  function renderMacros() {
+    var client = getSupa();
+    if (!client) return Promise.resolve(card('Macro Adherence (last 7 days)', '—', 'Backend unavailable'));
+    var cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 7);
+    var cutoffKey = cutoff.getFullYear() + '-' + String(cutoff.getMonth() + 1).padStart(2, '0') + '-' + String(cutoff.getDate()).padStart(2, '0');
+    return client.from('food_log').select('*').gte('log_date', cutoffKey).then(function (res) {
+      var rows = res.data || [];
+      var targets = loadTargets();
+      var byDay = {};
+      rows.forEach(function (r) { (byDay[r.log_date] = byDay[r.log_date] || []).push(r); });
+      var days = Object.keys(byDay);
+      if (!days.length) return card('Macro Adherence (last 7 days)', '—', 'No food logged this week');
+      var pcts = days.map(function (d) {
+        var budget = window.MacroCalc.remainingBudget(targets, byDay[d]);
+        return targets.calories > 0 ? (budget.consumed.calories / targets.calories) * 100 : 0;
+      });
+      var avgPct = Math.round(pcts.reduce(function (a, b) { return a + b; }, 0) / pcts.length);
+      return card('Macro Adherence (last 7 days)', avgPct + '% of calorie target', days.length + '/7 days logged');
+    });
+  }
+
+  function checkFaithIronSignal(correlation) {
+    var d = correlation && correlation.rowDaysDelta;
+    if (d == null || Math.abs(d) < 1.0) return null;
+    if (d > 0) {
+      return 'Training more consistent in weeks active with Vessel — ' + correlation.avgRowDaysHighVessel.toFixed(1) + ' days/week vs ' + correlation.avgRowDaysLowVessel.toFixed(1) + '.';
+    }
+    return 'Training actually more consistent in weeks less active with Vessel — worth noticing, not necessarily a problem.';
+  }
+
+  function renderFaithIron() {
+    var client = getSupa();
+    if (!client) return Promise.resolve(card('Faith + Iron', '—', 'Backend unavailable'));
+    return client.from('app_state').select('data').eq('key', 'vision:faith_iron').maybeSingle().then(function (res) {
+      var correlation = res.data && res.data.data;
+      var signal = checkFaithIronSignal(correlation);
+      if (!signal) return card('Faith + Iron', '—', 'Not enough signal yet');
+      return card('Faith + Iron', 'Correlation found', esc(signal));
+    });
+  }
+
+  Promise.all([renderMacros(), renderFaithIron()]).then(function (results) {
+    var html = renderVolume() + renderWeight() + renderSleep() + results[0] + results[1];
+    document.getElementById('somContent').innerHTML = html;
+  });
+})();
+</script>
+</body>
+</html>
