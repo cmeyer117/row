@@ -1,8 +1,8 @@
 # Standalone Coaching App — Design Spec
 
 **Date:** 2026-08-09
-**Status:** Approved by Carl, pending Codex (terra) review
-**Author:** Claude (brainstorming session with Carl)
+**Status:** Approved by Carl. Codex (terra) reviewed — 1 confirmed critical + 5 plausible security gaps found and folded in below (see "Codex review fixes"). Operational hardening items fast-followed, not blocking.
+**Author:** Claude (brainstorming session with Carl), reviewed by Codex terra
 
 ## Context
 
@@ -25,7 +25,7 @@ This is Phase 1 of that productization: get the *existing* feature set safely on
    - **Clients:** magic-link only (passwordless). Each client gets an `auth.users` row tied to their `coaching_clients` row by email. No password to manage, no signup form.
 4. **Invite flow is manual, not automatic.** Carl triggers "send magic link" from the owner dashboard when he's ready (e.g., after a client has actually paid/onboarded) — not auto-sent the instant a `coaching_clients` row is created.
 5. **Feature scope is a strict 1:1 port** — no new client-facing features in this build. See mapping table below.
-6. **RLS is the real security boundary.** A client's session can only read/write rows where `coaching_clients.email` (or a `client_id` FK on child tables) matches their authenticated email. Owner role bypasses this. The old `?id=` URL-param access model is retired entirely — a client without a valid session gets nothing.
+6. **RLS is the real security boundary, bound to `auth.users.id` — not email.** Email is used only once, to match an invited client to the magic-link session on their *first* login; at that point their `coaching_clients` row gets a permanent `auth_user_id` FK, and every RLS policy and RPC from then on checks that FK against `auth.uid()`, never email. (Codex flagged email-based tenancy as fragile — a changed or reused email could otherwise let a new person inherit a prior client's data.) Owner role bypasses this via the single-email `verifyOwner()`-style check, evaluated server-side against a verified session, never a client-supplied value. Every RPC must derive the caller's authorized identity from their own session server-side — a client-supplied `client_id` parameter is never trusted as authority, even for existing RPCs being ported over (`get_coaching_plan`, `get_coaching_client_logs`, `upsert_coaching_weight`, etc. all need this checked, not assumed carried over safely). The old `?id=` URL-param access model is retired entirely — see "Codex review fixes" below for what that actually requires.
 
 ## Feature mapping (what moves where)
 
@@ -38,21 +38,44 @@ This is Phase 1 of that productization: get the *existing* feature set safely on
 | `api/create-coaching-payment.js`, `api/stripe-webhook.js` | Ported, repointed at the new Supabase project's service-role key; `verifyOwner()` pattern reused as-is |
 | `api/send-coaching-inquiry-nudge.js` | Ported as-is (Telegram nudge on new inquiry, not auth-relevant) |
 
+## Codex review fixes (folded in, not deferred)
+
+Codex (terra) reviewed this spec pre-implementation and found one confirmed critical gap plus five plausible ones, all addressed here:
+
+1. **Retire the old unauthenticated path, don't just leave it as "fallback data."** The original spec said Row's `coaching_clients` data stays in place untouched as a fallback — true for the *data*, but the *old unauthenticated `coaching-log.html?id=` access route itself* must be actively disabled once cutover is verified: revoke the anon-role `EXECUTE` grants on `get_coaching_plan`/`get_coaching_client_logs`/`upsert_coaching_weight`/the set-logging RPC in Row's Supabase project, so the URL stops working even though the underlying rows are preserved. This is the actual security fix this whole project delivers — leaving the door unlocked while moving the valuables elsewhere defeats the point.
+2. **Tenancy bound to `auth.users.id`, not email** — see decision #6 above.
+3. **RPC identity derived from session, never a parameter** — see decision #6 above.
+4. **Rollout sequencing:** RLS policies, grants, and RPC identity checks must be fully in place and tested in the new Supabase project *before* any client account or magic-link invite is issued and before any real client data is inserted. Do not stand up the project, add data, then lock it down — lock it down first.
+5. **`coaching-plan.html`'s dual role resolves only from the server-verified session.** For a client, their identity comes solely from their session — never a URL param, local storage, or hidden UI state. For the owner picking a client to view, that selection must be re-validated server-side on every request (the owner role can see anyone, but the *specific client shown* still needs the request to prove the owner role, not just trust a client-side dropdown value).
+6. **Migration needs a real cutover point, not just a copy-and-go.** Freeze writes to Row's coaching pages for the migration window (brief, announced, not silent), reconcile row counts between old and new after the copy, make the migration script safely rerunnable (idempotent — a retry after partial failure shouldn't duplicate rows), and carry over the *same* `stripe_customer_id`/`stripe_subscription_id` values rather than creating new Stripe customers, so existing billing continuity isn't broken.
+
+**Verification scope, expanded per Codex's finding that the original list was too narrow:** the "client A can't see client B" test must cover every RPC (not just table-level REST access), all of read/insert/update/delete, guessed/incorrect client IDs, and expired/logged-out sessions — not just one happy-path read check.
+
+## Fast-follow (not blocking this build)
+
+Codex also flagged operational hardening that's real but doesn't need to block a one-owner-two-role Phase 1 launch:
+
+- **Do now, cheap:** Supabase Auth magic-link redirect URL allowlist (prevents open-redirect abuse of the invite flow); confirm the ported Stripe webhook handles duplicate/replayed events idempotently (it already verifies signatures — idempotent *handling* of a re-delivered event is the gap to check, not signature verification itself).
+- **Genuine fast-follow, not this build:** rate-limiting on login/invite endpoints, an audit log for owner actions and billing changes, a tested backup/restore procedure, and an explicit client offboarding/data-deletion procedure. Revisit once the app has real clients on it, not before.
+
 ## Data migration
 
-One-time migration script, run once by hand (not scheduled/automated):
+One-time migration script, run once by hand (not scheduled/automated). RLS/grants in the new project must already be locked down before this runs (Codex fix #4 above — never insert real client data into an unsecured project).
 
-1. Pull all `coaching_clients` rows + related plan/log data from Row's Supabase project.
-2. Insert into the new project's schema — same shape, no transform needed since the schema is ported as-is.
-3. Migrated clients are **not** auto-invited — they sit inactive until Carl manually sends each one a magic link (per decision #4).
-4. Row's original `coaching_clients` data stays in place, untouched, as a fallback until the new app is verified live with real client logins. Deletion is a separate, later, explicit decision — not part of this build.
+1. Announce and hold a brief write-freeze window on Row's coaching pages for the migration.
+2. Pull all `coaching_clients` rows + related plan/log data from Row's Supabase project, carrying over the same `stripe_customer_id`/`stripe_subscription_id` values (Codex fix #6 — don't create new Stripe customers).
+3. Insert into the new project's schema — same shape, no transform needed. Script must be safely rerunnable (idempotent) in case of a partial-failure retry.
+4. Reconcile row counts between old and new after the copy, before ending the write-freeze.
+5. Migrated clients are **not** auto-invited — they sit inactive until Carl manually sends each one a magic link (per decision #4).
+6. Row's original `coaching_clients` *data* stays in place as a fallback until the new app is verified live — but the old unauthenticated access *route* is disabled at the same time (Codex fix #1: revoke the anon-role `EXECUTE` grants on the coaching RPCs in Row's Supabase project). Data retained, access closed — not the same thing. Full data deletion is a separate, later, explicit decision.
 
 ## Verification before declaring done
 
-- **RLS cross-client isolation is the one thing that has to be bulletproof.** Log in as client A, confirm client B's data is genuinely unreachable (not just hidden in the UI — a direct RPC/REST call with client A's session must fail against client B's rows).
-- Owner login still sees every client's data.
-- A real Stripe test-mode payment flows end-to-end against the new project (checkout session → webhook → `coaching_clients` billing status update).
+- **RLS cross-client isolation is the one thing that has to be bulletproof — tested at full width, per Codex's finding that a single happy-path check isn't enough.** Log in as client A, confirm client B's data is genuinely unreachable across: every RPC (`get_coaching_plan`, `get_coaching_client_logs`, `upsert_coaching_weight`, the set-logging RPC — not just table-level REST), every operation (read, insert, update, delete), guessed/incorrect client IDs, and an expired or logged-out session.
+- Owner login still sees every client's data, and the owner's selected-client view is re-validated server-side (not trusted from client-side UI state).
+- A real Stripe test-mode payment flows end-to-end against the new project (checkout session → webhook → `coaching_clients` billing status update), using the migrated `stripe_customer_id`, not a freshly created one.
 - Magic-link invite → client login → client sees their own plan/log, nothing else.
+- The old Row `coaching-log.html?id=` URL genuinely stops working post-cutover (grants revoked, not just "clients won't know the link exists").
 
 ## Explicitly out of scope for this build
 
