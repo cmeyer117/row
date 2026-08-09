@@ -2367,7 +2367,7 @@ document.addEventListener('DOMContentLoaded', function () {
   initCloudSync({
     appKey: 'goals',
     syncedKeys: ['morning_outcomes_v1'],
-    syncedPrefixes: ['goals:', 'morning_launch:'],
+    syncedPrefixes: ['goals:', 'morning_launch:', 'routine_checklist:'],
     onApplied: function () {
       window.dispatchEvent(new CustomEvent('goals-changed'));
       window.dispatchEvent(new Event('storage'));
