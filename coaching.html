@@ -253,6 +253,17 @@ body { min-height: 100vh; padding: max(28px, env(safe-area-inset-top)) 20px 60px
     }
   }
 
+  // Adherence badge — days since a client's most recent log/weigh-in, the
+  // signal for whether they're actually engaging (not just billing status).
+  // Two batched queries across all clients, not N+1 per row.
+  function adherenceBadge(lastCheckIn) {
+    if (!lastCheckIn) return { label: 'NO CHECK-INS YET', cls: 'badge-draft' };
+    const days = Math.floor((Date.now() - new Date(lastCheckIn).getTime()) / 86400000);
+    if (days <= 3) return { label: 'ACTIVE', cls: 'badge-issued' };
+    if (days < 14) return { label: days + 'd AGO', cls: 'badge-draft' };
+    return { label: days + 'd AGO', cls: 'badge-review' };
+  }
+
   async function loadClients() {
     const { data, error } = await supa.from('coaching_clients').select('*').neq('status', 'archived').order('created_at', { ascending: false });
     const listEl = document.getElementById('clientList');
@@ -260,6 +271,22 @@ body { min-height: 100vh; padding: max(28px, env(safe-area-inset-top)) 20px 60px
     listEl.innerHTML = '';
     if (error || !data || data.length === 0) { emptyEl.style.display = 'block'; return; }
     emptyEl.style.display = 'none';
+
+    const clientIds = data.map((c) => c.id);
+    const [{ data: logs }, { data: weights }] = await Promise.all([
+      supa.from('coaching_client_logs').select('client_id, created_at').in('client_id', clientIds),
+      supa.from('coaching_client_weights').select('client_id, logged_at').in('client_id', clientIds),
+    ]);
+    const lastCheckInByClient = {};
+    for (const row of (logs || [])) {
+      const ts = row.created_at;
+      if (!lastCheckInByClient[row.client_id] || ts > lastCheckInByClient[row.client_id]) lastCheckInByClient[row.client_id] = ts;
+    }
+    for (const row of (weights || [])) {
+      const ts = row.logged_at;
+      if (!lastCheckInByClient[row.client_id] || ts > lastCheckInByClient[row.client_id]) lastCheckInByClient[row.client_id] = ts;
+    }
+
     data.forEach((c) => {
       const row = document.createElement('div');
       row.className = 'client-row';
@@ -279,6 +306,10 @@ body { min-height: 100vh; padding: max(28px, env(safe-area-inset-top)) 20px 60px
       const badge = document.createElement('span');
       badge.className = 'badge ' + badgeClass;
       badge.textContent = badgeLabel;
+      const adherence = adherenceBadge(lastCheckInByClient[c.id]);
+      const adherenceEl = document.createElement('span');
+      adherenceEl.className = 'badge ' + adherence.cls;
+      adherenceEl.textContent = adherence.label;
       const archiveBtn = document.createElement('button');
       archiveBtn.type = 'button';
       archiveBtn.className = 'archive-btn';
@@ -292,6 +323,7 @@ body { min-height: 100vh; padding: max(28px, env(safe-area-inset-top)) 20px 60px
       row.appendChild(a);
       if (c.billing_status && c.billing_status !== 'none') row.appendChild(billingBadge);
       row.appendChild(badge);
+      row.appendChild(adherenceEl);
       row.appendChild(billBtn);
       row.appendChild(archiveBtn);
       listEl.appendChild(row);
