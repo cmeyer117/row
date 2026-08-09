@@ -2076,6 +2076,56 @@ body::after {
     };
   }
 
+  // kind: 'morning' | 'evening'. Appends a checklist block into `wrap` once
+  // the relevant Vessel reads resolve (checkbox items render immediately from
+  // localStorage; live items render as "..." until their read resolves, then
+  // re-render in place -- no full-page re-render, keeps focus/scroll stable).
+  function mlAppendRoutineChecklist(wrap, kind) {
+    const RC = window.DailyRoutineChecklistLogic;
+    if (!RC) return;
+    const items = kind === 'morning' ? RC.MORNING_ITEMS : RC.EVENING_ITEMS;
+    const date = getActiveDateString();
+    const savedChecks = rcLoadSavedChecks(date);
+
+    const section = el('div', 'ml-phase');
+    section.appendChild(el('div', 'ml-phase-title', kind === 'morning' ? 'Morning Routine' : 'Evening Routine'));
+    const list = el('div', 'ml-outcome-list');
+    section.appendChild(list);
+    wrap.appendChild(section);
+
+    function renderList(vesselReads) {
+      list.innerHTML = '';
+      const state = RC.buildChecklistState(items, savedChecks, vesselReads || {}, date);
+      state.forEach(function (item) {
+        const row = el('label', 'ml-outcome-item');
+        if (item.kind === 'checkbox') {
+          const cb = document.createElement('input');
+          cb.type = 'checkbox';
+          cb.checked = item.checked;
+          cb.addEventListener('change', function () {
+            savedChecks[item.id] = cb.checked;
+            rcSaveChecked(date, item.id, cb.checked);
+          });
+          row.appendChild(cb);
+          row.appendChild(el('span', null, item.label));
+        } else {
+          const status = item.unknown ? '…' : (item.checked ? '✓' : '—');
+          row.appendChild(el('span', null, status + ' ' + item.label));
+        }
+        list.appendChild(row);
+      });
+    }
+
+    renderList({});
+    const liveItems = items.filter(function (i) { return i.kind === 'live'; });
+    Promise.all(liveItems.map(function (i) { return rcFetchVesselKey(i.vesselKey).then(function (data) { return [i.vesselKey, data]; }); }))
+      .then(function (pairs) {
+        const vesselReads = {};
+        pairs.forEach(function (pair) { vesselReads[pair[0]] = pair[1]; });
+        renderList(vesselReads);
+      });
+  }
+
   function mlBuildCommit(session, outcomesState) {
     const ML = window.MorningLaunchLogic;
     const wrap = el('div', 'ml-phase');
@@ -2122,6 +2172,7 @@ body::after {
     });
     wrap.appendChild(completeBtn);
     wrap.appendChild(err);
+    mlAppendRoutineChecklist(wrap, 'morning');
     return wrap;
   }
 
@@ -2195,6 +2246,7 @@ body::after {
     const proj = ML.buildEveningShutdown(session, getGoals(todayKey()));
     const wrap = el('div', 'ml-evening');
     wrap.appendChild(el('div', 'ml-phase-title', 'Evening Shutdown'));
+    mlAppendRoutineChecklist(wrap, 'evening');
 
     if (proj.source === 'launch') {
       wrap.appendChild(mlBuildMoverList(session));
