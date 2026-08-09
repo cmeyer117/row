@@ -921,6 +921,35 @@ body::after {
       window.dispatchEvent(new CustomEvent('goals-changed'));
     }
   }
+
+  // --- Daily routine checklist: Vessel read + local checkbox state ---
+  const RC_SUPABASE_URL = 'https://vikpcejlyxieguorwysf.supabase.co';
+  const RC_SUPABASE_KEY = 'sb_publishable_EvWPtfW1FBW5Vf-H6w0yHw_PcXK4imv';
+  let rcSupa = null;
+  function rcGetSupa() {
+    if (!rcSupa && window.supabase) rcSupa = window.supabase.createClient(RC_SUPABASE_URL, RC_SUPABASE_KEY);
+    return rcSupa;
+  }
+  function rcChecklistKey(date) { return 'routine_checklist:' + date; }
+  function rcLoadSavedChecks(date) {
+    const v = storeGet(rcChecklistKey(date));
+    return (v && typeof v === 'object') ? v : {};
+  }
+  function rcSaveChecked(date, itemId, checked) {
+    const saved = rcLoadSavedChecks(date);
+    saved[itemId] = checked;
+    storeSet(rcChecklistKey(date), saved);
+  }
+  // Fetches one app_state row's data, wrapped so a failure never throws --
+  // caller treats a missing/failed read the same as "not yet known" (renders unknown).
+  function rcFetchVesselKey(key) {
+    const client = rcGetSupa();
+    if (!client) return Promise.resolve(undefined);
+    return client.from('app_state').select('data').eq('key', key).maybeSingle()
+      .then(function (res) { return (res && res.data) ? res.data.data : undefined; })
+      .catch(function () { return undefined; });
+  }
+
   function newId(prefix) { return (prefix || 'id') + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
   function storeDelete(key) { try { localStorage.removeItem(key); } catch (e) {} }
   function storeListKeys(prefix) {
