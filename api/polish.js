@@ -1,10 +1,16 @@
 // Vercel serverless function — proxies the ✨ Polish request to Anthropic
 // so the API key stays server-side. Key lives in the Vercel env var
 // ANTHROPIC_API_KEY, never in client-shipped JS.
+import { verifyAppSecret } from './_lib/verify-app-secret.js';
+
 export default async function handler(req, res) {
   try {
     if (req.method !== 'POST') {
       res.status(405).json({ error: 'Method not allowed' });
+      return;
+    }
+    if (!verifyAppSecret(req.headers['authorization'], process.env.ROW_APP_SECRET)) {
+      res.status(401).json({ error: 'Unauthorized' });
       return;
     }
     const key = process.env.ANTHROPIC_API_KEY;

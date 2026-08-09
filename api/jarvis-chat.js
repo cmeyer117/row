@@ -5,6 +5,7 @@
 // sits in the static client HTML. JARVIS_SESSION_SECRET is a Vercel env
 // var (same value as Jarvis's JARVIS_SESSION_SECRET), not client-visible.
 import { createHmac } from 'node:crypto';
+import { verifyAppSecret } from './_lib/verify-app-secret.js';
 
 const JARVIS_URL = 'https://claude-workspace-production-8460.up.railway.app';
 
@@ -17,6 +18,10 @@ function sessionCookie(secret) {
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed' });
+    return;
+  }
+  if (!verifyAppSecret(req.headers['authorization'], process.env.ROW_APP_SECRET)) {
+    res.status(401).json({ error: 'Unauthorized' });
     return;
   }
   const { message } = req.body || {};
