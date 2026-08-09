@@ -1,0 +1,22 @@
+name: Morning Launch Nudge
+
+on:
+  schedule:
+    # 8am Eastern (EDT, accounting for DST drift — see workout-nudge.yml) = 12pm UTC
+    - cron: '0 12 * * *'
+  workflow_dispatch:
+
+jobs:
+  nudge:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send morning launch nudge
+        run: |
+          response=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
+            https://row-sage.vercel.app/api/send-morning-launch-nudge \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}")
+          echo "Response code: $response"
+          if [ "$response" != "200" ]; then
+            echo "Error: unexpected response $response"
+            exit 1
+          fi
