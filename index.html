@@ -190,11 +190,11 @@ body::after {
 .tile-fitness  { grid-column: span 2; grid-row: span 1; }
 .tile-health   { grid-column: span 1; grid-row: span 1; }
 .tile-finance  { grid-column: span 1; grid-row: span 1; }
-.tile-jarvis   { grid-column: span 2; }
+.tile-vision   { grid-column: span 2; }
 .tile-vessel   { grid-column: span 2; }
 
-.tile-jarvis .tile-name, .tile-vessel .tile-name { font-size: 30px; }
-.tile-jarvis .tile-icon, .tile-vessel .tile-icon { width: 38px; height: 38px; }
+.tile-vision .tile-name, .tile-vessel .tile-name { font-size: 30px; }
+.tile-vision .tile-icon, .tile-vessel .tile-icon { width: 38px; height: 38px; }
 
 /* centerpiece tile — Vee-style radial disc glow that breathes at rest. */
 .tile-goals {
@@ -333,7 +333,7 @@ body::after {
   .tile-fitness { grid-column: span 2; }
   .tile-health  { grid-column: span 1; }
   .tile-finance { grid-column: span 1; }
-  .tile-jarvis  { grid-column: span 1; }
+  .tile-vision  { grid-column: span 1; }
   .tile-vessel  { grid-column: span 1; }
 }
 @media (max-width: 440px) {
@@ -341,7 +341,7 @@ body::after {
     grid-template-columns: 1fr;
     grid-template-rows: auto;
   }
-  .tile-goals, .tile-fitness, .tile-health, .tile-finance, .tile-jarvis, .tile-vessel {
+  .tile-goals, .tile-fitness, .tile-health, .tile-finance, .tile-vision, .tile-vessel {
     grid-column: span 1; grid-row: span 1;
   }
   .dash-title { font-size: 24px; }
@@ -461,8 +461,8 @@ body::after {
       </div>
     </a>
 
-    <!-- Jarvis -->
-    <a href="https://jarvis-pi-liart.vercel.app?from=row" target="_blank" rel="noopener" class="tile tile-jarvis">
+    <!-- Vision -->
+    <a href="https://vision-carl-meyer.vercel.app" target="_blank" rel="noopener" class="tile tile-vision">
       <svg class="tile-art" viewBox="0 0 100 60" preserveAspectRatio="none">
         <g style="opacity:.6">
           <line class="tile-ghost-line" x1="75" y1="30" x2="75" y2="12"/><line class="tile-ghost-line" x1="75" y1="30" x2="93" y2="20"/>
@@ -474,7 +474,7 @@ body::after {
       <div>
         <div class="tile-num">·05</div>
         <svg class="tile-icon" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" stroke-width="1.6"><rect x="4" y="4" width="16" height="16" rx="4"/><circle cx="9" cy="10" r="1.3" fill="var(--text-tertiary)" stroke="none"/><circle cx="15" cy="10" r="1.3" fill="var(--text-tertiary)" stroke="none"/><path d="M8 15 h8" stroke-linecap="round"/></svg>
-        <div class="tile-name">Jarvis</div>
+        <div class="tile-name">Vision</div>
         <div class="tile-sub">Voice + text AI. Full memory, web search, and project context. Sir.</div>
       </div>
       <div class="tile-footer">
@@ -568,9 +568,11 @@ body::after {
     } catch (e) {}
   })();
 
-  // Coach's Read — Jarvis's weekly stall/volume/Faith+Iron narrative, read
-  // straight from the app_state row Jarvis's coach-read tool already writes.
-  // Row never computes or writes this data, only displays it.
+  // Coach's Read — Vision's weekly stall/volume/Faith+Iron narrative, read
+  // straight from the app_state row Vision's coach-read script already
+  // writes (vendored from Jarvis's original deterministic logic, zero
+  // LLM cost either way). Row never computes or writes this data, only
+  // displays it.
   (async function initCoachRead() {
     try {
       if (!window.supabase) return;
@@ -578,7 +580,7 @@ body::after {
         'https://vikpcejlyxieguorwysf.supabase.co',
         'sb_publishable_EvWPtfW1FBW5Vf-H6w0yHw_PcXK4imv'
       );
-      const { data, error } = await client.from('app_state').select('data').eq('key', 'jarvis:coach_read').maybeSingle();
+      const { data, error } = await client.from('app_state').select('data').eq('key', 'vision:coach_read').maybeSingle();
       if (error || !data || !data.data || !data.data.narrative) return;
       const read = data.data;
       document.getElementById('coachReadText').textContent = read.narrative;
