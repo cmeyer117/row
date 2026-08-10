@@ -314,7 +314,9 @@
       return record;
     }
     if (type === 'lift') {
-      return { type: 'lift', timestamp: timestamp, exercise: data.exercise, reps: data.reps };
+      var liftRecord = { type: 'lift', timestamp: timestamp, exercise: data.exercise, reps: data.reps };
+      if (data.liftCritique) liftRecord.liftCritique = data.liftCritique;
+      return liftRecord;
     }
     return null;
   }

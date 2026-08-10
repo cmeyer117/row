@@ -208,6 +208,13 @@ assertEqual(liftRecord.type, 'lift', 'buildHistoryRecord: lift record has type "
 assertEqual(liftRecord.exercise, 'Hack Squat', 'buildHistoryRecord: lift record carries the exercise name through');
 assertEqual(liftRecord.reps, e2eResult, 'buildHistoryRecord: lift record carries the scored reps array through unmodified');
 
+// buildHistoryRecord — lift shape carries an optional liftCritique through when present.
+var liftWithCritique = FCL.buildHistoryRecord('lift', { exercise: 'Hack Squat', reps: e2eResult, liftCritique: { critique: 'Slow the eccentric down.' } }, '2026-08-07T00:00:00.000Z');
+assertEqual(liftWithCritique.liftCritique.critique, 'Slow the eccentric down.', 'buildHistoryRecord: lift record carries liftCritique through when provided');
+
+// buildHistoryRecord — lift shape omits liftCritique when absent.
+assertEqual('liftCritique' in liftRecord, false, 'buildHistoryRecord: lift record has no liftCritique key when the caller did not provide one');
+
 // buildHistoryRecord — an unknown type returns null rather than a malformed record.
 assertEqual(FCL.buildHistoryRecord('bogus', {}), null, 'buildHistoryRecord: an unrecognized type returns null');
 
