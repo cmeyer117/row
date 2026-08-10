@@ -15,6 +15,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="topbar.js" defer></script>
 <script src="mobility-pain-library.js"></script>
+<script src="mobility-self-assessment.js"></script>
 <style>
 :root {
   --bg: #000000;
@@ -155,6 +156,23 @@ html, body {
 .mob-pain-label:first-child { margin-top: 0; }
 .mob-pain-list { margin: 0 0 4px; padding-left: 16px; font-size: 12px; color: var(--text-2); line-height: 1.5; }
 .mob-pain-list li { margin-bottom: 2px; }
+.mob-selfassess-buttons { display: flex; gap: 8px; margin-top: 10px; }
+.mob-selfassess-btn {
+  flex: 1; padding: 8px 0; border-radius: 999px; font-size: 12px; font-weight: 700;
+  letter-spacing: 0.04em; color: var(--text-3);
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+  cursor: pointer; transition: background 0.15s, border-color 0.15s, color 0.15s;
+  -webkit-tap-highlight-color: transparent; font-family: inherit;
+}
+.mob-selfassess-btn-pass.selected { color: var(--good); background: rgba(110,231,183,0.10); border-color: rgba(110,231,183,0.30); }
+.mob-selfassess-btn-fail.selected { color: var(--bad); background: rgba(255,138,138,0.10); border-color: rgba(255,138,138,0.30); }
+.mob-selfassess-card.answered { border-color: var(--border-strong); }
+.mob-selfassess-run-btn, .mob-selfassess-save-btn {
+  display: block; width: 100%; margin-top: 10px; padding: 10px 0; border-radius: 10px;
+  font-size: 13px; font-weight: 700; color: var(--text-1);
+  background: rgba(110,231,183,0.12); border: 1px solid rgba(110,231,183,0.30);
+  cursor: pointer; -webkit-tap-highlight-color: transparent; font-family: inherit;
+}
 
 /* ── Expandable exercise row ── */
 .mob-ex-head {
@@ -620,6 +638,11 @@ html, body {
     </div>
 
     <div class="mob-divider"></div>
+    <div class="mob-block-title">Self-Assessment</div>
+    <div id="selfAssessSummary"></div>
+    <div id="selfAssessTests" style="display:none"></div>
+
+    <div class="mob-divider"></div>
     <div class="mob-card">
       <div class="mob-card-body" style="font-size:12px">
         Do not go to zero. Total rest causes regression — connective tissue needs load signals to maintain integrity.
@@ -952,11 +975,87 @@ html, body {
     });
   }
 
+  // ── Self-assessment: render, wire up, and route failed areas into the pain library ──
+  var selfAssessResults = {};
+  var selfAssessSummaryEl = document.getElementById('selfAssessSummary');
+  var selfAssessTestsEl = document.getElementById('selfAssessTests');
+
+  function expandFailedAreas(failedAreas, shouldScroll) {
+    var wrap = document.getElementById('painLibraryWrap');
+    if (!wrap || !failedAreas.length || !window.MobilityPainLibrary) return;
+    var firstRow = null;
+    failedAreas.forEach(function (area) {
+      var entry = window.MobilityPainLibrary.PAIN_LIBRARY[area];
+      if (!entry) return;
+      var headings = wrap.querySelectorAll('.mob-block-title');
+      var heading = null;
+      for (var i = 0; i < headings.length; i++) {
+        if (headings[i].textContent === entry.label) { heading = headings[i]; break; }
+      }
+      if (!heading) return;
+      var infoRow = heading.nextElementSibling && heading.nextElementSibling.nextElementSibling;
+      if (infoRow && infoRow.classList.contains('mob-ex-row')) {
+        infoRow.classList.add('expanded');
+        if (!firstRow) firstRow = infoRow;
+      }
+    });
+    if (shouldScroll && firstRow) firstRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  function loadSelfAssessment() {
+    if (!window.MobilitySelfAssessment) return;
+    var saved = null;
+    try { saved = JSON.parse(localStorage.getItem(window.MobilitySelfAssessment.STORAGE_KEY) || 'null'); } catch (e) { saved = null; }
+    if (selfAssessSummaryEl) selfAssessSummaryEl.innerHTML = window.MobilitySelfAssessment.renderSummary(saved);
+    if (saved) expandFailedAreas(window.MobilitySelfAssessment.getFailedAreas(saved.results), false);
+  }
+
+  document.addEventListener('click', function (e) {
+    if (!window.MobilitySelfAssessment) return;
+
+    if (e.target.closest('#selfAssessRunBtn')) {
+      selfAssessResults = {};
+      selfAssessTestsEl.innerHTML = window.MobilitySelfAssessment.renderTests();
+      selfAssessTestsEl.style.display = 'block';
+      return;
+    }
+
+    var resultBtn = e.target.closest('.mob-selfassess-btn');
+    if (resultBtn && selfAssessTestsEl.contains(resultBtn)) {
+      var card = resultBtn.closest('.mob-selfassess-card');
+      var area = card.getAttribute('data-area');
+      selfAssessResults[area] = resultBtn.getAttribute('data-result');
+      var siblingBtns = card.querySelectorAll('.mob-selfassess-btn');
+      for (var i = 0; i < siblingBtns.length; i++) siblingBtns[i].classList.remove('selected');
+      resultBtn.classList.add('selected');
+      card.classList.add('answered');
+      var saveBtn = document.getElementById('selfAssessSaveBtn');
+      if (saveBtn && window.MobilitySelfAssessment.allAnswered(selfAssessResults)) {
+        saveBtn.style.display = 'block';
+      }
+      return;
+    }
+
+    if (e.target.closest('#selfAssessSaveBtn')) {
+      var record = { date: new Date().toISOString().slice(0, 10), results: selfAssessResults };
+      localStorage.setItem(window.MobilitySelfAssessment.STORAGE_KEY, JSON.stringify(record));
+      selfAssessSummaryEl.innerHTML = window.MobilitySelfAssessment.renderSummary(record);
+      selfAssessTestsEl.style.display = 'none';
+      expandFailedAreas(window.MobilitySelfAssessment.getFailedAreas(record.results), true);
+      return;
+    }
+  });
+
   // ── Render the pain library into the Joint Care tab ──
   var painLibraryWrap = document.getElementById('painLibraryWrap');
   if (painLibraryWrap && window.MobilityPainLibrary) {
     painLibraryWrap.innerHTML = window.MobilityPainLibrary.renderAll();
   }
+
+  // Must run after painLibraryWrap is populated above — expandFailedAreas()
+  // looks up .mob-block-title headings inside it, which don't exist until
+  // the pain library has actually rendered into the DOM.
+  loadSelfAssessment();
 
   swapPhotos(document);
 })();
