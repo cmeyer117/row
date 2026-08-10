@@ -99,4 +99,28 @@ assertTrue(/weigh/i.test(r.reason), 'insufficient-weight reason names weigh-ins 
 r = L.computeRecompDelta([], [], 30, NOW);
 assertEqual(r.ok, false, 'both series empty returns ok:false');
 
-console.log('recomp-signal-logic.selfcheck.cjs: all assertions passed (Task 1)');
+// --- buildRecompChart ---
+
+// Both series present (2+ points each) — both lines render
+let svg = L.buildRecompChart(
+  [{ date: '2026-07-01', value: 200 }, { date: '2026-08-01', value: 202 }],
+  [{ date: '2026-07-01', value: 35 }, { date: '2026-08-01', value: 34 }],
+  300, 90
+);
+assertTrue(svg.indexOf('<svg') !== -1, 'chart with two full series returns an svg tag');
+assertEqual((svg.match(/<polyline/g) || []).length, 2, 'chart with two full series draws two polylines');
+
+// One series short (waist has only 1 point) — only the weight line renders
+svg = L.buildRecompChart(
+  [{ date: '2026-07-01', value: 200 }, { date: '2026-08-01', value: 202 }],
+  [{ date: '2026-08-01', value: 34 }],
+  300, 90
+);
+assertTrue(svg.indexOf('<svg') !== -1, 'chart with one short series still returns an svg tag');
+assertEqual((svg.match(/<polyline/g) || []).length, 1, 'chart with one short series draws exactly one polyline');
+
+// Both series empty — returns empty string, not a broken/empty svg tag
+svg = L.buildRecompChart([], [], 300, 90);
+assertEqual(svg, '', 'chart with no data at all returns an empty string');
+
+console.log('recomp-signal-logic.selfcheck.cjs: all assertions passed (Task 2)');

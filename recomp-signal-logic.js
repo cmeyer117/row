@@ -72,10 +72,54 @@
     };
   }
 
+  // weightSeries/waistSeries: [{date, value}]. All-time range (not
+  // window-limited) — matches the other Health Markers charts. Each line
+  // is normalized to its own min/max since weight (~200s lbs) and waist
+  // (~30s in) aren't comparable on one scale. A series with fewer than 2
+  // points is simply omitted rather than erroring. Returns an SVG string
+  // (with a small legend) or '' if there's nothing to plot at all.
+  function buildRecompChart(weightSeries, waistSeries, w, h) {
+    var weight = (weightSeries || []).slice().sort(function (a, b) { return a.date.localeCompare(b.date); });
+    var waist = (waistSeries || []).slice().sort(function (a, b) { return a.date.localeCompare(b.date); });
+    if (weight.length < 2 && waist.length < 2) return '';
+
+    var pad = 6;
+    var allDates = weight.concat(waist).map(function (p) { return p.date; }).sort();
+    var minT = new Date(allDates[0] + 'T00:00:00Z').getTime();
+    var maxT = new Date(allDates[allDates.length - 1] + 'T00:00:00Z').getTime();
+    var spanT = maxT - minT || 1;
+
+    function xFor(date) {
+      var t = new Date(date + 'T00:00:00Z').getTime();
+      return pad + ((t - minT) / spanT) * (w - pad * 2);
+    }
+    function lineFor(series, color) {
+      if (series.length < 2) return '';
+      var vals = series.map(function (p) { return p.value; });
+      var min = Math.min.apply(null, vals), max = Math.max.apply(null, vals);
+      var range = max - min || 1;
+      var points = series.map(function (p) {
+        var y = h - pad - ((p.value - min) / range) * (h - pad * 2);
+        return xFor(p.date).toFixed(1) + ',' + y.toFixed(1);
+      });
+      return '<polyline fill="none" stroke="' + color + '" stroke-width="2" points="' + points.join(' ') + '" />';
+    }
+
+    var weightLine = lineFor(weight, 'var(--text-primary)');
+    var waistLine = lineFor(waist, 'var(--accent)');
+    var legend = '<div class="recomp-legend">' +
+      '<span class="recomp-legend-item"><span class="recomp-swatch" style="background:var(--text-primary)"></span>Weight</span>' +
+      '<span class="recomp-legend-item"><span class="recomp-swatch" style="background:var(--accent)"></span>Waist</span>' +
+      '</div>';
+    return legend +
+      '<svg viewBox="0 0 ' + w + ' ' + h + '" xmlns="http://www.w3.org/2000/svg">' + weightLine + waistLine + '</svg>';
+  }
+
   var api = {
     WEIGHT_FLAT_THRESHOLD: WEIGHT_FLAT_THRESHOLD,
     WAIST_FLAT_THRESHOLD: WAIST_FLAT_THRESHOLD,
-    computeRecompDelta: computeRecompDelta
+    computeRecompDelta: computeRecompDelta,
+    buildRecompChart: buildRecompChart
   };
   if (typeof window !== 'undefined') window.RecompSignalLogic = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
