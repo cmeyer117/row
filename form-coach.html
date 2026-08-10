@@ -496,6 +496,31 @@ window.FormCoachActiveMode = 'posing';
   var cameraStarted = false;
   var LIFT_LANDMARK = window.FormCoachLogic.LANDMARK;
 
+  // Same client-visible trust tier as the Posing Coach IIFE's own
+  // ROW_APP_SECRET (separate <script> block, not in scope here) --
+  // must match the ROW_APP_SECRET Vercel env var checked by
+  // api/_lib/verify-app-secret.js.
+  async function fetchLiftCritique(exercise, reps) {
+    var controller = new AbortController();
+    var timer = setTimeout(function () { controller.abort(); }, 25000);
+    try {
+      var res = await fetch('/api/vision-lift-critique', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer 007007' },
+        body: JSON.stringify({ exercise: exercise, reps: reps }),
+        signal: controller.signal,
+      });
+      if (!res.ok) return null;
+      var data = await res.json();
+      return (data && typeof data.critique === 'string') ? data : null;
+    } catch (err) {
+      console.warn('[form-coach] lift critique fetch failed:', err && err.message);
+      return null;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
   function midpoint(a, b) { return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }; }
 
   // Picks the tracked point with the greatest y-range across the
@@ -580,8 +605,20 @@ window.FormCoachActiveMode = 'posing';
       var minAmplitude = primary.range * 0.15; // 15% of the set's own observed range filters jitter without hiding a real short rep
       var scored = window.FormCoachLogic.scoreSet(primary.samples, stabilitySamples, minAmplitude);
       var exerciseName = document.getElementById('liftExerciseName').value.trim();
-      if (scored.length) window.FormCoachHistory.logSession('lift', { exercise: exerciseName, reps: scored });
       renderResult(scored, exerciseName);
+      if (scored.length) {
+        resultEl.insertAdjacentHTML('beforeend', '<div class="mob-card" id="liftCritiqueCard"><div class="mob-card-body">Getting AI critique&hellip;</div></div>');
+        fetchLiftCritique(exerciseName, scored).then(function (result) {
+          var card = document.getElementById('liftCritiqueCard');
+          if (result) {
+            if (card) card.querySelector('.mob-card-body').textContent = result.critique;
+            window.FormCoachHistory.logSession('lift', { exercise: exerciseName, reps: scored, liftCritique: result });
+          } else {
+            if (card) card.remove();
+            window.FormCoachHistory.logSession('lift', { exercise: exerciseName, reps: scored });
+          }
+        });
+      }
     }
   });
 })();
