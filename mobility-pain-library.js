@@ -192,6 +192,48 @@
     flareAction: 'Back off to a pain-free squat depth (box squats/leg press instead of ATG). Keep isometric glute and hip-flexor work. Skip anything ballistic (jumps, cleans) until it settles.'
   };
 
+  PAIN_LIBRARY.lowBack = {
+    label: 'Low Back',
+    causes: [
+      'Muscle strain from lifting under fatigue with poor bracing or a rounding spine',
+      'SI joint sprain or dysfunction from asymmetric loading (uneven stance, one-sided carries)',
+      'General deconditioning of the trunk relative to the loads going through squats and deadlifts'
+    ],
+    drills: [
+      {
+        name: 'Cat-cow',
+        dose: '2 × 10 slow reps',
+        detail: 'On hands and knees, alternate rounding and arching the spine through a full pain-free range. Restores segmental movement without load.'
+      },
+      {
+        name: 'Bird-dog',
+        dose: '3 × 8/side',
+        detail: 'Opposite arm and leg extended, hold 2–3 sec, keep the low back still — no rotation or sag. Trains the anti-rotation control that’s missing when the back tweaks under load.'
+      },
+      {
+        name: 'Glute bridge',
+        dose: '3 × 12',
+        detail: 'Feet flat, drive through heels, squeeze glutes at the top. Builds a hip-extension pattern that offloads the lumbar spine from doing all the extension work.'
+      },
+      {
+        name: 'Dead bug',
+        dose: '3 × 8/side',
+        detail: 'On your back, lower the opposite arm and leg slowly while keeping the low back pressed flat against the floor. Trains bracing without spinal flexion — the pattern that protects the disc under load.'
+      }
+    ],
+    avoid: [
+      'Maxing out squats/deadlifts while fatigued or once bracing technique breaks down',
+      'Loaded spinal flexion — rounding under a bar (good-mornings, deadlifts with a rounded back)',
+      'Ignoring one-sided low-back pain that could be SI-joint related instead of muscular'
+    ],
+    whenToSeeSomeone: [
+      'Same-day medical care, not a training modification: saddle numbness, new loss of bladder or bowel control, or progressive weakness in both legs — these are cauda equina red flags',
+      'Pain radiating below the knee',
+      'No improvement after 4–6 weeks'
+    ],
+    flareAction: 'Drop to bodyweight/banded core work only. No loaded spinal flexion. Keep walking daily — movement helps back pain more than rest. No deadlifts or heavy squats until pain-free.'
+  };
+
   function escapeAttr(s) {
     return String(s).replace(/"/g, '&quot;');
   }
