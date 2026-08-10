@@ -15,6 +15,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="gym-volume-logic.js"></script>
 <script src="macro-calc.js"></script>
+<script src="recomp-signal-logic.js"></script>
 <script src="topbar.js" defer></script>
 <style>
 :root {
@@ -87,6 +88,9 @@ h1 { font-family: 'Instrument Serif', Georgia, serif; font-size: 28px; margin: 0
   function loadSleep() {
     try { return JSON.parse(localStorage.getItem('health:sleep') || '[]'); } catch (e) { return []; }
   }
+  function loadMeasurements() {
+    try { return JSON.parse(localStorage.getItem('health:measurements') || '[]'); } catch (e) { return []; }
+  }
   function loadTargets() {
     var DEFAULT_TARGETS = { proteinG: 280, carbG: 397, fatG: 58, calories: 3201 };
     try {
@@ -125,6 +129,22 @@ h1 { font-family: 'Instrument Serif', Georgia, serif; font-size: 28px; margin: 0
     var dir = delta < 0 ? 'down' : (delta > 0 ? 'up' : 'flat');
     return card('Weight Trend (30 days)', last.weight + ' lbs',
       dir === 'flat' ? 'Holding steady' : (Math.abs(delta) + ' lbs ' + dir + ' over 30 days'));
+  }
+
+  function renderRecomp() {
+    var weightSeries = loadWeights()
+      .filter(function (w) { return w && w.dateKey && w.weight != null; })
+      .map(function (w) { return { date: w.dateKey, value: w.weight }; });
+    var waistSeries = loadMeasurements()
+      .filter(function (e) { return e && e.date && e.waist != null; })
+      .map(function (e) { return { date: e.date, value: e.waist }; });
+
+    var result = window.RecompSignalLogic.computeRecompDelta(weightSeries, waistSeries, 30, new Date());
+    if (!result.ok) return card('Recomp Signal (30 days)', '—', result.reason);
+
+    var weightStr = (result.weightDelta >= 0 ? '+' : '') + result.weightDelta + ' lbs';
+    var waistStr = (result.waistDelta >= 0 ? '+' : '') + result.waistDelta + ' in';
+    return card('Recomp Signal (30 days)', esc(result.label), 'Weight ' + weightStr + ' · Waist ' + waistStr);
   }
 
   function renderSleep() {
@@ -181,7 +201,7 @@ h1 { font-family: 'Instrument Serif', Georgia, serif; font-size: 28px; margin: 0
   }
 
   Promise.all([renderMacros(), renderFaithIron()]).then(function (results) {
-    var html = renderVolume() + renderWeight() + renderSleep() + results[0] + results[1];
+    var html = renderVolume() + renderWeight() + renderRecomp() + renderSleep() + results[0] + results[1];
     document.getElementById('somContent').innerHTML = html;
   });
 })();
