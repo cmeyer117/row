@@ -149,6 +149,49 @@
     flareAction: 'Spanish squat holds + TKE only. No loaded squatting until 2–3 days clear. After training: elevate legs 10–15 min, ice directly on the patellar tendon 10 min if acutely painful.'
   };
 
+  PAIN_LIBRARY.hip = {
+    label: 'Hip',
+    causes: [
+      'FAI (extra bone growth at the hip joint) or a labral tear irritated by deep loaded ranges — ATG squats, deep lunges, cleans/snatches',
+      'Hip flexor strain from sudden ballistic movement or overuse without adequate recovery',
+      'Hip pain accounts for roughly a quarter of powerlifting injuries, driven by the heavy hip-torque demands of the squat and deadlift'
+    ],
+    drills: [
+      {
+        name: 'Standing hip flexor stretch',
+        dose: '3 × 30 sec/side',
+        detail: 'Half-kneeling, back knee down, squeeze the glute and shift weight forward until you feel a stretch through the front of the hip. Keep the torso tall — don’t arch the low back to fake range.'
+      },
+      {
+        name: '90/90 hip switches',
+        dose: '2 × 10 switches',
+        detail: 'Seated, both knees bent 90°, rotate from one hip’s internal rotation to the other’s external rotation without using your hands. Restores the rotational range squat depth needs.'
+      },
+      {
+        name: 'Banded hip abduction (clamshell / monster walk)',
+        dose: '3 × 15/side',
+        detail: 'Light band above the knees, side-lying clamshells or standing monster walks. Builds glute medius to control the femur during single-leg and loaded work.'
+      },
+      {
+        name: 'Deep squat hold',
+        dose: '2 × 30–45 sec',
+        detail: 'Bodyweight only, hold the bottom of a squat within a pain-free range — don’t force depth past a pinch.'
+      }
+    ],
+    avoid: [
+      'Forcing depth past a pinching or catching point in the front of the hip',
+      'Ballistic deep lunges or cleans/snatches during a flare',
+      'Ignoring repeated pinching pain at the bottom of squats — that’s the impingement signal, not just tightness'
+    ],
+    whenToSeeSomeone: [
+      'Intense pain that disrupts sleep',
+      'Sudden swelling or bruising',
+      'Inability to bear weight',
+      'Pinching or catching that doesn’t resolve after 4–6 weeks of modified training'
+    ],
+    flareAction: 'Back off to a pain-free squat depth (box squats/leg press instead of ATG). Keep isometric glute and hip-flexor work. Skip anything ballistic (jumps, cleans) until it settles.'
+  };
+
   function escapeAttr(s) {
     return String(s).replace(/"/g, '&quot;');
   }
