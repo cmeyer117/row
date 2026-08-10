@@ -271,6 +271,44 @@
     flareAction: 'Switch to neutral-grip pressing or use straps for pulling. Drop wrist-extension-heavy accessory work. Ice and reduce loaded wrist volume for the week.'
   };
 
+  PAIN_LIBRARY.ankle = {
+    label: 'Ankle / Achilles',
+    causes: [
+      'Achilles tendinopathy from repetitive load or a rapid jump in training volume — calf-raise spikes, sprinting, jump work',
+      'Tight calves limiting ankle dorsiflexion, which shifts extra load onto the tendon during squats and lunges',
+      '"Too much too soon" is the single most common driver in the active population, not a one-off injury'
+    ],
+    drills: [
+      {
+        name: 'Standing calf stretch',
+        dose: '3 × 30 sec/leg, knee straight then bent',
+        detail: 'Hands on a wall, back leg straight then knee slightly bent — straight-knee hits the gastrocnemius, bent-knee hits the soleus underneath it.'
+      },
+      {
+        name: 'Eccentric heel drops',
+        dose: '3 × 15, slow 3–4 sec lower',
+        detail: 'Rise onto the toes on both feet, shift weight to the affected side, lower slowly off the edge of a step.',
+        note: 'The gold-standard load for remodeling a tendinopathic Achilles.'
+      },
+      {
+        name: 'Ankle dorsiflexion mobilization (knee-to-wall)',
+        dose: '3 × 10/side',
+        detail: 'Foot a few inches from a wall, drive the knee toward the wall over the toes without the heel lifting. Restores the ankle range squats and lunges need.'
+      }
+    ],
+    avoid: [
+      'Sudden volume jumps in calf-raise or jump/plyo work',
+      'Running or plyo work through morning stiffness or tendon pain',
+      'Ignoring a "too much too soon" spike in training load — that’s the actual mechanism, not bad luck'
+    ],
+    whenToSeeSomeone: [
+      'A sudden sharp pain with a pop or snap — possible rupture, needs same-day evaluation',
+      'Inability to rise onto the toes on that leg',
+      'Swelling that doesn’t settle'
+    ],
+    flareAction: 'Drop jump/plyo and calf-raise volume. Isometric calf holds only. Skip cold morning stretching through sharp pain — warm up gently first.'
+  };
+
   function escapeAttr(s) {
     return String(s).replace(/"/g, '&quot;');
   }
