@@ -5991,6 +5991,13 @@ img, video, canvas, svg { max-width: 100%; }
     });
 
     recognition.addEventListener('end', function () { setListening(false); });
+    // ponytail: iOS fires 'nomatch' (not 'result'/'error') when it hears speech
+    // but has no confident transcript — unhandled, this left the mic silently
+    // dead (button stops pulsing, no toast).
+    recognition.addEventListener('nomatch', function () {
+      setListening(false);
+      showToast("Didn't catch that — try again", null);
+    });
     recognition.addEventListener('error', function () {
       setListening(false);
       showToast("Didn't catch that — try again", null);
