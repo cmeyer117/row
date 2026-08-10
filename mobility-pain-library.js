@@ -98,6 +98,57 @@
     flareAction: 'Drop to bodyweight curls or isometrics. Use straps for back. Keep the Tyler Twist — it helps during flares.'
   };
 
+  PAIN_LIBRARY.knee = {
+    label: 'Knee',
+    causes: [
+      'Patellar tendon overload from jumping, heavy squatting, or a sudden training-load spike',
+      'Quad/hamstring strength imbalance shifting extra strain onto the tendon',
+      'Tight quads and calves increasing tension through the patellar tendon and posterior knee chain'
+    ],
+    drills: [
+      {
+        name: 'Spanish squat isometric',
+        dose: '5 × 45 sec before leg sessions',
+        detail: 'Knee bent 60–90°. Isometrics reduce patellar tendon pain acutely — do them, then train.',
+        slug: 'spanish-squat-isometric',
+        diagramSvg: '<circle cx="55" cy="16" r="6"/><line x1="55" y1="22" x2="48" y2="50"/><line x1="48" y1="50" x2="45" y2="75"/><line x1="45" y1="75" x2="45" y2="92"/><line x1="20" y1="50" x2="80" y2="50"/>'
+      },
+      {
+        name: 'Reverse Nordic curl',
+        dose: '3 × 5, build to 3 × 15 over 6–8 weeks',
+        detail: 'Kneel on pad, feet anchored under rack. Lower torso backward slowly (3–4 sec) as far as pain allows, pull back up.',
+        slug: 'reverse-nordic-curl',
+        diagramSvg: '<circle cx="60" cy="30" r="6"/><line x1="58" y1="36" x2="45" y2="70"/><line x1="45" y1="70" x2="45" y2="88"/><line x1="45" y1="88" x2="65" y2="88"/><line x1="55" y1="45" x2="45" y2="55"/>',
+        note: 'Gold standard eccentric for patellar tendinopathy. Actually remodels the tendon (Purdam et al. 2004, Visnes & Bahr 2007).'
+      },
+      {
+        name: 'TKE with band',
+        dose: '3 × 15/leg',
+        detail: 'Band looped behind knee, slight knee bend, extend fully. Fixes patellar tracking by strengthening VMO.',
+        slug: 'tke-band',
+        diagramSvg: '<circle cx="50" cy="14" r="6"/><line x1="50" y1="20" x2="50" y2="55"/><line x1="50" y1="55" x2="45" y2="90"/><line x1="50" y1="55" x2="65" y2="65"/><line x1="65" y1="65" x2="80" y2="60"/><line x1="20" y1="65" x2="80" y2="65"/>'
+      },
+      {
+        name: 'Foam roller — outer quad + IT band',
+        dose: '60 sec/leg',
+        detail: 'Find tight spots and hold 10–15 sec. Also roll quad muscle belly and calves (tight calves pull on posterior knee chain).',
+        slug: 'foam-roller-quad-itband',
+        diagramSvg: '<ellipse cx="50" cy="70" rx="22" ry="6"/><circle cx="20" cy="45" r="6"/><line x1="25" y1="48" x2="55" y2="60"/><line x1="55" y1="60" x2="80" y2="62"/><line x1="30" y1="55" x2="20" y2="70"/>'
+      }
+    ],
+    avoid: [
+      'High-volume jump/plyo work through pain',
+      'Deep loaded squats during an acute flare',
+      'Sudden spikes in squat volume or intensity — the tendon needs a ramp, not a jump'
+    ],
+    whenToSeeSomeone: [
+      'Pain at rest, not just with load — atypical for tendinopathy and worth a look',
+      'Visible swelling',
+      'A sense of the tendon giving way — possible partial tear, not just irritation'
+    ],
+    flareAction: 'Spanish squat holds + TKE only. No loaded squatting until 2–3 days clear. After training: elevate legs 10–15 min, ice directly on the patellar tendon 10 min if acutely painful.'
+  };
+
   function escapeAttr(s) {
     return String(s).replace(/"/g, '&quot;');
   }
