@@ -234,6 +234,43 @@
     flareAction: 'Drop to bodyweight/banded core work only. No loaded spinal flexion. Keep walking daily — movement helps back pain more than rest. No deadlifts or heavy squats until pain-free.'
   };
 
+  PAIN_LIBRARY.wrist = {
+    label: 'Wrist',
+    causes: [
+      'The bar rolling toward the fingers during pressing instead of sitting in the heel of the palm — bends the wrist back under load and creates a big lever arm on the joint',
+      'Wrist extensor/flexor tendinopathy from repetitive loaded extension (push-ups, heavy pressing, curls) without enough recovery',
+      'TFCC irritation from repetitive pronation/supination under load'
+    ],
+    drills: [
+      {
+        name: 'Wrist flexor/extensor stretch',
+        dose: '3 × 20–30 sec each direction',
+        detail: 'Arm extended, opposite hand gently pulls the fingers back (extensor) then down (flexor). Do before pressing/pulling sessions.'
+      },
+      {
+        name: 'Light wrist curls + reverse curls',
+        dose: '3 × 15, light load',
+        detail: 'Palm up (curls) and palm down (reverse curls), slow and controlled. Builds tendon capacity so daily loading stops being the max stress the tendon sees.'
+      },
+      {
+        name: 'Neutral-grip press substitution',
+        dose: 'As needed when flared',
+        detail: 'Swap barbell bench/press for a neutral-grip dumbbell or landmine press — takes the forced wrist extension out of the movement entirely while it settles.'
+      }
+    ],
+    avoid: [
+      'Letting the bar roll toward the fingers on any pressing movement — reset your grip so it sits in the heel of the palm',
+      'High-volume loaded wrist extension (heavy push-ups, handstand work) through pain',
+      'Skipping a neutral-grip option once it’s already flared'
+    ],
+    whenToSeeSomeone: [
+      'Sudden deformity or inability to grip',
+      'Persistent numbness or tingling — nerve involvement, not just a tendon issue',
+      'No improvement after 2 weeks of load modification'
+    ],
+    flareAction: 'Switch to neutral-grip pressing or use straps for pulling. Drop wrist-extension-heavy accessory work. Ice and reduce loaded wrist volume for the week.'
+  };
+
   function escapeAttr(s) {
     return String(s).replace(/"/g, '&quot;');
   }
