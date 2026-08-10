@@ -53,6 +53,51 @@
     flareAction: 'Drop to cables/machines. Keep banded ER isometrics. Skip heavy pressing for the session.'
   };
 
+  PAIN_LIBRARY.elbow = {
+    label: 'Elbow',
+    causes: [
+      'Repeated wrist/forearm loading under grip-dominant work (curls, heavy pulling, forceful pronation/supination) creates microtears where the tendon attaches to the epicondyle',
+      'Lateral elbow tendinopathy (tennis elbow) hits the outer elbow/extensor tendon; medial (golfer’s elbow) hits the inner elbow/flexor-pronator tendon',
+      'Sudden jumps in arm-day volume or load without a ramp-up period'
+    ],
+    drills: [
+      {
+        name: 'Wrist isometrics (flexor + extensor)',
+        dose: '5 × 15 sec each',
+        detail: 'Flexor: palm up, push into resistance. Extensor: palm down, push back of hand up. Do before working sets that bother you.',
+        slug: 'wrist-flexor-extensor-stretch',
+        diagramSvg: '<line x1="20" y1="55" x2="60" y2="55"/><line x1="60" y1="55" x2="72" y2="45"/><line x1="65" y1="35" x2="70" y2="48"/>',
+        note: 'Isometrics reduce tendon pain for 45+ min acutely (Cook & Purdam, 2009).'
+      },
+      {
+        name: 'Tyler Twist (Theraband Flexbar)',
+        dose: '3 × 15 daily',
+        detail: 'Grip bar at both ends, one hand pronated one supinated. Flex both wrists, then slowly let the painful side extend against resistance.',
+        slug: 'tyler-twist-flexbar',
+        diagramSvg: '<line x1="30" y1="50" x2="70" y2="50"/><line x1="30" y1="50" x2="15" y2="40"/><line x1="70" y1="50" x2="85" y2="60"/><line x1="15" y1="40" x2="12" y2="30"/><line x1="85" y1="60" x2="88" y2="70"/>',
+        note: 'Gold standard for lateral epicondylitis. Takes 6–8 weeks for full effect. Bisset et al. (2006) — superior to corticosteroid injections at 1 year.'
+      },
+      {
+        name: 'Reverse wrist curls (eccentric)',
+        dose: '3 × 15 · 3× per week on arm days',
+        detail: 'Light DB (5–10 lbs), palm down. Lower wrist slowly 3–4 sec down, 1 sec up.',
+        slug: 'reverse-wrist-curls',
+        diagramSvg: '<line x1="20" y1="60" x2="60" y2="58"/><line x1="60" y1="58" x2="75" y2="50"/><circle cx="78" cy="47" r="4"/>'
+      }
+    ],
+    avoid: [
+      'Grinding through heavy curls/extensions on a day it’s already sore',
+      'Death-grip pulling — let straps take the grip demand when flared',
+      'Sudden volume or load jumps on isolation elbow work'
+    ],
+    whenToSeeSomeone: [
+      'No improvement after 2 weeks of reduced load',
+      'Losing grip strength',
+      'Numbness or tingling into the hand — that’s nerve, not tendon, and needs a different workup'
+    ],
+    flareAction: 'Drop to bodyweight curls or isometrics. Use straps for back. Keep the Tyler Twist — it helps during flares.'
+  };
+
   function escapeAttr(s) {
     return String(s).replace(/"/g, '&quot;');
   }
