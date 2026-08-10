@@ -6008,7 +6008,7 @@ img, video, canvas, svg { max-width: 100%; }
       var normalized = window.GymVoiceLogic.normalizeTranscript(transcript);
       var parsed = parseQuickLog(normalized);
       if (!parsed) {
-        showToast("Didn't catch that — try again", null);
+        showToast("Didn't catch that: \"" + transcript + "\"", null); // ponytail: temp diagnostic, revert once we see a real transcript
         return;
       }
       var candidates = getFiltered(); // today's workout: program + today's adhoc
