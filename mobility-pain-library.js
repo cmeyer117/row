@@ -8,6 +8,51 @@
 
   var PAIN_LIBRARY = {};
 
+  PAIN_LIBRARY.shoulder = {
+    label: 'Shoulder',
+    causes: [
+      'Poor T-spine mobility forces extra rotation through the GH joint under load',
+      'Weak scapular stabilizers (serratus anterior, lower trap) let the humeral head ride up into the acromion during pressing or overhead work',
+      'Repetitive overhead motion or flared-elbow bench pressing without enough rotator-cuff capacity to control it'
+    ],
+    drills: [
+      {
+        name: 'Side-lying ER with light DB',
+        dose: '3 × 15 · 2–5 lbs',
+        detail: 'Directly loads infraspinatus and teres minor — the muscles stabilizing the GH joint when the labrum is compromised.',
+        slug: 'side-lying-er-dumbbell',
+        diagramSvg: '<circle cx="20" cy="55" r="6"/><line x1="26" y1="55" x2="70" y2="58"/><line x1="70" y1="58" x2="60" y2="90"/><line x1="40" y1="55" x2="45" y2="40"/><line x1="45" y1="40" x2="55" y2="25"/><circle cx="57" cy="22" r="3"/>'
+      },
+      {
+        name: 'Wall slides with upward rotation',
+        dose: '2 × 10',
+        detail: 'Retrains serratus anterior and lower trap. Without these firing, every arm elevation creates grinding and impingement.',
+        slug: 'wall-slides',
+        diagramSvg: '<line x1="20" y1="6" x2="20" y2="94"/><circle cx="45" cy="18" r="6"/><line x1="45" y1="24" x2="42" y2="55"/><line x1="42" y1="55" x2="38" y2="90"/><line x1="42" y1="55" x2="46" y2="90"/><line x1="43" y1="28" x2="28" y2="14"/><line x1="47" y1="28" x2="60" y2="14"/>'
+      },
+      {
+        name: '90/90 shoulder rotation drill',
+        dose: '2 × 10 reps',
+        detail: 'Arm at 90° abduction, rotate palm down then up slowly. Lubricates the GH joint through its actual range.',
+        slug: 'shoulder-90-90-rotation',
+        diagramSvg: '<circle cx="50" cy="14" r="6"/><line x1="50" y1="20" x2="50" y2="55"/><line x1="50" y1="55" x2="45" y2="90"/><line x1="50" y1="55" x2="55" y2="90"/><line x1="48" y1="28" x2="70" y2="28"/><line x1="70" y1="28" x2="70" y2="10"/>'
+      }
+    ],
+    avoid: [
+      'Upright rows',
+      'Behind-neck press',
+      'Behind-neck pulldown',
+      'Sleeping on the affected shoulder',
+      'Arm behind body in internal rotation — stretches the posterior labrum directly'
+    ],
+    whenToSeeSomeone: [
+      'Catching, popping, or a feeling of the joint shifting/giving way — that’s instability, not soreness',
+      'Pain that disrupts sleep on that side',
+      'No improvement after 8–12 weeks of consistent daily work'
+    ],
+    flareAction: 'Drop to cables/machines. Keep banded ER isometrics. Skip heavy pressing for the session.'
+  };
+
   function escapeAttr(s) {
     return String(s).replace(/"/g, '&quot;');
   }
