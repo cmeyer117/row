@@ -16,6 +16,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="sync.js" defer></script>
 <script src="topbar.js" defer></script>
+<script src="recomp-signal-logic.js"></script>
 <style>
 :root {
   --bg: #000000;
@@ -577,6 +578,11 @@ main {
 .hm-chart-wrap { margin-bottom: 14px; }
 .hm-chart { width: 100%; height: 90px; margin-top: 8px; }
 .hm-chart svg { width: 100%; height: 100%; display: block; }
+.recomp-legend { display: flex; gap: 14px; font-size: 11px; color: var(--text-secondary); margin-bottom: 4px; }
+.recomp-legend-item { display: flex; align-items: center; gap: 5px; }
+.recomp-swatch { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.recomp-detail { font-size: 13px; color: var(--text-secondary); margin-top: 10px; line-height: 1.4; }
+.recomp-label { font-weight: 700; color: var(--text-primary); }
 .hm-chart-empty {
   font-family: var(--font-mono);
   font-size: 11px;
@@ -740,6 +746,7 @@ main {
       <button class="hm-tab-btn" data-hm-tab="labs">Labs</button>
       <button class="hm-tab-btn" data-hm-tab="measurements">Measurements</button>
       <button class="hm-tab-btn" data-hm-tab="sleep">Sleep</button>
+      <button class="hm-tab-btn" data-hm-tab="recomp">Recomp</button>
     </div>
 
     <div id="hmView-vitals" class="hm-view">
@@ -829,6 +836,11 @@ main {
         <div id="hmSleepChart" class="hm-chart"></div>
       </div>
       <div id="hmSleepList" class="hm-list"></div>
+    </div>
+
+    <div id="hmView-recomp" class="hm-view" hidden>
+      <div id="recompChart" class="hm-chart" style="height:110px;"></div>
+      <div id="recompDetail" class="recomp-detail"></div>
     </div>
   </div>
 
@@ -997,12 +1009,13 @@ main {
   }
 
   function hmSwitchTab(tab) {
-    ['vitals', 'labs', 'measurements', 'sleep'].forEach((t) => {
+    ['vitals', 'labs', 'measurements', 'sleep', 'recomp'].forEach((t) => {
       document.getElementById('hmView-' + t).hidden = t !== tab;
     });
     document.querySelectorAll('.hm-tab-btn').forEach((btn) => {
       btn.classList.toggle('hm-tab-active', btn.dataset.hmTab === tab);
     });
+    if (tab === 'recomp') renderRecomp();
   }
 
   document.getElementById('hmTabs').addEventListener('click', (e) => {
@@ -1157,6 +1170,39 @@ main {
     renderMeasurements();
   });
 
+  function loadWeightSeries() {
+    let weights = [];
+    try { weights = JSON.parse(localStorage.getItem('po_coach_weights') || '[]'); } catch {}
+    return weights
+      .filter((w) => w && w.dateKey && w.weight != null)
+      .map((w) => ({ date: w.dateKey, value: w.weight }));
+  }
+  function loadWaistSeries() {
+    return getMeasurements()
+      .filter((e) => e && e.date && e.waist != null)
+      .map((e) => ({ date: e.date, value: e.waist }));
+  }
+
+  function renderRecomp() {
+    const weightSeries = loadWeightSeries();
+    const waistSeries = loadWaistSeries();
+
+    const chartEl = document.getElementById('recompChart');
+    const chartHtml = window.RecompSignalLogic.buildRecompChart(weightSeries, waistSeries, 300, 90);
+    chartEl.innerHTML = chartHtml || '<div class="hm-chart-empty">Need weight + waist data to chart a trend</div>';
+
+    const detailEl = document.getElementById('recompDetail');
+    const result = window.RecompSignalLogic.computeRecompDelta(weightSeries, waistSeries, 30, new Date());
+    if (!result.ok) {
+      detailEl.textContent = result.reason;
+      return;
+    }
+    const weightStr = (result.weightDelta >= 0 ? '+' : '') + result.weightDelta + ' lbs';
+    const waistStr = (result.waistDelta >= 0 ? '+' : '') + result.waistDelta + ' in';
+    detailEl.innerHTML = '<span class="recomp-label">' + result.label + '</span> — ' + result.detail +
+      ' <br>Weight ' + weightStr + ' · Waist ' + waistStr + ' (last 30 days)';
+  }
+
   document.getElementById('hmMeasMetric').addEventListener('change', renderMeasurements);
 
   document.getElementById('hmMeasList').addEventListener('click', (e) => {
@@ -1213,7 +1259,7 @@ main {
 
   window.RowHealthMarkers = {
     _get, _set, upsertByDate, buildMiniSpark,
-    rerenderAll: () => { renderVitals(); renderLabs(); renderMeasurements(); renderSleep(); }
+    rerenderAll: () => { renderVitals(); renderLabs(); renderMeasurements(); renderSleep(); renderRecomp(); }
   };
 })();
 </script>
