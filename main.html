@@ -905,6 +905,7 @@ body::after {
 
 <script src="morning-launch-logic.js"></script>
 <script src="daily-routine-checklist-logic.js"></script>
+<script src="voice-helpers.js"></script>
 <script>
 (function () {
   'use strict';
@@ -1659,6 +1660,17 @@ body::after {
   let mlExpanded = false;
   let mlAlignRevealed = false;
 
+  // Speaks each phase's prompt once per render-into-view (not on every
+  // re-render triggered by quiet autosaves), so it doesn't re-narrate on
+  // every keystroke. Reset when the user leaves the phase (mlNextButton).
+  let mlLastSpokenPhase = null;
+  function mlSpeakPhasePrompt(phaseKey, text) {
+    if (!window.RowVoice || !window.RowVoice.isSupported()) return;
+    if (mlLastSpokenPhase === phaseKey) return;
+    mlLastSpokenPhase = phaseKey;
+    window.RowVoice.speak(text);
+  }
+
   function mlSessionKey() { return 'morning_launch:' + getActiveDateString(); }
   function mlOutcomesLoad() {
     const o = storeGet(ML_OUTCOMES_KEY);
@@ -1795,6 +1807,7 @@ body::after {
       const check = window.MorningLaunchLogic.advancePhase(session, targetPhase);
       if (!check.ok) { err.textContent = check.errors.join(' '); return; }
       session.currentPhase = targetPhase;
+      mlLastSpokenPhase = null;
       mlSessionSave(session);
     });
     wrap.appendChild(btn);
@@ -1806,12 +1819,14 @@ body::after {
     const wrap = el('div', 'ml-phase');
     wrap.appendChild(el('div', 'ml-phase-title', 'Clear'));
     wrap.appendChild(el('label', 'ml-prompt', 'What is occupying your mind right now?'));
+    mlSpeakPhasePrompt('clear', 'What is occupying your mind right now?');
     const ta = document.createElement('textarea');
     ta.className = 'gm-input ml-textarea';
     ta.value = session.brainDump || '';
     ta.setAttribute('aria-label', 'Brain dump');
     ta.addEventListener('input', () => { session.brainDump = ta.value; mlSessionSaveQuiet(session); });
     wrap.appendChild(ta);
+    if (window.RowVoice) window.RowVoice.attachMic(ta);
     wrap.appendChild(mlNextButton(session, 'align', {
       beforeAdvance: () => { session.brainDump = ta.value; },
       label: 'Continue to Align'
@@ -1872,6 +1887,7 @@ body::after {
     const wrap = el('div', 'ml-phase');
     wrap.appendChild(el('div', 'ml-phase-title', 'Align'));
     wrap.appendChild(el('p', 'ml-prompt', 'Write shortened versions of your five current outcomes from memory.'));
+    mlSpeakPhasePrompt('align', 'Write shortened versions of your five current outcomes from memory.');
     const inputs = [];
     const list = el('div', 'ml-outcome-list');
     for (let i = 0; i < 5; i++) {
@@ -1883,6 +1899,7 @@ body::after {
         mlSessionSaveQuiet(session);
       });
       list.appendChild(inp);
+      if (window.RowVoice) window.RowVoice.attachMic(inp);
       inputs.push(inp);
     }
     wrap.appendChild(list);
