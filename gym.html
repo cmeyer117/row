@@ -5942,15 +5942,16 @@ img, video, canvas, svg { max-width: 100%; }
     var toast = $('voiceToast');
     var toastMsg = $('voiceToastMsg');
     var toastUndo = $('voiceToastUndo');
+    if (!btn) { alert('mic-debug: voiceMicBtn element not found in DOM'); return; }
     var SpeechRecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognitionCtor) return; // button stays display:none — unsupported browser
+    if (!SpeechRecognitionCtor) { alert('mic-debug: SpeechRecognition unsupported'); return; } // button stays display:none — unsupported browser
     // ponytail: iOS WebKit blocks getUserMedia/SpeechRecognition in standalone
     // (home-screen) display mode — recognition.start() hangs forever instead of
     // erroring (WebKit bug 185448, still open). Bail out rather than freeze the tap.
     var isStandalone = window.navigator.standalone === true ||
       window.matchMedia('(display-mode: standalone)').matches;
-    if (isStandalone) return; // button stays display:none — open in a Safari tab instead
-
+    if (isStandalone) { alert('mic-debug: standalone mode detected (navigator.standalone=' + window.navigator.standalone + ', matchMedia=' + window.matchMedia('(display-mode: standalone)').matches + ')'); return; } // button stays display:none — open in a Safari tab instead
+    alert('mic-debug: passed all checks, showing button');
     btn.style.display = 'flex';
     var recognition = new SpeechRecognitionCtor();
     recognition.lang = 'en-US';
