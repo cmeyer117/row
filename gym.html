@@ -6889,8 +6889,13 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   function pcMaybeApplyRemote(remote) {
-    if (pcIsUserEditing()) { pcPendingRemote = remote; return; }
-    pcApplyRemoteState(remote);
+    if (pcIsUserEditing()) { pcPendingRemote = remote; return false; }
+    // Codex-review catch: this used to fall off the end without returning
+    // pcApplyRemoteState's result, so every caller's `if (pcMaybeApplyRemote(...))
+    // pcSchedulePush()` check was always false -- a merge that folded in
+    // local-only data Supabase didn't have yet never got pushed back
+    // (exactly the "Bug:" already flagged in pcPullRemote's comment above).
+    return pcApplyRemoteState(remote);
   }
 
   function pcApplyPendingIfReady() {
@@ -6924,6 +6929,19 @@ document.addEventListener('DOMContentLoaded', function () {
 
   async function pcPushNow() {
     if (!pcSupa) return;
+    // fix (2026-08-11): merge remote first so a concurrent writer (Vision's
+    // log_workout, another device) that landed since our last pull isn't
+    // silently overwritten by this blind push. pcPullRemote() already
+    // pulls, merges via the proven mergeLogs/mergeJointPain/mergeCheckins
+    // union logic, and writes the merged result to localStorage. See
+    // docs/superpowers/specs/2026-08-11-po-coach-push-merge-race-design.md.
+    await pcPullRemote();
+    // Codex-review catch: if a focused input deferred the merge (pcMaybeApplyRemote
+    // sets pcPendingRemote instead of applying it), localStorage hasn't actually
+    // picked up the remote change yet -- pushing now would push stale state right
+    // back over it. Bail; focusout's pcApplyPendingIfReady() applies the merge,
+    // and the next real edit's debounced push will pick it up correctly.
+    if (pcPendingRemote) { pcSchedulePush(); return; }
     const state = pcCollectState();
     const json = JSON.stringify(state);
     if (json === pcLastSyncedJson) return;
@@ -6951,6 +6969,11 @@ document.addEventListener('DOMContentLoaded', function () {
   // doesn't lose the latest change before the debounced push fires.
   function pcFlushPushOnUnload() {
     if (!pcSupa || !pcInitialPullDone) return;
+    // Codex-review catch: matches the same guard in pcPushNow() -- if a
+    // merge is deferred (user was mid-edit when a remote change arrived),
+    // localStorage doesn't have it yet, so a flush here would push stale
+    // state over it. Better to skip this unload push than clobber it.
+    if (pcPendingRemote) return;
     const state = pcCollectState();
     const json = JSON.stringify(state);
     if (json === pcLastSyncedJson) return;
