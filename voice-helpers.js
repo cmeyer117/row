@@ -1,5 +1,5 @@
 // Shared voice capture (MediaRecorder -> /api/vision-stt) + playback
-// (/api/vision-tts -> Audio) primitive for gym.html and main.html.
+// (/api/vision-talk?mode=tts -> Audio) primitive for gym.html and main.html.
 // Replaces the old SpeechRecognition-based mic, which iOS WebKit silently
 // disables in standalone/home-screen PWA mode (bug 185448) -- MediaRecorder
 // + getUserMedia have no such restriction. Mirrors the pattern Vision's own
@@ -36,7 +36,7 @@ window.RowVoice = (function () {
         if (!chunks.length) { onError('No audio captured'); return; }
         var blob = new Blob(chunks, { type: 'audio/webm' });
         blob.arrayBuffer().then(function (buf) {
-          return fetch('/api/vision-stt', {
+          return fetch('/api/vision-talk?mode=stt', {
             method: 'POST',
             headers: { 'Content-Type': 'audio/webm', 'Authorization': 'Bearer ' + ROW_APP_SECRET },
             body: buf,
@@ -97,7 +97,7 @@ window.RowVoice = (function () {
   // Fetches and plays TTS for the given text. Returns the Audio element (or
   // null if playback couldn't start) so callers can pause() it if needed.
   function speak(text, onDone) {
-    return fetch('/api/vision-tts', {
+    return fetch('/api/vision-talk?mode=tts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + ROW_APP_SECRET },
       body: JSON.stringify({ text: text }),
