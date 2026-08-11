@@ -6003,40 +6003,29 @@ img, video, canvas, svg { max-width: 100%; }
       showToast("Didn't catch that — try again", null);
     });
 
+    // ponytail: routes through Vision's /talk (codex exec, ChatGPT-Plus-billed,
+    // not metered API) instead of the local rigid regex parser -- see
+    // docs/superpowers/specs/2026-08-10-voice-log-vision-talk-design.md.
+    // Vision's log_workout action writes straight into the same po_coach_v1
+    // cloud state gym.html reads, so a logged set shows up via the existing
+    // initCloudSync pull, no local write here.
     recognition.addEventListener('result', function (e) {
       var transcript = e.results[0][0].transcript;
-      var normalized = window.GymVoiceLogic.normalizeTranscript(transcript);
-      var parsed = parseQuickLog(normalized);
-      if (!parsed) {
-        showToast("Didn't catch that — try again", null);
-        return;
-      }
-      var candidates = getFiltered(); // today's workout: program + today's adhoc
-      var matched = window.GymVoiceLogic.restrictedFuzzyMatch(parsed.namePart, candidates);
-      if (!matched) {
-        showToast("Didn't catch the exercise — try again", null);
-        return;
-      }
-      var raw = matched.bw
-        ? matched.name + ' ' + parsed.reps + (parsed.rir != null ? ' @' + parsed.rir : '')
-        : matched.name + ' ' + parsed.weight + '×' + parsed.reps + (parsed.rir != null ? ' @' + parsed.rir : '');
-      var beforeCount = (state.logs[matched.id] || []).length;
-      var result = quickLog(raw, getActiveDate());
-      if (!result.ok) {
-        showToast(result.msg, null);
-        return;
-      }
-      var logsArr = state.logs[matched.id];
-      var canUndo = logsArr.length > beforeCount;
-      showToast(result.msg, canUndo ? function () {
-        // quickLog() pins every same-day entry to a fixed noon timestamp
-        // (not real time), so same-day entries tie on `.date` — Array.sort
-        // is stable, and we pushed this entry last before sorting, so the
-        // tie-break preserves push order and it's still last here.
-        logsArr.pop();
-        saveState(); renderAll();
-        if (typeof wtRender === 'function') wtRender();
-      } : null);
+      showToast('Thinking…', null);
+      var controller = new AbortController();
+      var timer = setTimeout(function () { controller.abort(); }, 30000);
+      fetch('/api/vision-talk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + ROW_APP_SECRET },
+        body: JSON.stringify({ transcript: transcript, coachId: 'gym' }),
+        signal: controller.signal,
+      }).then(function (res) { return res.json(); }).then(function (data) {
+        clearTimeout(timer);
+        showToast(data && data.reply ? data.reply : "Vision didn't respond — try again", null);
+      }).catch(function () {
+        clearTimeout(timer);
+        showToast("Vision didn't respond — try again", null);
+      });
     });
   })();
 
@@ -6626,9 +6615,7 @@ img, video, canvas, svg { max-width: 100%; }
 <script src="gym-season-logic.js"></script>
 <script src="gym-volume-logic.js"></script>
 <script src="plate-calc.js"></script>
-<script src="gym-state-merge-logic.js"></script>
-<script src="gym-voice-logic.js"></script>
-<script src="hype-audio.js"></script>
+<script src="gym-state-merge-logic.js"></script><script src="hype-audio.js"></script>
 <script>
 // hype_audio gets its own independent app_state row via the plain
 // initCloudSync() helper (sync.js) — deliberately NOT bundled into
