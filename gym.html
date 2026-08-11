@@ -6890,6 +6890,9 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   function pcMaybeApplyRemote(remote) {
+    // temp diagnostic (2026-08-11): confirm whether pcIsUserEditing() is
+    // spuriously true, silently deferring every merge forever.
+    pcDebug('maybe-apply-remote', { isUserEditing: pcIsUserEditing(), activeTag: document.activeElement && document.activeElement.tagName, activeId: document.activeElement && document.activeElement.id });
     if (pcIsUserEditing()) { pcPendingRemote = remote; return false; }
     // Codex-review catch: this used to fall off the end without returning
     // pcApplyRemoteState's result, so every caller's `if (pcMaybeApplyRemote(...))
