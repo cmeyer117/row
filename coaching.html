@@ -386,7 +386,13 @@ body { min-height: 100vh; padding: max(28px, env(safe-area-inset-top)) 20px 60px
     window.location.href = 'coaching-plan.html?id=' + encodeURIComponent(data.id);
   });
 
-  window.RowAuth.ensure().then(function () { loadClients(); loadInquiries(); });
+  // row-auth.js is `defer`'d and hasn't necessarily run yet at this point --
+  // this inline block runs synchronously during parsing. DOMContentLoaded
+  // fires only after every deferred script (row-auth.js among them) has
+  // already executed, guaranteeing window.RowAuth exists here.
+  document.addEventListener('DOMContentLoaded', function () {
+    window.RowAuth.ensure().then(function () { loadClients(); loadInquiries(); });
+  });
 })();
 </script>
 </body>

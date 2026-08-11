@@ -258,7 +258,13 @@ textarea { width: 100%; min-height: 90px; padding: 10px; border-radius: 10px; bo
     window.print();
   });
 
-  window.RowAuth.ensure().then(load);
+  // row-auth.js is `defer`'d and hasn't necessarily run yet at this point --
+  // this inline block runs synchronously during parsing. DOMContentLoaded
+  // fires only after every deferred script (row-auth.js among them) has
+  // already executed, guaranteeing window.RowAuth exists here.
+  document.addEventListener('DOMContentLoaded', function () {
+    window.RowAuth.ensure().then(load);
+  });
 })();
 </script>
 </body>
