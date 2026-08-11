@@ -6884,7 +6884,17 @@ document.addEventListener('DOMContentLoaded', function () {
     } finally {
       pcSuppressSync = false;
     }
-    if (changed) { try { pcRerender(); } catch (e) {} }
+    // fix (2026-08-11): always rerender on a real remote apply, not just when
+    // a byte-for-byte write happened. `changed` only tracks whether any
+    // localStorage key needed writing this pass -- if an earlier reload's
+    // merge already wrote the same content (e.g. after a page reload
+    // re-applies data that was already synced), this stayed false and the
+    // UI never refreshed to reflect state that was, in fact, already
+    // current. pcRerender() is a cheap, idempotent read-and-redraw -- safe
+    // to run unconditionally whenever pcApplyRemoteState was invoked at all
+    // (only happens when pcPullRemote() already found the remote row
+    // differs from what we last saw).
+    try { pcRerender(); } catch (e) {}
     return changed;
   }
 
