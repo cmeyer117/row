@@ -3181,6 +3181,7 @@ img, video, canvas, svg { max-width: 100%; }
   </div>
 </div>
 
+<script src="voice-helpers.js"></script>
 <script>
 // ── Seed: bodyweight history (Apr 17 – Jun 10 2026) ──────────────────────────
 // Merges historical entries with existing data — never overwrites a date the
@@ -5951,21 +5952,12 @@ img, video, canvas, svg { max-width: 100%; }
     var toastMsg = $('voiceToastMsg');
     var toastUndo = $('voiceToastUndo');
     if (!btn) return;
-    var SpeechRecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognitionCtor) return; // button stays display:none — unsupported browser
-    // ponytail: iOS WebKit blocks getUserMedia/SpeechRecognition in standalone
-    // (home-screen) display mode — recognition.start() hangs forever instead of
-    // erroring (WebKit bug 185448, still open). Bail out rather than freeze the tap.
-    var isStandalone = window.navigator.standalone === true ||
-      window.matchMedia('(display-mode: standalone)').matches;
-    if (isStandalone) return; // button stays display:none — open in a Safari tab instead
+    if (!window.RowVoice || !window.RowVoice.isSupported()) return; // button stays display:none
+
     btn.style.display = 'flex';
-    var recognition = new SpeechRecognitionCtor();
-    recognition.lang = 'en-US';
-    recognition.interimResults = false;
-    recognition.maxAlternatives = 1;
-    var listening = false;
     var toastTimer = null;
+    var talkPending = false;
+    var voiceController = null;
 
     function hideToast() {
       toast.classList.add('ql-hidden');
@@ -5988,27 +5980,21 @@ img, video, canvas, svg { max-width: 100%; }
     }
 
     function setListening(on) {
-      listening = on;
       btn.classList.toggle('is-listening', on);
     }
 
     btn.addEventListener('click', function () {
-      if (listening) { recognition.stop(); return; }
-      try { recognition.start(); setListening(true); }
-      catch (e) { setListening(false); } // already-started guard
-    });
-
-    recognition.addEventListener('end', function () { setListening(false); });
-    // ponytail: iOS fires 'nomatch' (not 'result'/'error') when it hears speech
-    // but has no confident transcript — unhandled, this left the mic silently
-    // dead (button stops pulsing, no toast).
-    recognition.addEventListener('nomatch', function () {
-      setListening(false);
-      showToast("Didn't catch that — try again", null);
-    });
-    recognition.addEventListener('error', function () {
-      setListening(false);
-      showToast("Didn't catch that — try again", null);
+      if (voiceController) { voiceController.stop(); voiceController = null; setListening(false); return; }
+      setListening(true);
+      voiceController = window.RowVoice.startCapture(function (transcript) {
+        voiceController = null;
+        setListening(false);
+        sendToVision(transcript);
+      }, function (msg) {
+        voiceController = null;
+        setListening(false);
+        showToast(msg, null);
+      });
     });
 
     // ponytail: routes through Vision's /talk (codex exec, ChatGPT-Plus-billed,
@@ -6017,14 +6003,9 @@ img, video, canvas, svg { max-width: 100%; }
     // Vision's log_workout action writes straight into the same po_coach_v1
     // cloud state gym.html reads, so a logged set shows up via the existing
     // initCloudSync pull, no local write here.
-    var talkPending = false;
-    recognition.addEventListener('result', function (e) {
-      // Codex-review catch: a second tap while a /talk call is still in
-      // flight (e.g. after an impatient retry) had no guard, letting two
-      // requests race and potentially double-log the same set.
+    function sendToVision(transcript) {
       if (talkPending) { showToast('Still working on the last one…', null); return; }
       talkPending = true;
-      var transcript = e.results[0][0].transcript;
       showToast('Thinking…', null);
       var controller = new AbortController();
       // Codex-review catch: this must stay >= Vision's own 60s codex-exec
@@ -6041,18 +6022,13 @@ img, video, canvas, svg { max-width: 100%; }
         clearTimeout(timer);
         talkPending = false;
         showToast(data && data.reply ? data.reply : "Vision didn't respond — try again", null);
-        // Speaks the reply using iOS's built-in TTS (SpeechSynthesis) --
-        // zero cost, on-device, no Vision/OpenAI TTS call. Row's own mic
-        // input already uses this API's input twin (SpeechRecognition).
-        if (data && data.reply && window.speechSynthesis) {
-          try { window.speechSynthesis.speak(new SpeechSynthesisUtterance(data.reply)); } catch (e) {}
-        }
+        if (data && data.reply) window.RowVoice.speak(data.reply);
       }).catch(function () {
         clearTimeout(timer);
         talkPending = false;
         showToast("Vision didn't respond — try again", null);
       });
-    });
+    }
   })();
 
   (function initPlateCalc() {
