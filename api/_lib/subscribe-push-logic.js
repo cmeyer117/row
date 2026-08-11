@@ -1,5 +1,5 @@
 const SUPABASE_URL = 'https://vikpcejlyxieguorwysf.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_EvWPtfW1FBW5Vf-H6w0yHw_PcXK4imv';
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 export function buildSubscribeUpsertRequest(app, endpoint, keys) {
   return {
