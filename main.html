@@ -1457,10 +1457,11 @@ body::after {
     el._t = setTimeout(() => { el.textContent = ''; el.classList.remove('gm-status-error'); }, 3500);
   }
 
-  // Same trust tier as topbar.js's AUTH_PASS ('007007', reused here) --
-  // raises the bar on /api/polish from "any bot that finds the URL burns
-  // Anthropic usage" to "requires reading page source". Must match the
-  // ROW_APP_SECRET Vercel env var checked by api/_lib/verify-app-secret.js.
+  // A client-visible speed bump, not real security (it ships in page
+  // source) -- raises the bar on /api/polish from "any bot that finds the
+  // URL burns Anthropic usage" to "requires reading page source". Must
+  // match the ROW_APP_SECRET Vercel env var checked by
+  // api/_lib/verify-app-secret.js.
   const ROW_APP_SECRET = '007007';
 
   async function polishOne(text) {
