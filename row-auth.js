@@ -23,7 +23,12 @@
     return new Promise(function (resolve) {
       var overlay = document.createElement('div');
       overlay.id = 'row-auth-overlay';
-      overlay.style.cssText = 'position:fixed;inset:0;z-index:100000;display:flex;align-items:center;justify-content:center;background:#080808;font-family:-apple-system,BlinkMacSystemFont,"Inter",sans-serif;';
+      // visibility:visible overrides the inherited hidden state that
+      // topbar.js's authGate() sets on documentElement while waiting for
+      // this promise to resolve -- without it, the login form itself would
+      // be invisible (visibility is an inherited CSS property). Caught via
+      // a real live check, not assumed correct from reading the code.
+      overlay.style.cssText = 'position:fixed;inset:0;z-index:100000;display:flex;align-items:center;justify-content:center;background:#080808;font-family:-apple-system,BlinkMacSystemFont,"Inter",sans-serif;visibility:visible;';
       overlay.innerHTML =
         '<form id="ra-form" style="width:100%;max-width:340px;padding:36px 30px;border-radius:20px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.04);display:flex;flex-direction:column;gap:12px;">' +
         '<div style="color:#FAFAFA;font-size:18px;font-weight:700;">Carl&#39;s Dashboard &mdash; sign in</div>' +
