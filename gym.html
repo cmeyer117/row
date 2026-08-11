@@ -4656,10 +4656,15 @@ img, video, canvas, svg { max-width: 100%; }
     return { perEx, totalSets, totalVol };
   }
 
+  var _micDebugRenderFired = false;
   function renderTodaysWorkout() {
     const todayKey = wtDateKey(new Date());
     const all = logsByDay();
     const todaySets = all[todayKey] || [];
+    if (!_micDebugRenderFired) {
+      _micDebugRenderFired = true;
+      alert('mic-debug render: todayKey=' + todayKey + ' latPulldownInState=' + JSON.stringify((state.logs['seed_7_1783790050413']||[]).slice(-1)[0]) + ' todaySetsCount=' + todaySets.length + ' allDayKeys=' + Object.keys(all).join(','));
+    }
     const sum = summarizeDay(todaySets);
     const u = state.units;
 
@@ -6887,6 +6892,7 @@ document.addEventListener('DOMContentLoaded', function () {
     } finally {
       pcSuppressSync = false;
     }
+    alert('mic-debug apply: changed=' + changed + ' willCallRerender=' + !!changed);
     if (changed) { try { pcRerender(); } catch (e) {} }
     return changed;
   }
