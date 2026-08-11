@@ -8,66 +8,18 @@
 (function () {
   'use strict';
 
-  // -------- Auth gate — blocks page until correct passphrase entered --------
-  const AUTH_PASS = '007007';
-  const AUTH_KEY  = 'row_auth';
-
+  // -------- Auth gate — blocks page until real Supabase Auth session --------
   function authGate() {
     if (window.self !== window.top) return; // skip iframes
-    // coaching.html/coaching-plan.html have real Supabase Auth login (coaching-auth.js)
-    // enforced at the DB layer since the 2026-07-24 RLS lockdown — this passphrase is
-    // redundant there now, not a security control on those two pages anymore.
-    var path = (window.location.pathname || '').toLowerCase();
-    if (path.endsWith('coaching.html') || path.endsWith('coaching-plan.html')) return;
-    if (sessionStorage.getItem(AUTH_KEY) === '1') return; // already authed this session
-
-    // Hide page content immediately
     document.documentElement.style.visibility = 'hidden';
-
-    const overlay = document.createElement('div');
-    overlay.id = 'auth-overlay';
-    overlay.style.cssText = [
-      'position:fixed;inset:0;z-index:99999',
-      'display:flex;align-items:center;justify-content:center',
-      'background:#080808',
-      'font-family:-apple-system,BlinkMacSystemFont,"Inter",sans-serif',
-    ].join(';');
-
-    overlay.innerHTML = `
-      <div style="width:100%;max-width:340px;padding:40px 32px;border-radius:20px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.04);display:flex;flex-direction:column;align-items:center;gap:20px;">
-        <div style="width:48px;height:48px;border-radius:50%;background:rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:center;font-size:22px;">🔒</div>
-        <div style="text-align:center;">
-          <div style="color:#FAFAFA;font-size:18px;font-weight:700;margin-bottom:4px;">Carl's Dashboard</div>
-          <div style="color:rgba(255,255,255,0.35);font-size:13px;">Enter passphrase to continue</div>
-        </div>
-        <form id="auth-form" style="width:100%;display:flex;flex-direction:column;gap:10px;">
-          <input id="auth-input" type="password" placeholder="Passphrase" autocomplete="current-password"
-            style="width:100%;box-sizing:border-box;padding:12px 16px;border-radius:12px;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.07);color:#FAFAFA;font-size:14px;outline:none;font-family:inherit;" />
-          <div id="auth-error" style="color:#FF6B6B;font-size:12px;text-align:center;display:none;">Incorrect passphrase — try again</div>
-          <button type="submit"
-            style="width:100%;padding:12px;border-radius:12px;border:0;background:#FAFAFA;color:#0A0A0B;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;">
-            Unlock
-          </button>
-        </form>
-      </div>`;
-
-    document.addEventListener('DOMContentLoaded', function () {
-      document.body.appendChild(overlay);
+    window.RowAuth.ensure().then(function () {
       document.documentElement.style.visibility = '';
-      const input = document.getElementById('auth-input');
-      const error = document.getElementById('auth-error');
-      if (input) input.focus();
-      document.getElementById('auth-form').addEventListener('submit', function (e) {
-        e.preventDefault();
-        if (input.value === AUTH_PASS) {
-          sessionStorage.setItem(AUTH_KEY, '1');
-          overlay.remove();
-        } else {
-          error.style.display = 'block';
-          input.value = '';
-          input.focus();
-        }
-      });
+    }).catch(function (err) {
+      // Fail open rather than permanently blanking the page on a network
+      // hiccup — matches the old gate's behavior of never leaving Carl
+      // locked out by something other than a wrong credential.
+      console.error('RowAuth.ensure() failed:', err);
+      document.documentElement.style.visibility = '';
     });
   }
 
