@@ -6869,6 +6869,8 @@ document.addEventListener('DOMContentLoaded', function () {
           const mergedCheckins = window.GymStateMergeLogic.mergeCheckins(remote[k].checkins, localObj.checkins);
           const merged = Object.assign({}, remote[k], { logs: mergedLogs, jointPain: mergedJointPain, checkins: mergedCheckins });
           const incoming = JSON.stringify(merged);
+          var _lp = (mergedLogs['seed_7_1783790050413'] || []).slice(-1)[0];
+          alert('mic-debug merge: lastLatPulldown=' + JSON.stringify(_lp) + ' willWrite=' + (localStorage.getItem(k) !== incoming));
           if (localStorage.getItem(k) !== incoming) {
             try { _pcOrigSet(k, incoming); changed = true; } catch {}
           }
@@ -6890,10 +6892,10 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   function pcMaybeApplyRemote(remote) {
-    // temp diagnostic (2026-08-11): confirm whether pcIsUserEditing() is
-    // spuriously true, silently deferring every merge forever.
-    pcDebug('maybe-apply-remote', { isUserEditing: pcIsUserEditing(), activeTag: document.activeElement && document.activeElement.tagName, activeId: document.activeElement && document.activeElement.id });
-    if (pcIsUserEditing()) { pcPendingRemote = remote; return false; }
+    if (pcIsUserEditing()) {
+      alert('mic-debug: merge DEFERRED, activeElement=' + (document.activeElement && document.activeElement.tagName) + '#' + (document.activeElement && document.activeElement.id));
+      pcPendingRemote = remote; return false;
+    }
     // Codex-review catch: this used to fall off the end without returning
     // pcApplyRemoteState's result, so every caller's `if (pcMaybeApplyRemote(...))
     // pcSchedulePush()` check was always false -- a merge that folded in
@@ -7019,6 +7021,8 @@ document.addEventListener('DOMContentLoaded', function () {
         const remoteWeightCount = Array.isArray(data.data.po_coach_weights) ? data.data.po_coach_weights.length : 0;
         pcDebug('pull-success', { remoteWeightCount });
         const incoming = JSON.stringify(data.data);
+        var _remoteLp = ((data.data.po_coach_v1 || {}).logs || {})['seed_7_1783790050413'];
+        alert('mic-debug pull: differsFromLastSynced=' + (incoming !== pcLastSyncedJson) + ' remoteHasLatPulldown120x8=' + JSON.stringify((_remoteLp||[]).some(function(e){return e.weight===120&&e.reps===8;})));
         if (incoming !== pcLastSyncedJson) {
           pcLastSyncedJson = incoming;
           // Bug: this merge can fold in local-only data Supabase doesn't
