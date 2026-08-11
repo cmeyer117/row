@@ -6009,11 +6009,21 @@ img, video, canvas, svg { max-width: 100%; }
     // Vision's log_workout action writes straight into the same po_coach_v1
     // cloud state gym.html reads, so a logged set shows up via the existing
     // initCloudSync pull, no local write here.
+    var talkPending = false;
     recognition.addEventListener('result', function (e) {
+      // Codex-review catch: a second tap while a /talk call is still in
+      // flight (e.g. after an impatient retry) had no guard, letting two
+      // requests race and potentially double-log the same set.
+      if (talkPending) { showToast('Still working on the last one…', null); return; }
+      talkPending = true;
       var transcript = e.results[0][0].transcript;
       showToast('Thinking…', null);
       var controller = new AbortController();
-      var timer = setTimeout(function () { controller.abort(); }, 30000);
+      // Codex-review catch: this must stay >= Vision's own 60s codex-exec
+      // timeout (vision/src/codex.ts EXEC_OPTIONS). A shorter client timeout
+      // showed "didn't respond" while the action had actually already been
+      // written server-side, making a retry likely to double-log.
+      var timer = setTimeout(function () { controller.abort(); }, 65000);
       fetch('/api/vision-talk', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + ROW_APP_SECRET },
@@ -6021,9 +6031,11 @@ img, video, canvas, svg { max-width: 100%; }
         signal: controller.signal,
       }).then(function (res) { return res.json(); }).then(function (data) {
         clearTimeout(timer);
+        talkPending = false;
         showToast(data && data.reply ? data.reply : "Vision didn't respond — try again", null);
       }).catch(function () {
         clearTimeout(timer);
+        talkPending = false;
         showToast("Vision didn't respond — try again", null);
       });
     });
