@@ -6034,6 +6034,12 @@ img, video, canvas, svg { max-width: 100%; }
         clearTimeout(timer);
         talkPending = false;
         showToast(data && data.reply ? data.reply : "Vision didn't respond — try again", null);
+        // Speaks the reply using iOS's built-in TTS (SpeechSynthesis) --
+        // zero cost, on-device, no Vision/OpenAI TTS call. Row's own mic
+        // input already uses this API's input twin (SpeechRecognition).
+        if (data && data.reply && window.speechSynthesis) {
+          try { window.speechSynthesis.speak(new SpeechSynthesisUtterance(data.reply)); } catch (e) {}
+        }
       }).catch(function () {
         clearTimeout(timer);
         talkPending = false;
