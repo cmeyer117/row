@@ -3182,6 +3182,7 @@ img, video, canvas, svg { max-width: 100%; }
 </div>
 
 <script src="voice-helpers.js"></script>
+<script src="stt-prompt-logic.js"></script>
 <script>
 // ── Seed: bodyweight history (Apr 17 – Jun 10 2026) ──────────────────────────
 // Merges historical entries with existing data — never overwrites a date the
@@ -5995,6 +5996,9 @@ img, video, canvas, svg { max-width: 100%; }
     btn.addEventListener('click', function () {
       if (voiceController) { voiceController.stop(); voiceController = null; setListening(false); return; }
       setListening(true);
+      var sttPrompt = window.SttPromptLogic
+        ? window.SttPromptLogic.buildSttPrompt(state.exercises, getAllAdhocExercises())
+        : '';
       voiceController = window.RowVoice.startCapture(function (transcript) {
         voiceController = null;
         setListening(false);
@@ -6003,7 +6007,7 @@ img, video, canvas, svg { max-width: 100%; }
         voiceController = null;
         setListening(false);
         showToast(msg, null);
-      });
+      }, { sttPrompt: sttPrompt });
     });
 
     // ponytail: routes through Vision's /talk (codex exec, ChatGPT-Plus-billed,
