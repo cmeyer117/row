@@ -1,5 +1,7 @@
 # Mini Vision Chat Bubble — Design
 
+**Reviewed by Codex (luna) and Grok, 2026-08-12** — both confirmed the Web Component approach is sound; must-fix gaps folded in below (voice-helpers script gap, `pcPullRemote` refresh hook, history contract/race, timeout/guard carryover, `.ml-voice-mic-btn` correction). Accessibility/theming polish flagged by Grok deliberately deferred past v1.
+
 ## Problem
 
 Row's only entry point into Vision is a push-to-talk mic button on `gym.html` (`voiceMicBtn`/`sendToVision`, `gym.html:5958-6048`) — single-shot voice logging, toast reply, no visible history even though Vision already keeps per-coach conversation memory server-side (`vision/src/talk-turn.ts`, `getRecentHistory`/`getCoachHistory`). Carl wants a fuller, persistent "mini Vision" chat surface reachable from the pages he actually uses, not just one voice-triggered action on one page.
@@ -32,16 +34,19 @@ Web Component needs no build tooling, has no injection flicker, and is the reusa
 
 ## Behavior
 
-- Renders as a fixed-position floating bubble. Click toggles an expand/collapse panel (message list, text input, mic button). **Closed by default on every page load** — no cross-page open-state persistence in v1 (Row has no SPA router; each page is a fresh load, so "remembering open" would need `localStorage` plumbing that isn't worth it yet).
-- On first expand per page load, fetches history via a new `mode=history` branch on the existing Row→Vision proxy (`api/vision-talk.js`) → Vision's existing `GET /coach/gym/history` — **no Vision backend changes needed**, the endpoint already exists.
-- Sending (text or voice) funnels into the same `/api/vision-talk` call (`mode=talk`, `coachId: 'gym'`) the old mic used — only the source of `transcript` differs (typed vs. `RowVoice.startCapture` output).
+- Renders as a fixed-position floating bubble. Click toggles an expand/collapse panel (message list, text input, mic button). **Closed by default on every page load** — no cross-page open-state persistence in v1 (Row has no SPA router; each page is a fresh load, so "remembering open" would need `localStorage` plumbing that isn't worth it yet). Since the component remounts fresh on every navigation (full page reload, not an SPA), any in-progress voice capture must stop on `beforeunload`/`pagehide` so a mic session never leaks across navigations.
+- On first expand per page load, fetches history via a new `mode=history` branch on the existing Row→Vision proxy (`api/vision-talk.js`) → Vision's existing `GET /coach/gym/history`. **The proxy route is POST-only** (matches `talk`/`tts`/`stt`), so the browser call is a `POST /api/vision-talk?mode=history` that internally performs the upstream `GET` — no Vision backend changes needed, the endpoint already exists.
+  - **History contract:** response is `{ turns: HistoryTurn[] }` in chronological order (oldest first), matching `getCoachHistory`'s existing return shape (`vision/src/app.ts:116-125`). Render each turn as a user bubble + assistant bubble pair; no pagination/truncation handling needed since the endpoint doesn't paginate today.
+  - **Send-during-history-load race:** the input/mic stays disabled (with a loading state) until the initial history fetch resolves, so a send can't land before history renders and get overwritten or duplicated. If the history fetch fails, treat it the same as no history (render nothing, don't block sending — history is an enhancement, not a hard dependency, matching Vision's own server-side treatment of it).
+- Sending (text or voice) funnels into the same `/api/vision-talk` call (`mode=talk`, `coachId: 'gym'`) the old mic used — only the source of `transcript` differs (typed vs. `RowVoice.startCapture` output). Carries over the old mic's two safety behaviors verbatim: a **pending-send guard** (disable input while a call is in flight, matching `talkPending`) and the **65s client-side abort timeout** (must stay ≥ Vision's own 60s `codex-exec` timeout — a shorter client timeout risks a retry double-logging a write action that actually already landed server-side).
 - Reply renders as a new message bubble. **Only spoken aloud via `RowVoice.speak()` when the turn was voice-initiated** — a typed message gets a silent text-only reply, so the widget doesn't talk unexpectedly in a shared/gym setting.
+- **On `gym.html` specifically**, a successful reply must still trigger `window.__gym.pcPullRemote()` (if present) — the old mic added this because Vision's workout writes otherwise took ~3 minutes to show up via the normal sync cadence. Dropping it without replacing it would make a real logged set look like it silently failed.
 
 ## Files touched
 
 - **New:** `mini-vision-chat.js` (the custom element: shadow-DOM markup/styles, open/close toggle, history fetch, text+voice send, message rendering).
-- **Row pages:** add the script+tag to `main.html`, `gym.html`, `health.html`, `macros.html`, `coaching.html`.
-- **`gym.html`:** delete the old `voiceMicBtn`/`sendToVision`/voice-toast code (`gym.html:5958-6048`, ~90 lines) and its CSS (`.po-voice-mic`, `.ml-voice-mic-btn` rules).
+- **Row pages:** add the script+tag to `main.html`, `gym.html`, `health.html`, `macros.html`, `coaching.html`. **`health.html`, `macros.html`, `coaching.html` don't currently load `voice-helpers.js`** (only `gym.html`/`main.html` do) — must add that script include too, or the mic button on those 3 pages will silently do nothing.
+- **`gym.html`:** delete the old `voiceMicBtn`/`sendToVision`/voice-toast code (`gym.html:5958-6048`, ~90 lines) and its `.po-voice-mic` CSS rule. **`.ml-voice-mic-btn` is a separate generic voice-input class, not part of the old floating mic — leave it alone**, verify what else references it before removing anything under that name.
 - **`api/vision-talk.js`:** add a `mode=history` branch mirroring the existing `mode=tts`/`mode=stt` pattern, proxying to Vision's `GET /coach/gym/history` with the same session-cookie auth already used for `talk`/`tts`/`stt`.
 
 ## Testing
