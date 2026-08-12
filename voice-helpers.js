@@ -21,6 +21,7 @@ window.RowVoice = (function () {
   // (not a fresh `new Audio()`) for every later async playback -- Safari's
   // "unlocked" state is per-element, not per-page.
   var _unlockedAudio = null;
+  var _currentUtterance = null; // keeps the in-flight SpeechSynthesisUtterance referenced -- see speak()
   // 1-sample silent WAV, valid enough to satisfy play()/pause() without any
   // audible click.
   var SILENT_WAV = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=';
@@ -152,6 +153,11 @@ window.RowVoice = (function () {
     try {
       window.speechSynthesis.cancel(); // don't queue behind the silent unlock primer or a prior reply
       var utterance = new SpeechSynthesisUtterance(text);
+      // Some browsers (documented Chrome bug, WebKit inconsistently too) can
+      // garbage-collect an utterance mid-speech if nothing in JS holds a
+      // strong reference to it -- speechSynthesis itself doesn't keep one.
+      // Same reasoning as _unlockedAudio being module-scoped, not local.
+      _currentUtterance = utterance;
       utterance.onend = function () { if (onDone) onDone(); };
       utterance.onerror = utterance.onend;
       window.speechSynthesis.speak(utterance);
