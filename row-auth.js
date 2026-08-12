@@ -11,6 +11,15 @@
   const SUPABASE_URL = 'https://vikpcejlyxieguorwysf.supabase.co';
   const SUPABASE_KEY = 'sb_publishable_EvWPtfW1FBW5Vf-H6w0yHw_PcXK4imv';
   const AUTH_KEY = 'row_auth';
+  // Matches coaching_is_owner()'s check server-side -- this client-side
+  // check is defense-in-depth (RLS is the real boundary), but the gate's
+  // whole point is to represent "signed in as the owner," not just "signed
+  // in as anyone," so it has to actually check who, not just whether.
+  const OWNER_EMAIL = 'carl.meyer.business@gmail.com';
+
+  function isOwner(session) {
+    return !!(session && session.user && session.user.email === OWNER_EMAIL);
+  }
 
   function markAuthed() { try { sessionStorage.setItem(AUTH_KEY, '1'); } catch (e) {} }
 
@@ -50,6 +59,12 @@
           errEl.style.display = 'block';
           return;
         }
+        if (!isOwner(res.data.session)) {
+          await supa.auth.signOut();
+          errEl.textContent = 'This account is not authorized.';
+          errEl.style.display = 'block';
+          return;
+        }
         markAuthed();
         overlay.remove();
         resolve(res.data.session);
@@ -64,7 +79,8 @@
       if (!window.supabase) throw new Error('RowAuth.ensure() called before the Supabase CDN script loaded');
       var supa = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
       var got = await supa.auth.getSession();
-      if (got.data.session) { markAuthed(); return got.data.session; }
+      if (got.data.session && isOwner(got.data.session)) { markAuthed(); return got.data.session; }
+      if (got.data.session) await supa.auth.signOut();
       return showLogin(supa);
     },
   };
