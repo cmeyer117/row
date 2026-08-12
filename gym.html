@@ -4127,10 +4127,19 @@ img, video, canvas, svg { max-width: 100%; }
         if (!state.recentlyDeleted) state.recentlyDeleted = [];
         state.recentlyDeleted.push({ exId: state.currentEx, entry: entry });
         if (state.recentlyDeleted.length > 20) state.recentlyDeleted.shift();
-        arr.splice(origIdx, 1);
+        // fix (2026-08-12): mark deleted instead of splicing immediately, so
+        // a sync merge-before-push can correctly out-rank remote's
+        // still-live copy instead of silently reintroducing it. See
+        // docs/superpowers/specs/2026-08-12-deleted-set-resurrection-fix-design.md.
+        // mergeLogs() strips deleted:true entries from its own output, so
+        // this tombstone never persists past the next merge -- every other
+        // reader of state.logs is unaffected.
+        arr[origIdx] = Object.assign({}, entry, { deleted: true });
+        state.logs[state.currentEx] = arr;
+        saveState(); // persists the tombstone to localStorage, triggers the sync push
+        arr.splice(origIdx, 1); // in-memory only, past this point -- immediate correct render
         if (!arr.length) delete state.logs[state.currentEx];
-        else state.logs[state.currentEx] = arr;
-        saveState(); renderAll();
+        renderAll();
       });
     });
   }
@@ -6957,7 +6966,11 @@ document.addEventListener('DOMContentLoaded', function () {
     // pulls, merges via the proven mergeLogs/mergeJointPain/mergeCheckins
     // union logic, and writes the merged result to localStorage. See
     // docs/superpowers/specs/2026-08-11-po-coach-push-merge-race-design.md.
-    await pcPullRemote();
+    // force:true (2026-08-12): this pre-push merge must run every time, even
+    // when remote looks unchanged -- its job here isn't just "pick up
+    // remote changes," it's "strip any local tombstone before we push."
+    // See docs/superpowers/specs/2026-08-12-deleted-set-resurrection-fix-design.md.
+    await pcPullRemote({ force: true });
     // Codex-review catch: if a focused input deferred the merge (pcMaybeApplyRemote
     // sets pcPendingRemote instead of applying it), localStorage hasn't actually
     // picked up the remote change yet -- pushing now would push stale state right
@@ -7020,8 +7033,19 @@ document.addEventListener('DOMContentLoaded', function () {
   // a long-open tab's realtime subscription can silently die (iOS suspends
   // it) with no error, so without a re-pull on wake it just keeps showing
   // whatever was true at its last real page load, forever.
-  async function pcPullRemote() {
+  async function pcPullRemote(opts) {
     if (!pcSupa) return;
+    // fix (2026-08-12, Codex-caught): the "no-change-since-last-sync" skip
+    // below is correct for a UI-refresh pull, but pcPushNow() also reuses
+    // this function as its pre-push merge step -- and that step's real job
+    // is to strip any local tombstone (see gym-state-merge-logic.js's
+    // mergeLogs) before collecting state to push. Skipping the merge just
+    // because remote LOOKS unchanged (the common case for a delete, since
+    // deleting doesn't touch remote) let a raw deleted:true entry survive
+    // in both localStorage and the eventual push, undoing the deleted-set
+    // resurrection fix through a different door. force:true (passed by
+    // pcPushNow) always runs the merge regardless of that shortcut.
+    var force = opts && opts.force;
     try {
       const { data, error } = await pcSupa
         .from('app_state').select('data').eq('key', APP_KEY).maybeSingle();
@@ -7037,7 +7061,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const remoteWeightCount = Array.isArray(data.data.po_coach_weights) ? data.data.po_coach_weights.length : 0;
         pcDebug('pull-success', { remoteWeightCount });
         const incoming = JSON.stringify(data.data);
-        if (incoming !== pcLastSyncedJson) {
+        if (force || incoming !== pcLastSyncedJson) {
           pcLastSyncedJson = incoming;
           // Bug: this merge can fold in local-only data Supabase doesn't
           // have yet (a device that pulls before pushing its own newer

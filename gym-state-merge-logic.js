@@ -16,13 +16,26 @@
   // Two log entries are "the same" if every field matches exactly -- entries
   // have no id field, unlike weights (dateKey) or photos (id), so exact
   // structural equality via a stable JSON key is the merge identity.
+  // `deleted` is excluded from the hash so a tombstoned entry and its
+  // pre-delete counterpart resolve to the SAME key (see mergeLogs) --
+  // without this, they'd never be recognized as "the same entry" and a
+  // deletion could never out-rank a still-live remote copy.
   function stableKey(entry) {
+    if (entry && 'deleted' in entry) {
+      const rest = Object.assign({}, entry);
+      delete rest.deleted;
+      return JSON.stringify(rest, Object.keys(rest).sort());
+    }
     return JSON.stringify(entry, Object.keys(entry).sort());
   }
 
   // remoteLogs/localLogs: { [exerciseId]: [{weight, reps, date, ...}, ...] }
   // Returns a new logs object with every remote entry, plus any local-only
-  // entry (per exercise) that isn't already present remotely.
+  // entry (per exercise) that isn't already present remotely. Tombstoned
+  // entries ({..., deleted: true}, see gym.html's po-hist-del handler) are
+  // used only to decide which side of a same-identity pair wins -- the
+  // returned logs NEVER contain a deleted:true entry, so every other
+  // reader of state.logs elsewhere in the app needs no changes at all.
   function mergeLogs(remoteLogs, localLogs) {
     remoteLogs = remoteLogs || {};
     localLogs = localLogs || {};
@@ -31,9 +44,19 @@
     for (const exId of allExIds) {
       const remoteArr = Array.isArray(remoteLogs[exId]) ? remoteLogs[exId] : [];
       const localArr = Array.isArray(localLogs[exId]) ? localLogs[exId] : [];
-      const seen = new Set(remoteArr.map(stableKey));
-      const localOnly = localArr.filter((e) => !seen.has(stableKey(e)));
-      merged[exId] = [...remoteArr, ...localOnly];
+      const byKey = new Map();
+      // Local first, then remote -- remote can overwrite a live local
+      // entry, but a local tombstone must survive being overwritten by
+      // remote's still-live copy of the same entry (checked next).
+      for (const e of localArr) byKey.set(stableKey(e), e);
+      for (const e of remoteArr) {
+        const k = stableKey(e);
+        const existing = byKey.get(k);
+        if (!existing || !existing.deleted) byKey.set(k, e);
+        // else: local tombstone wins, remote's live copy is dropped
+      }
+      const result = Array.from(byKey.values()).filter((e) => !e.deleted);
+      if (result.length) merged[exId] = result;
     }
     return merged;
   }

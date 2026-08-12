@@ -13,9 +13,42 @@ const source = readFileSync(new URL('./gym-state-merge-logic.js', import.meta.ur
 const sandbox = { window: {} };
 vm.createContext(sandbox);
 vm.runInContext(source, sandbox);
-const { mergeJointPain } = sandbox.window.GymStateMergeLogic;
+const { mergeJointPain, mergeLogs } = sandbox.window.GymStateMergeLogic;
 
 const cases = [];
+
+// mergeLogs -- deletion (tombstone) handling.
+// See docs/superpowers/specs/2026-08-12-deleted-set-resurrection-fix-design.md
+{
+  const entry = { date: '2026-08-11T12:00:00.000Z', weight: 315, reps: 8 };
+  const remote = { ex1: [entry] };
+  const local = { ex1: [Object.assign({}, entry, { deleted: true })] };
+  const result = mergeLogs(remote, local);
+  cases.push(['local tombstone beats remote live copy, entry dropped', !result.ex1 || result.ex1.length === 0]);
+}
+{
+  const entry = { date: '2026-08-11T12:00:00.000Z', weight: 225, reps: 10 };
+  const remote = { ex1: [Object.assign({}, entry, { deleted: true })] };
+  const local = { ex1: [entry] };
+  const result = mergeLogs(remote, local);
+  cases.push(['remote tombstone beats local live copy, entry dropped', !result.ex1 || result.ex1.length === 0]);
+}
+{
+  const local = { ex1: [{ date: '2026-08-12T12:00:00.000Z', weight: 100, reps: 5 }] };
+  const result = mergeLogs({}, local);
+  cases.push(['genuine local-only entry survives, unaffected by tombstone logic', result.ex1 && result.ex1.length === 1]);
+}
+{
+  const remote = { ex1: [{ date: '2026-08-12T12:00:00.000Z', weight: 135, reps: 6 }] };
+  const result = mergeLogs(remote, {});
+  cases.push(['genuine remote-only entry survives, unaffected by tombstone logic', result.ex1 && result.ex1.length === 1]);
+}
+{
+  const remote = { ex1: [{ date: '2026-08-10T12:00:00.000Z', weight: 185, reps: 8 }] };
+  const local = { ex1: [{ date: '2026-08-11T12:00:00.000Z', weight: 190, reps: 6 }] };
+  const result = mergeLogs(remote, local);
+  cases.push(['two distinct non-deleted entries both survive (existing behavior unchanged)', result.ex1 && result.ex1.length === 2]);
+}
 
 // Empty/missing inputs don't throw, return empty array.
 {
@@ -62,4 +95,4 @@ for (const [label, ok] of cases) {
   if (!ok) { console.error('FAIL:', label); failed++; }
 }
 if (failed > 0) { console.error(`${failed}/${cases.length} cases failed`); process.exit(1); }
-console.log(`gym-state-merge-logic (jointPain): all ${cases.length} cases pass`);
+console.log(`gym-state-merge-logic: all ${cases.length} cases pass`);
