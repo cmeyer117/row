@@ -6027,7 +6027,10 @@ img, video, canvas, svg { max-width: 100%; }
         // whatever the normal pull cadence/realtime channel happens to
         // catch up with -- a real test showed a ~3 minute gap before a
         // voice-logged set appeared in the UI.
-        if (data && data.reply && window.__gym && window.__gym.pcPullRemote) window.__gym.pcPullRemote();
+        if (data && data.reply && window.__gym && window.__gym.pcPullRemote) {
+          if (window.__gym.pcDebug) window.__gym.pcDebug('voice-log-reply-received', { t: Date.now() });
+          window.__gym.pcPullRemote();
+        }
       }).catch(function () {
         clearTimeout(timer);
         talkPending = false;
@@ -6695,6 +6698,10 @@ document.addEventListener('DOMContentLoaded', function () {
   // hoisted, so this reference is safe even though it's assigned before
   // the declaration appears later in this same IIFE.
   window.__gym.pcPullRemote = function () { return pcPullRemote(); };
+  // temp diagnostic (2026-08-12): expose pcDebug so sendToVision (separate
+  // IIFE) can log a timing marker -- checking the po-coach-sync-debug trail
+  // server-side after the next test instead of asking Carl to relay alerts.
+  window.__gym.pcDebug = function (event, extra) { return pcDebug(event, extra); };
 
   // Fire-and-forget insert for the journal-reactive-prompts feature —
   // must never block or throw into the caller (set-logging is the primary
