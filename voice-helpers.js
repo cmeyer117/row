@@ -19,13 +19,21 @@ window.RowVoice = (function () {
   // onError(msg) on failure. Returns a controller with stop().
   function startCapture(onTranscript, onError) {
     var chunks = [];
-    var active = true;
+    // fix (2026-08-11): `active` used to be a single flag serving two
+    // conflicting purposes -- "cancelled before getUserMedia resolved" AND
+    // "should onstop process the result." stop() set it false BEFORE calling
+    // recorder.stop(), so by the time onstop's own `if (!active) return`
+    // check ran, it always saw false and silently discarded every manual
+    // stop -- confirmed live: tap to stop produced zero toast, zero error,
+    // total silence. `cancelled` now means only the first case; a normal
+    // stop no longer touches it, so onstop always processes real results.
+    var cancelled = false;
     var recorder = null;
     var stream = null;
     var maxTimer = null;
 
     navigator.mediaDevices.getUserMedia({ audio: true }).then(function (s) {
-      if (!active) { s.getTracks().forEach(function (t) { t.stop(); }); return; }
+      if (cancelled) { s.getTracks().forEach(function (t) { t.stop(); }); return; }
       stream = s;
       recorder = new MediaRecorder(stream);
       // iOS Safari has no WebM encoder -- MediaRecorder silently falls back
@@ -37,7 +45,6 @@ window.RowVoice = (function () {
       recorder.onstop = function () {
         clearTimeout(maxTimer);
         stream.getTracks().forEach(function (t) { t.stop(); });
-        if (!active) return;
         if (!chunks.length) { onError('No audio captured'); return; }
         var blob = new Blob(chunks, { type: recordedMimeType });
         blob.arrayBuffer().then(function (buf) {
@@ -67,15 +74,19 @@ window.RowVoice = (function () {
         if (recorder.state === 'recording') recorder.stop();
       }, MAX_RECORD_MS);
     }).catch(function () {
-      active = false;
       onError('Microphone unavailable — check browser permissions');
     });
 
     return {
       stop: function () {
-        active = false;
         clearTimeout(maxTimer);
-        if (recorder && recorder.state === 'recording') recorder.stop();
+        if (recorder && recorder.state === 'recording') {
+          recorder.stop(); // triggers onstop, which processes the real result
+        } else if (!recorder) {
+          // getUserMedia is still pending -- cancel so its .then() stops the
+          // tracks instead of starting a recording nobody wants anymore.
+          cancelled = true;
+        }
       },
     };
   }
