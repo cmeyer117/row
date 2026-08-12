@@ -51,30 +51,27 @@ window.RowVoice = (function () {
     getAsrPipeline().catch(function () {});
   }
 
-  var TRANSFORMERS_CDN = 'https://cdn.jsdelivr.net/npm/@huggingface/transformers';
+  // Pinned, not @latest -- the unpinned CDN URL resolved to a version that
+  // threw "Can't create a session... Missing required scale" on this exact
+  // model's quantized decoder weights (confirmed live, reproduced 3x across
+  // different models/dtypes before finding this was a version-skew issue,
+  // not a model problem). 3.0.0 confirmed working end-to-end, including a
+  // real transcription call, not just pipeline creation.
+  var TRANSFORMERS_CDN = 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.0.0';
   var ASR_MODEL = 'Xenova/whisper-tiny.en';
   var _asrPipelinePromise = null;
 
-  // Loads transformers.js from CDN as a classic script (exposes window.transformers,
-  // same pattern as @supabase/supabase-js elsewhere in this codebase -- no
-  // bundler needed). Cached: a rejected promise (device genuinely can't run
-  // it) stays rejected for the rest of the page session rather than retrying
-  // a slow doomed load on every subsequent tap -- a page reload retries.
-  function loadTransformersScript() {
-    return new Promise(function (resolve, reject) {
-      if (window.transformers) { resolve(); return; }
-      var script = document.createElement('script');
-      script.src = TRANSFORMERS_CDN;
-      script.onload = function () { resolve(); };
-      script.onerror = function () { reject(new Error('Failed to load transformers.js')); };
-      document.head.appendChild(script);
-    });
-  }
-
+  // fix (2026-08-12): the CDN bundle is ESM-only (throws "Cannot use
+  // 'import.meta' outside a module" if loaded as a classic <script src>,
+  // confirmed live) -- dynamic import() works from any script context,
+  // classic or module, with no HTML <script type=module> tag needed
+  // anywhere. Cached: a rejected promise (device genuinely can't run it)
+  // stays rejected for the rest of the page session rather than retrying a
+  // slow doomed load on every subsequent tap -- a page reload retries.
   function getAsrPipeline() {
     if (_asrPipelinePromise) return _asrPipelinePromise;
-    _asrPipelinePromise = loadTransformersScript().then(function () {
-      return window.transformers.pipeline('automatic-speech-recognition', ASR_MODEL);
+    _asrPipelinePromise = import(TRANSFORMERS_CDN).then(function (mod) {
+      return mod.pipeline('automatic-speech-recognition', ASR_MODEL);
     });
     return _asrPipelinePromise;
   }
