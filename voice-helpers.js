@@ -39,7 +39,8 @@ window.RowVoice = (function () {
   // Records until the caller calls stop() (or MAX_RECORD_MS elapses), then
   // POSTs to /api/vision-stt. Calls onTranscript(text) on success,
   // onError(msg) on failure. Returns a controller with stop().
-  function startCapture(onTranscript, onError) {
+  function startCapture(onTranscript, onError, opts) {
+    opts = opts || {};
     unlockAudio(); // synchronous, still inside the caller's click handler
     var chunks = [];
     // fix (2026-08-11): `active` used to be a single flag serving two
@@ -80,9 +81,11 @@ window.RowVoice = (function () {
         if (!chunks.length) { onError('No audio captured'); return; }
         var blob = new Blob(chunks, { type: recordedMimeType });
         blob.arrayBuffer().then(function (buf) {
+          var headers = { 'Content-Type': recordedMimeType, 'Authorization': 'Bearer ' + ROW_APP_SECRET };
+          if (opts.sttPrompt) headers['X-STT-Prompt'] = opts.sttPrompt;
           return fetch('/api/vision-talk?mode=stt', {
             method: 'POST',
-            headers: { 'Content-Type': recordedMimeType, 'Authorization': 'Bearer ' + ROW_APP_SECRET },
+            headers: headers,
             body: buf,
           });
         }).then(function (res) { return res.json(); }).then(function (data) {
