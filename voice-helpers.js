@@ -30,6 +30,18 @@ window.RowVoice = (function () {
       _unlockedAudio = new Audio(SILENT_WAV);
       _unlockedAudio.play().catch(function () {}); // best-effort; if this fails, speak() will too, same as before
     } catch (e) { _unlockedAudio = null; }
+    // fix (2026-08-12): speechSynthesis has the same Safari gesture-timing
+    // quirk as <audio>.play() did -- priming it with a silent utterance here,
+    // synchronously inside the tap handler, before the real reply comes back
+    // several seconds later through STT->Vision, same reasoning as the Audio
+    // unlock above.
+    try {
+      if (window.speechSynthesis) {
+        var primer = new SpeechSynthesisUtterance('');
+        primer.volume = 0;
+        window.speechSynthesis.speak(primer);
+      }
+    } catch (e) {}
   }
 
   function isSupported() {
@@ -126,27 +138,28 @@ window.RowVoice = (function () {
     };
   }
 
-  // Fetches and plays TTS for the given text. Returns the Audio element (or
-  // null if playback couldn't start) so callers can pause() it if needed.
+  // Speaks the given text via the browser's free built-in TTS (no OpenAI
+  // call, no cost -- 2026-08-12, replaces the OpenAI-TTS fetch to stop
+  // burning the shared OpenAI credit balance; see docs/superpowers/specs/
+  // 2026-08-12-free-tts-speechsynthesis-design.md). Quality is a real,
+  // accepted downgrade from the old "cedar" voice -- Carl's explicit call,
+  // upgrade path (in-browser WASM Whisper for STT + a nicer TTS) is a
+  // separate future pass, not this one. Returns the SpeechSynthesisUtterance
+  // (or null if unsupported) so callers have a comparable return value to
+  // the old Audio element, though nothing currently uses it.
   function speak(text, onDone) {
-    return fetch('/api/vision-talk?mode=tts', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + ROW_APP_SECRET },
-      body: JSON.stringify({ text: text }),
-    }).then(function (res) { return res.ok ? res.blob() : null; }).then(function (blob) {
-      if (!blob) { if (onDone) onDone(); return null; }
-      var url = URL.createObjectURL(blob);
-      // Reuse the tap-unlocked element instead of `new Audio()` -- Safari's
-      // autoplay unlock is per-element, a fresh instance here wouldn't
-      // inherit it. Falls back to a new element if unlock never ran/failed
-      // (still swallowed below, matching prior behavior for that edge case).
-      var audio = _unlockedAudio || new Audio();
-      audio.src = url;
-      audio.onended = function () { URL.revokeObjectURL(url); if (onDone) onDone(); };
-      audio.onerror = audio.onended;
-      audio.play().catch(function (e) { console.warn('[RowVoice] TTS playback blocked:', e && e.message); });
-      return audio;
-    }).catch(function () { if (onDone) onDone(); return null; });
+    if (!window.speechSynthesis || !text) { if (onDone) onDone(); return null; }
+    try {
+      window.speechSynthesis.cancel(); // don't queue behind the silent unlock primer or a prior reply
+      var utterance = new SpeechSynthesisUtterance(text);
+      utterance.onend = function () { if (onDone) onDone(); };
+      utterance.onerror = utterance.onend;
+      window.speechSynthesis.speak(utterance);
+      return utterance;
+    } catch (e) {
+      if (onDone) onDone();
+      return null;
+    }
   }
 
   // Attaches a mic button after `input` (a <textarea> or <input type=text>).
