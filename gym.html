@@ -6023,6 +6023,11 @@ img, video, canvas, svg { max-width: 100%; }
         talkPending = false;
         showToast(data && data.reply ? data.reply : "Vision didn't respond — try again", null);
         if (data && data.reply) window.RowVoice.speak(data.reply);
+        // fix (2026-08-12): force an immediate re-sync instead of waiting on
+        // whatever the normal pull cadence/realtime channel happens to
+        // catch up with -- a real test showed a ~3 minute gap before a
+        // voice-logged set appeared in the UI.
+        if (data && data.reply && window.__gym && window.__gym.pcPullRemote) window.__gym.pcPullRemote();
       }).catch(function () {
         clearTimeout(timer);
         talkPending = false;
@@ -6682,6 +6687,14 @@ document.addEventListener('DOMContentLoaded', function () {
   // gym-weight-photos.js's uploadPhotoToStorage() needs to read pcSupa —
   // expose it live since it's reassigned below once the client connects.
   Object.defineProperty(window.__gym, 'pcSupa', { get: () => pcSupa });
+  // fix (2026-08-12): initVoiceLog() lives in a separate <script> block/IIFE
+  // with no access to pcPullRemote -- a voice-logged set had no way to
+  // trigger an immediate re-sync, so it only appeared once whatever the
+  // normal pull cadence happened to be caught up (confirmed live: ~3
+  // minutes on a real test). pcPullRemote is a function declaration,
+  // hoisted, so this reference is safe even though it's assigned before
+  // the declaration appears later in this same IIFE.
+  window.__gym.pcPullRemote = function () { return pcPullRemote(); };
 
   // Fire-and-forget insert for the journal-reactive-prompts feature —
   // must never block or throw into the caller (set-logging is the primary
