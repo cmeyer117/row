@@ -101,6 +101,22 @@ async function handleStt(req, res, rawBody) {
   }
 }
 
+async function handleHistory(req, res, rawBody) {
+  let parsed;
+  try { parsed = JSON.parse(rawBody.toString('utf8') || '{}'); } catch { parsed = {}; }
+  const coachId = typeof parsed.coachId === 'string' ? parsed.coachId : 'gym';
+  try {
+    const upstream = await fetch(`${VISION_URL}/coach/${coachId}/history`, {
+      method: 'GET',
+      headers: { 'Cookie': sessionCookie(process.env.VISION_SESSION_SECRET) },
+    });
+    const data = await upstream.json();
+    res.status(upstream.status).json(data);
+  } catch (e) {
+    res.status(502).json({ error: 'Could not reach Vision' });
+  }
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed' });
@@ -114,5 +130,6 @@ export default async function handler(req, res) {
   const mode = (req.query && req.query.mode) || 'talk';
   if (mode === 'tts') return handleTts(req, res, rawBody);
   if (mode === 'stt') return handleStt(req, res, rawBody);
+  if (mode === 'history') return handleHistory(req, res, rawBody);
   return handleTalk(req, res, rawBody);
 }
