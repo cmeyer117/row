@@ -8,22 +8,21 @@
 window.RowVoice = (function () {
   // Same trust tier as topbar.js's AUTH_PASS -- see api/_lib/verify-app-secret.js.
   var ROW_APP_SECRET = '007007';
-  var SILENCE_THRESHOLD = 0.01;
-  var SILENCE_DELAY_MS = 1500;
-  var MIN_RECORD_MS = 800;
+  var MAX_RECORD_MS = 30000; // safety net only -- normal use is manual tap-to-stop
 
   function isSupported() {
     return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder);
   }
 
-  // Records until sustained silence (or the caller can wire a manual
-  // stop button), then POSTs to /api/vision-stt. Calls onTranscript(text)
-  // on success, onError(msg) on failure. Returns a controller with stop().
+  // Records until the caller calls stop() (or MAX_RECORD_MS elapses), then
+  // POSTs to /api/vision-stt. Calls onTranscript(text) on success,
+  // onError(msg) on failure. Returns a controller with stop().
   function startCapture(onTranscript, onError) {
     var chunks = [];
     var active = true;
     var recorder = null;
     var stream = null;
+    var maxTimer = null;
 
     navigator.mediaDevices.getUserMedia({ audio: true }).then(function (s) {
       if (!active) { s.getTracks().forEach(function (t) { t.stop(); }); return; }
@@ -36,6 +35,7 @@ window.RowVoice = (function () {
       var recordedMimeType = recorder.mimeType || 'audio/webm';
       recorder.ondataavailable = function (e) { if (e.data.size > 0) chunks.push(e.data); };
       recorder.onstop = function () {
+        clearTimeout(maxTimer);
         stream.getTracks().forEach(function (t) { t.stop(); });
         if (!active) return;
         if (!chunks.length) { onError('No audio captured'); return; }
@@ -51,41 +51,21 @@ window.RowVoice = (function () {
           else onError("Didn't catch that — try again");
         }).catch(function () { onError("Didn't catch that — try again"); });
       };
-      recorder.start();
-
-      // Silence-based auto-stop, same VAD approach as Vision's useCodexVoice.
-      try {
-        var ctx = new AudioContext();
-        var analyser = ctx.createAnalyser();
-        analyser.fftSize = 512;
-        ctx.createMediaStreamSource(stream).connect(analyser);
-        var data = new Uint8Array(analyser.frequencyBinCount);
-        var start = Date.now();
-        var silenceTimer = null;
-        var interval = setInterval(function () {
-          if (!active || recorder.state !== 'recording') { clearInterval(interval); return; }
-          analyser.getByteTimeDomainData(data);
-          var sum = 0;
-          for (var i = 0; i < data.length; i++) { var x = (data[i] - 128) / 128; sum += x * x; }
-          var rms = Math.sqrt(sum / data.length);
-          var elapsed = Date.now() - start;
-          if (rms < SILENCE_THRESHOLD && elapsed > MIN_RECORD_MS) {
-            if (!silenceTimer) {
-              silenceTimer = setTimeout(function () {
-                if (recorder.state === 'recording') recorder.stop();
-                clearInterval(interval);
-                ctx.close().catch(function () {});
-              }, SILENCE_DELAY_MS);
-            }
-          } else if (silenceTimer) {
-            clearTimeout(silenceTimer);
-            silenceTimer = null;
-          }
-        }, 200);
-      } catch (e) {
-        // AudioContext unavailable -- caller's manual stop() is the only way
-        // to submit; capture still works, just no auto-send on silence.
-      }
+      // fix (2026-08-11): dropped the AudioContext-based silence-detection
+      // auto-stop that used to run here. Concurrently attaching a
+      // MediaStreamSource/analyser to the SAME stream an active
+      // MediaRecorder is encoding is a known-flaky combination on iOS
+      // Safari -- it was producing zero-byte recordings ("No audio
+      // captured") despite real speech, confirmed via a from-scratch
+      // server-side pipeline test that proved STT/Vision/TTS all work
+      // correctly given real audio bytes, isolating the bug to capture.
+      // Manual tap-to-stop already exists on every caller (gym.html's
+      // toggle, attachMic's toggle below) -- this timeout is purely a
+      // forgot-to-stop safety net, not the primary stop mechanism.
+      recorder.start(1000); // timeslice: flush data progressively, not just at stop()
+      maxTimer = setTimeout(function () {
+        if (recorder.state === 'recording') recorder.stop();
+      }, MAX_RECORD_MS);
     }).catch(function () {
       active = false;
       onError('Microphone unavailable — check browser permissions');
@@ -94,6 +74,7 @@ window.RowVoice = (function () {
     return {
       stop: function () {
         active = false;
+        clearTimeout(maxTimer);
         if (recorder && recorder.state === 'recording') recorder.stop();
       },
     };
