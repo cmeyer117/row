@@ -168,6 +168,10 @@
     _toggleMic() {
       if (this._voiceController) { this._stopVoice(); return; }
       this._micBtn.classList.add('listening');
+      // Feeds gym.html's real exercise vocabulary into STT when available
+      // (window.__gym.getSttPrompt, added by gym.html itself) -- undefined
+      // on the other 4 pages, which have no such vocabulary to hint with.
+      var sttPrompt = (window.__gym && window.__gym.getSttPrompt) ? window.__gym.getSttPrompt() : '';
       this._voiceController = window.RowVoice.startCapture((transcript) => {
         this._voiceController = null;
         this._micBtn.classList.remove('listening');
@@ -176,7 +180,7 @@
         this._voiceController = null;
         this._micBtn.classList.remove('listening');
         this._appendMessage('status', msg);
-      });
+      }, { sttPrompt: sttPrompt });
     }
 
     _stopVoice() {
