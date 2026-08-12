@@ -43,6 +43,73 @@ window.RowVoice = (function () {
         window.speechSynthesis.speak(primer);
       }
     } catch (e) {}
+    // Fire-and-forget: starts the transformers.js/model download on first
+    // tap so it's more likely warm by the time a capture actually finishes,
+    // without blocking anything here. A rejection here is expected/silent
+    // -- transcribeLocally() checks the same cached promise later and falls
+    // back to OpenAI on failure.
+    getAsrPipeline().catch(function () {});
+  }
+
+  var TRANSFORMERS_CDN = 'https://cdn.jsdelivr.net/npm/@huggingface/transformers';
+  var ASR_MODEL = 'Xenova/whisper-tiny.en';
+  var _asrPipelinePromise = null;
+
+  // Loads transformers.js from CDN as a classic script (exposes window.transformers,
+  // same pattern as @supabase/supabase-js elsewhere in this codebase -- no
+  // bundler needed). Cached: a rejected promise (device genuinely can't run
+  // it) stays rejected for the rest of the page session rather than retrying
+  // a slow doomed load on every subsequent tap -- a page reload retries.
+  function loadTransformersScript() {
+    return new Promise(function (resolve, reject) {
+      if (window.transformers) { resolve(); return; }
+      var script = document.createElement('script');
+      script.src = TRANSFORMERS_CDN;
+      script.onload = function () { resolve(); };
+      script.onerror = function () { reject(new Error('Failed to load transformers.js')); };
+      document.head.appendChild(script);
+    });
+  }
+
+  function getAsrPipeline() {
+    if (_asrPipelinePromise) return _asrPipelinePromise;
+    _asrPipelinePromise = loadTransformersScript().then(function () {
+      return window.transformers.pipeline('automatic-speech-recognition', ASR_MODEL);
+    });
+    return _asrPipelinePromise;
+  }
+
+  // Transcribes locally, zero cost. Resolves to the transcript string, or
+  // null on any failure (model load failed, inference threw, empty result)
+  // -- callers fall back to transcribeViaOpenAI() on null, never throw.
+  function transcribeLocally(blob) {
+    return getAsrPipeline().then(function (transcriber) {
+      var url = URL.createObjectURL(blob);
+      return transcriber(url).then(function (result) {
+        URL.revokeObjectURL(url);
+        var text = result && result.text ? result.text.trim() : '';
+        return text || null;
+      });
+    }).catch(function () { return null; });
+  }
+
+  // The exact OpenAI STT call that used to live inline in recorder.onstop,
+  // extracted so it can serve as transcribeLocally()'s fallback. Resolves to
+  // the transcript string, or null on any failure -- never throws, so the
+  // caller's own onError message ("Didn't catch that...") is the single
+  // source of truth for that message, not duplicated here.
+  function transcribeViaOpenAI(blob, recordedMimeType, sttPrompt) {
+    return blob.arrayBuffer().then(function (buf) {
+      var headers = { 'Content-Type': recordedMimeType, 'Authorization': 'Bearer ' + ROW_APP_SECRET };
+      if (sttPrompt) headers['X-STT-Prompt'] = sttPrompt;
+      return fetch('/api/vision-talk?mode=stt', {
+        method: 'POST',
+        headers: headers,
+        body: buf,
+      });
+    }).then(function (res) { return res.json(); }).then(function (data) {
+      return (data && data.transcript && data.transcript.trim()) ? data.transcript.trim() : null;
+    }).catch(function () { return null; });
   }
 
   function isSupported() {
@@ -93,17 +160,12 @@ window.RowVoice = (function () {
         stream.getTracks().forEach(function (t) { t.stop(); });
         if (!chunks.length) { onError('No audio captured'); return; }
         var blob = new Blob(chunks, { type: recordedMimeType });
-        blob.arrayBuffer().then(function (buf) {
-          var headers = { 'Content-Type': recordedMimeType, 'Authorization': 'Bearer ' + ROW_APP_SECRET };
-          if (opts.sttPrompt) headers['X-STT-Prompt'] = opts.sttPrompt;
-          return fetch('/api/vision-talk?mode=stt', {
-            method: 'POST',
-            headers: headers,
-            body: buf,
+        transcribeLocally(blob).then(function (localText) {
+          if (localText) { onTranscript(localText); return; }
+          return transcribeViaOpenAI(blob, recordedMimeType, opts.sttPrompt).then(function (fallbackText) {
+            if (fallbackText) onTranscript(fallbackText);
+            else onError("Didn't catch that — try again");
           });
-        }).then(function (res) { return res.json(); }).then(function (data) {
-          if (data && data.transcript && data.transcript.trim()) onTranscript(data.transcript.trim());
-          else onError("Didn't catch that — try again");
         }).catch(function () { onError("Didn't catch that — try again"); });
       };
       // fix (2026-08-11): dropped the AudioContext-based silence-detection
