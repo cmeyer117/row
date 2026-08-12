@@ -35,7 +35,16 @@ window.RowVoice = (function () {
     navigator.mediaDevices.getUserMedia({ audio: true }).then(function (s) {
       if (cancelled) { s.getTracks().forEach(function (t) { t.stop(); }); return; }
       stream = s;
-      recorder = new MediaRecorder(stream);
+      // fix (2026-08-11): letting MediaRecorder pick its own default codec
+      // (no mimeType passed) is a known-unreliable path on iOS Safari --
+      // real recordings still came back as zero bytes even after removing
+      // the concurrent-AudioContext theory. Explicitly requesting a codec
+      // Safari actually supports is the standard, well-documented fix.
+      var PREFERRED_TYPES = ['audio/mp4', 'audio/webm;codecs=opus', 'audio/webm'];
+      var chosenType = PREFERRED_TYPES.find(function (t) {
+        return window.MediaRecorder.isTypeSupported && window.MediaRecorder.isTypeSupported(t);
+      });
+      recorder = chosenType ? new MediaRecorder(stream, { mimeType: chosenType }) : new MediaRecorder(stream);
       // iOS Safari has no WebM encoder -- MediaRecorder silently falls back
       // to audio/mp4 there. Read the real chosen type instead of assuming
       // webm, or the server mislabels the bytes and Whisper fails to decode
