@@ -78,9 +78,13 @@ async function handleTts(req, res, rawBody) {
 
 async function handleStt(req, res, rawBody) {
   try {
+    // Forward the client's real Content-Type (iOS Safari sends audio/mp4,
+    // not webm -- see stt.ts on Vision's side for why this can't be
+    // hardcoded) instead of relabeling every recording as webm.
+    const contentType = req.headers['content-type'] || 'audio/webm';
     const upstream = await fetch(VISION_URL + '/stt', {
       method: 'POST',
-      headers: { 'Content-Type': 'audio/webm', 'Cookie': sessionCookie(process.env.VISION_SESSION_SECRET) },
+      headers: { 'Content-Type': contentType, 'Cookie': sessionCookie(process.env.VISION_SESSION_SECRET) },
       body: rawBody,
     });
     const data = await upstream.json();

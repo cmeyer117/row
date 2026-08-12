@@ -29,16 +29,21 @@ window.RowVoice = (function () {
       if (!active) { s.getTracks().forEach(function (t) { t.stop(); }); return; }
       stream = s;
       recorder = new MediaRecorder(stream);
+      // iOS Safari has no WebM encoder -- MediaRecorder silently falls back
+      // to audio/mp4 there. Read the real chosen type instead of assuming
+      // webm, or the server mislabels the bytes and Whisper fails to decode
+      // them (every recording came back as "Didn't catch that" on iOS).
+      var recordedMimeType = recorder.mimeType || 'audio/webm';
       recorder.ondataavailable = function (e) { if (e.data.size > 0) chunks.push(e.data); };
       recorder.onstop = function () {
         stream.getTracks().forEach(function (t) { t.stop(); });
         if (!active) return;
         if (!chunks.length) { onError('No audio captured'); return; }
-        var blob = new Blob(chunks, { type: 'audio/webm' });
+        var blob = new Blob(chunks, { type: recordedMimeType });
         blob.arrayBuffer().then(function (buf) {
           return fetch('/api/vision-talk?mode=stt', {
             method: 'POST',
-            headers: { 'Content-Type': 'audio/webm', 'Authorization': 'Bearer ' + ROW_APP_SECRET },
+            headers: { 'Content-Type': recordedMimeType, 'Authorization': 'Bearer ' + ROW_APP_SECRET },
             body: buf,
           });
         }).then(function (res) { return res.json(); }).then(function (data) {
