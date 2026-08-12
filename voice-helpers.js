@@ -10,6 +10,28 @@ window.RowVoice = (function () {
   var ROW_APP_SECRET = '007007';
   var MAX_RECORD_MS = 30000; // safety net only -- normal use is manual tap-to-stop
 
+  // fix (2026-08-12): TTS playback never actually played -- speak() called
+  // audio.play() with a bare .catch(() => {}), so Safari's autoplay policy
+  // silently blocked it and nothing surfaced. Root cause: by the time the
+  // reply comes back (STT round trip -> Vision round trip -> TTS round
+  // trip, several real seconds), Safari no longer considers play() tied to
+  // the original tap gesture and refuses it. Standard fix: create+play a
+  // silent element SYNCHRONOUSLY inside the tap handler (still counts as
+  // the gesture) to unlock this ONE element, then reuse that same element
+  // (not a fresh `new Audio()`) for every later async playback -- Safari's
+  // "unlocked" state is per-element, not per-page.
+  var _unlockedAudio = null;
+  // 1-sample silent WAV, valid enough to satisfy play()/pause() without any
+  // audible click.
+  var SILENT_WAV = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=';
+  function unlockAudio() {
+    if (_unlockedAudio) return;
+    try {
+      _unlockedAudio = new Audio(SILENT_WAV);
+      _unlockedAudio.play().catch(function () {}); // best-effort; if this fails, speak() will too, same as before
+    } catch (e) { _unlockedAudio = null; }
+  }
+
   function isSupported() {
     return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder);
   }
@@ -18,6 +40,7 @@ window.RowVoice = (function () {
   // POSTs to /api/vision-stt. Calls onTranscript(text) on success,
   // onError(msg) on failure. Returns a controller with stop().
   function startCapture(onTranscript, onError) {
+    unlockAudio(); // synchronous, still inside the caller's click handler
     var chunks = [];
     // fix (2026-08-11): `active` used to be a single flag serving two
     // conflicting purposes -- "cancelled before getUserMedia resolved" AND
@@ -110,10 +133,15 @@ window.RowVoice = (function () {
     }).then(function (res) { return res.ok ? res.blob() : null; }).then(function (blob) {
       if (!blob) { if (onDone) onDone(); return null; }
       var url = URL.createObjectURL(blob);
-      var audio = new Audio(url);
+      // Reuse the tap-unlocked element instead of `new Audio()` -- Safari's
+      // autoplay unlock is per-element, a fresh instance here wouldn't
+      // inherit it. Falls back to a new element if unlock never ran/failed
+      // (still swallowed below, matching prior behavior for that edge case).
+      var audio = _unlockedAudio || new Audio();
+      audio.src = url;
       audio.onended = function () { URL.revokeObjectURL(url); if (onDone) onDone(); };
       audio.onerror = audio.onended;
-      audio.play().catch(function () {});
+      audio.play().catch(function (e) { console.warn('[RowVoice] TTS playback blocked:', e && e.message); });
       return audio;
     }).catch(function () { if (onDone) onDone(); return null; });
   }
