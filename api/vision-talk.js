@@ -82,9 +82,16 @@ async function handleStt(req, res, rawBody) {
     // not webm -- see stt.ts on Vision's side for why this can't be
     // hardcoded) instead of relabeling every recording as webm.
     const contentType = req.headers['content-type'] || 'audio/webm';
+    const headers = { 'Content-Type': contentType, 'Cookie': sessionCookie(process.env.VISION_SESSION_SECRET) };
+    // Vocabulary-bias hint (exercise names), built client-side and passed
+    // through unchanged -- see docs/superpowers/specs/
+    // 2026-08-12-stt-gym-vocabulary-hint-design.md. Optional: absent for
+    // any caller (e.g. Vessel's mic) that doesn't send one.
+    const sttPrompt = req.headers['x-stt-prompt'];
+    if (sttPrompt && typeof sttPrompt === 'string') headers['X-STT-Prompt'] = sttPrompt;
     const upstream = await fetch(VISION_URL + '/stt', {
       method: 'POST',
-      headers: { 'Content-Type': contentType, 'Cookie': sessionCookie(process.env.VISION_SESSION_SECRET) },
+      headers,
       body: rawBody,
     });
     const data = await upstream.json();
