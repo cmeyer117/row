@@ -2090,7 +2090,13 @@ body::after {
       });
       confirmWrap.appendChild(btn);
       confirmWrap.appendChild(err);
-      seqContainer.parentNode.appendChild(confirmWrap);
+      // Replace the sequence's own UI (was still showing "Step 4 of 4")
+      // rather than appending alongside it -- appending left both the old
+      // step UI and, on any repeat onAllDone trigger, a second copy of this
+      // confirmation screen stacked on top of the first. Caught live: two
+      // full if-then confirmation blocks rendered after one completion.
+      seqContainer.innerHTML = '';
+      seqContainer.appendChild(confirmWrap);
     });
     return wrap;
   }
