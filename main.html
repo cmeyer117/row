@@ -1747,7 +1747,12 @@ body::after {
   function mlOutcomesSave(o) { storeSet(ML_OUTCOMES_KEY, o); }
   function mlSessionLoad() {
     const s = storeGet(mlSessionKey());
-    return (s && s.version === 1) ? s : window.MorningLaunchLogic.newSession(getActiveDateString());
+    if (!s || s.version !== 1) return window.MorningLaunchLogic.newSession(getActiveDateString());
+    s.currentPhase = window.MorningLaunchLogic.migratePhaseNames(s.currentPhase);
+    if (typeof s.feltRehearsal !== 'string') s.feltRehearsal = '';
+    if (typeof s.spokenCommitment !== 'string') s.spokenCommitment = '';
+    if (s.spokenAt === undefined) s.spokenAt = null;
+    return s;
   }
   function mlSessionSaveQuiet(s) { storeSet(mlSessionKey(), s); }
   function mlSessionSave(s) { storeSet(mlSessionKey(), s); mlRender(); }
@@ -1818,7 +1823,7 @@ body::after {
   function mlBuildEntry(session) {
     const wrap = el('div', 'ml-entry');
     wrap.appendChild(el('div', 'ml-eyebrow', 'Morning Launch'));
-    const started = session.currentPhase !== 'clear' || !!session.brainDump;
+    const started = session.currentPhase !== 'settle' || !!session.brainDump;
     wrap.appendChild(el('div', 'ml-sub', started ? ('Continue where you left off — ' + session.currentPhase) : 'Estimated 10–15 minutes'));
     const actions = el('div', 'ml-actions');
     const startBtn = el('button', 'gm-add', started ? 'Continue Morning Launch' : 'Start Morning Launch');
@@ -1883,22 +1888,25 @@ body::after {
     return wrap;
   }
 
-  function mlBuildClear(session) {
+  function mlBuildSettle(session) {
     const wrap = el('div', 'ml-phase');
-    wrap.appendChild(el('div', 'ml-phase-title', 'Clear'));
-    wrap.appendChild(el('label', 'ml-prompt', 'What is occupying your mind right now?'));
-    mlSpeakPhasePrompt('clear', 'What is occupying your mind right now?');
-    const ta = document.createElement('textarea');
-    ta.className = 'gm-input ml-textarea';
-    ta.value = session.brainDump || '';
-    ta.setAttribute('aria-label', 'Brain dump');
-    ta.addEventListener('input', () => { session.brainDump = ta.value; mlSessionSaveQuiet(session); });
-    wrap.appendChild(ta);
-    if (window.RowVoice) window.RowVoice.attachMic(ta);
-    wrap.appendChild(mlNextButton(session, 'align', {
-      beforeAdvance: () => { session.brainDump = ta.value; },
-      label: 'Continue to Align'
-    }));
+    wrap.appendChild(el('div', 'ml-phase-title', 'Settle'));
+    const seqContainer = el('div', 'ml-voice-seq');
+    wrap.appendChild(seqContainer);
+    mlVoiceSequence(seqContainer, 'settle', [
+      {
+        key: 'brainDump',
+        prompt: 'Before anything else — what\'s on your mind this morning?',
+        get: () => session.brainDump || '',
+        set: (v) => { session.brainDump = v; mlSessionSaveQuiet(session); }
+      }
+    ], () => {
+      const check = window.MorningLaunchLogic.advancePhase(session, 'align');
+      if (!check.ok) return;
+      session.currentPhase = 'align';
+      mlLastSpokenPhase = null;
+      mlSessionSave(session);
+    });
     return wrap;
   }
 
@@ -1954,34 +1962,22 @@ body::after {
     const ML = window.MorningLaunchLogic;
     const wrap = el('div', 'ml-phase');
     wrap.appendChild(el('div', 'ml-phase-title', 'Align'));
-    wrap.appendChild(el('p', 'ml-prompt', 'Write shortened versions of your five current outcomes from memory.'));
-    mlSpeakPhasePrompt('align', 'Write shortened versions of your five current outcomes from memory.');
-    const inputs = [];
-    const list = el('div', 'ml-outcome-list');
-    for (let i = 0; i < 5; i++) {
-      const inp = document.createElement('input');
-      inp.type = 'text'; inp.className = 'gm-input'; inp.placeholder = 'Outcome ' + (i + 1);
-      inp.value = (session.recalledOutcomes && session.recalledOutcomes[i]) || '';
-      inp.addEventListener('input', () => {
-        session.recalledOutcomes = inputs.map(x => x.value);
-        mlSessionSaveQuiet(session);
-      });
-      list.appendChild(inp);
-      if (window.RowVoice) window.RowVoice.attachMic(inp);
-      inputs.push(inp);
-    }
-    wrap.appendChild(list);
 
     if (!mlAlignRevealed) {
-      const submitBtn = el('button', 'gm-add', 'Reveal saved outcomes');
-      submitBtn.type = 'button';
-      submitBtn.addEventListener('click', () => {
-        session.recalledOutcomes = inputs.map(i => i.value.trim());
-        mlSessionSaveQuiet(session);
+      if (!Array.isArray(session.recalledOutcomes)) session.recalledOutcomes = ['', '', '', '', ''];
+      while (session.recalledOutcomes.length < 5) session.recalledOutcomes.push('');
+      const seqContainer = el('div', 'ml-voice-seq');
+      wrap.appendChild(seqContainer);
+      const steps = [0, 1, 2, 3, 4].map(i => ({
+        key: 'outcome' + i,
+        prompt: 'Outcome ' + (i + 1) + ' — say it from memory.',
+        get: () => session.recalledOutcomes[i] || '',
+        set: (v) => { session.recalledOutcomes[i] = v; mlSessionSaveQuiet(session); }
+      }));
+      mlVoiceSequence(seqContainer, 'align', steps, () => {
         mlAlignRevealed = true;
         mlRender();
       });
-      wrap.appendChild(submitBtn);
       return wrap;
     }
 
@@ -2006,56 +2002,70 @@ body::after {
       revealList.appendChild(row);
     });
     wrap.appendChild(revealList);
-    wrap.appendChild(mlNextButton(session, 'visualize', {
+    wrap.appendChild(mlNextButton(session, 'rehearse', {
       extraValidate: () => session.focusOutcomeId ? null : 'Select the outcome that matters most today.',
-      label: 'Continue to Visualize'
+      label: 'Continue to Rehearse'
     }));
     return wrap;
   }
 
-  function mlBuildVisualize(session) {
+  function mlBuildRehearse(session) {
     const ML = window.MorningLaunchLogic;
     const wrap = el('div', 'ml-phase');
-    wrap.appendChild(el('div', 'ml-phase-title', 'Visualize'));
-    wrap.appendChild(el('label', 'ml-prompt', 'What does doing the work successfully look like? Describe the process you will perform.'));
-    const pv = document.createElement('textarea');
-    pv.className = 'gm-input ml-textarea'; pv.value = session.processVisualization || '';
-    pv.addEventListener('input', () => { session.processVisualization = pv.value; mlSessionSaveQuiet(session); });
-    wrap.appendChild(pv);
-
-    wrap.appendChild(el('label', 'ml-prompt', 'What internal obstacle is most likely to interfere?'));
-    const ob = document.createElement('input');
-    ob.type = 'text'; ob.className = 'gm-input'; ob.value = session.obstacle || '';
-    ob.addEventListener('input', () => { session.obstacle = ob.value; mlSessionSaveQuiet(session); refreshSentence(); });
-    wrap.appendChild(ob);
-
-    wrap.appendChild(el('label', 'ml-prompt', 'If that happens, what exactly will you do?'));
-    const rs = document.createElement('input');
-    rs.type = 'text'; rs.className = 'gm-input'; rs.value = session.response || '';
-    rs.addEventListener('input', () => { session.response = rs.value; mlSessionSaveQuiet(session); refreshSentence(); });
-    wrap.appendChild(rs);
-
-    const sentence = el('div', 'ml-ifthen', ML.formatIfThen(session.obstacle, session.response) || 'Fill in both fields to see your if-then plan.');
-    function refreshSentence() { sentence.textContent = ML.formatIfThen(ob.value, rs.value) || 'Fill in both fields to see your if-then plan.'; }
-    wrap.appendChild(sentence);
-
-    const confirmLabel = el('label', 'ml-outcome-item');
-    const confirmCb = document.createElement('input');
-    confirmCb.type = 'checkbox';
-    confirmCb.checked = !!(session.obstacle && session.response);
-    confirmLabel.appendChild(confirmCb);
-    confirmLabel.appendChild(el('span', null, 'I confirm this if-then plan'));
-    wrap.appendChild(confirmLabel);
-
-    wrap.appendChild(mlNextButton(session, 'commit', {
-      beforeAdvance: () => {
-        session.processVisualization = pv.value;
-        session.obstacle = ob.value;
-        session.response = rs.value;
+    wrap.appendChild(el('div', 'ml-phase-title', 'Rehearse'));
+    const seqContainer = el('div', 'ml-voice-seq');
+    wrap.appendChild(seqContainer);
+    const steps = [
+      {
+        key: 'processVisualization',
+        prompt: 'What does doing the work successfully look like? Describe the process you will perform.',
+        get: () => session.processVisualization || '',
+        set: (v) => { session.processVisualization = v; mlSessionSaveQuiet(session); }
       },
-      extraValidate: () => confirmCb.checked ? null : 'Confirm the if-then plan before continuing.',
-      label: 'Continue to Commit'
-    }));
+      {
+        key: 'obstacle',
+        prompt: 'What internal obstacle is most likely to interfere?',
+        get: () => session.obstacle || '',
+        set: (v) => { session.obstacle = v; mlSessionSaveQuiet(session); }
+      },
+      {
+        key: 'response',
+        prompt: 'If that happens, what exactly will you do?',
+        get: () => session.response || '',
+        set: (v) => { session.response = v; mlSessionSaveQuiet(session); }
+      },
+      {
+        key: 'feltRehearsal',
+        prompt: 'Now picture today actually going well. What does that feel like — and where does it get hard? Include that moment too.',
+        get: () => session.feltRehearsal || '',
+        set: (v) => { session.feltRehearsal = v; mlSessionSaveQuiet(session); }
+      }
+    ];
+    mlVoiceSequence(seqContainer, 'rehearse', steps, () => {
+      const sentence = ML.formatIfThen(session.obstacle, session.response);
+      const confirmWrap = el('div', 'ml-phase');
+      confirmWrap.appendChild(el('div', 'ml-ifthen', sentence || 'Fill in both fields to see your if-then plan.'));
+      const confirmLabel = el('label', 'ml-outcome-item');
+      const confirmCb = document.createElement('input');
+      confirmCb.type = 'checkbox';
+      confirmLabel.appendChild(confirmCb);
+      confirmLabel.appendChild(el('span', null, 'I confirm this if-then plan'));
+      confirmWrap.appendChild(confirmLabel);
+      const err = el('div', 'ml-error');
+      const btn = el('button', 'gm-add', 'Continue to Commit');
+      btn.type = 'button';
+      btn.addEventListener('click', () => {
+        if (!confirmCb.checked) { err.textContent = 'Confirm the if-then plan before continuing.'; return; }
+        const check = ML.advancePhase(session, 'commit');
+        if (!check.ok) { err.textContent = check.errors.join(' '); return; }
+        session.currentPhase = 'commit';
+        mlLastSpokenPhase = null;
+        mlSessionSave(session);
+      });
+      confirmWrap.appendChild(btn);
+      confirmWrap.appendChild(err);
+      seqContainer.parentNode.appendChild(confirmWrap);
+    });
     return wrap;
   }
 
@@ -2325,6 +2335,29 @@ body::after {
   }
   let mlExpandedReview = false;
 
+  function mlBuildSpeakIt(session) {
+    const ML = window.MorningLaunchLogic;
+    const wrap = el('div', 'ml-phase');
+    wrap.appendChild(el('div', 'ml-phase-title', 'Speak It'));
+    wrap.appendChild(el('div', 'ml-sub', 'Win condition: ' + (ML.summarize(session).winCondition || '—')));
+    const seqContainer = el('div', 'ml-voice-seq');
+    wrap.appendChild(seqContainer);
+    mlVoiceSequence(seqContainer, 'speakit', [
+      {
+        key: 'spokenCommitment',
+        prompt: 'Say your win condition and today\'s focus out loud.',
+        get: () => session.spokenCommitment || '',
+        set: (v) => { session.spokenCommitment = v; mlSessionSaveQuiet(session); }
+      }
+    ], () => {
+      const result = ML.completeSpeakIt(session, session.spokenCommitment);
+      if (!result.ok) return;
+      mlSessionSave(result.session);
+      loadToday();
+    });
+    return wrap;
+  }
+
   function mlEveningDue() { return new Date().getHours() >= 17; }
 
   function mlBuildEvening(session) {
@@ -2419,10 +2452,11 @@ body::after {
       } else {
         mlAlignRevealed = false;
       }
-      if (session.currentPhase === 'clear') primary = mlBuildClear(session);
+      if (session.currentPhase === 'settle') primary = mlBuildSettle(session);
       else if (session.currentPhase === 'align') primary = mlBuildAlign(session, outcomesState);
-      else if (session.currentPhase === 'visualize') primary = mlBuildVisualize(session);
+      else if (session.currentPhase === 'rehearse') primary = mlBuildRehearse(session);
       else if (session.currentPhase === 'commit') primary = mlBuildCommit(session, outcomesState);
+      else if (session.currentPhase === 'speakit') primary = mlBuildSpeakIt(session);
       else primary = mlBuildEntry(session);
     }
     card.appendChild(primary);
