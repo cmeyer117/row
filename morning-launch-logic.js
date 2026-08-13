@@ -6,10 +6,15 @@
 (function () {
   'use strict';
 
-  var PHASE_ORDER = ['clear', 'align', 'visualize', 'commit', 'complete'];
+  var PHASE_ORDER = ['settle', 'align', 'rehearse', 'commit', 'speakit', 'complete'];
 
   function isNonEmpty(s) {
     return typeof s === 'string' && s.trim().length > 0;
+  }
+
+  var PHASE_MIGRATIONS = { clear: 'settle', visualize: 'rehearse' };
+  function migratePhaseNames(phase) {
+    return PHASE_MIGRATIONS[phase] || phase;
   }
 
   function newSession(date) {
@@ -17,7 +22,7 @@
       version: 1,
       date: date,
       status: 'draft',
-      currentPhase: 'clear',
+      currentPhase: 'settle',
       brainDump: '',
       recalledOutcomes: [],
       savedOutcomeSnapshot: null,
@@ -25,8 +30,11 @@
       processVisualization: '',
       obstacle: '',
       response: '',
+      feltRehearsal: '',
       needleMovers: [],
       winMoverId: null,
+      spokenCommitment: '',
+      spokenAt: null,
       skipReason: null,
       startedAt: new Date().toISOString(),
       completedAt: null,
@@ -46,13 +54,16 @@
 
   function canEnterPhase(session, phase) {
     if (!session) return false;
-    if (phase === 'clear') return true;
-    if (phase === 'align') return isNonEmpty(session.brainDump) || session.currentPhase !== 'clear';
-    if (phase === 'visualize') return !!session.focusOutcomeId;
+    if (phase === 'settle') return true;
+    if (phase === 'align') return isNonEmpty(session.brainDump) || session.currentPhase !== 'settle';
+    if (phase === 'rehearse') return !!session.focusOutcomeId;
     if (phase === 'commit') {
-      return isNonEmpty(session.processVisualization) && isNonEmpty(session.obstacle) && isNonEmpty(session.response);
+      return isNonEmpty(session.processVisualization) && isNonEmpty(session.obstacle) && isNonEmpty(session.response) && isNonEmpty(session.feltRehearsal);
     }
-    if (phase === 'complete') return false; // only via completeSession
+    if (phase === 'speakit') {
+      return Array.isArray(session.needleMovers) && session.needleMovers.length === 3 && !!session.winMoverId;
+    }
+    if (phase === 'complete') return false; // only via completeSpeakIt
     return false;
   }
 
@@ -131,23 +142,40 @@
     });
   }
 
+  // Closes Commit -- lands in speakit, not complete. The session isn't
+  // fully done until completeSpeakIt runs.
   function completeSession(session, outcomes, movers, winMoverId) {
     var outcomeCheck = validateOutcomes(outcomes);
     var moverCheck = validateMovers(movers, winMoverId);
     var errors = outcomeCheck.errors.concat(moverCheck.errors);
     if (!isNonEmpty(session.processVisualization) || !isNonEmpty(session.obstacle) || !isNonEmpty(session.response)) {
-      errors.push('Visualize phase is incomplete.');
+      errors.push('Rehearse phase is incomplete.');
+    }
+    if (!isNonEmpty(session.feltRehearsal)) {
+      errors.push('Felt-sense rehearsal is incomplete.');
     }
     if (errors.length) return { ok: false, errors: errors };
 
     var active = outcomes.filter(function (o) { return o.active; });
     var copy = {};
     for (var k in session) { if (Object.prototype.hasOwnProperty.call(session, k)) copy[k] = session[k]; }
-    copy.status = 'completed';
-    copy.currentPhase = 'complete';
+    copy.status = 'draft';
+    copy.currentPhase = 'speakit';
     copy.needleMovers = movers;
     copy.winMoverId = winMoverId;
     copy.savedOutcomeSnapshot = active.map(function (o) { return { id: o.id, text: o.text }; });
+    return { ok: true, session: copy };
+  }
+
+  // Closes Speak It -- the actual final step of the ritual.
+  function completeSpeakIt(session, spokenCommitment) {
+    if (!isNonEmpty(spokenCommitment)) return { ok: false, errors: ['A spoken commitment is required.'] };
+    var copy = {};
+    for (var k in session) { if (Object.prototype.hasOwnProperty.call(session, k)) copy[k] = session[k]; }
+    copy.status = 'completed';
+    copy.currentPhase = 'complete';
+    copy.spokenCommitment = spokenCommitment;
+    copy.spokenAt = new Date().toISOString();
     copy.completedAt = new Date().toISOString();
     return { ok: true, session: copy };
   }
@@ -164,7 +192,8 @@
       winCondition: win ? win.textSnapshot : null,
       movers: session.needleMovers || [],
       currentFirstAction: firstOpen ? firstOpen.firstAction : null,
-      ifThen: formatIfThen(session.obstacle, session.response)
+      ifThen: formatIfThen(session.obstacle, session.response),
+      spokenCommitment: session.spokenCommitment || null
     };
   }
 
@@ -185,6 +214,8 @@
       }),
       processVisualization: session.processVisualization,
       ifThen: formatIfThen(session.obstacle, session.response),
+      feltRehearsal: session.feltRehearsal || null,
+      spokenCommitment: session.spokenCommitment || null,
       evening: session.evening || null
     };
   }
@@ -216,6 +247,7 @@
 
   var api = {
     newSession: newSession,
+    migratePhaseNames: migratePhaseNames,
     validateOutcomes: validateOutcomes,
     canEnterPhase: canEnterPhase,
     advancePhase: advancePhase,
@@ -226,6 +258,7 @@
     resolveMoverReference: resolveMoverReference,
     reconcileFromToday: reconcileFromToday,
     completeSession: completeSession,
+    completeSpeakIt: completeSpeakIt,
     summarize: summarize,
     vaultExportProjection: vaultExportProjection,
     validateEveningClose: validateEveningClose,
