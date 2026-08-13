@@ -6,8 +6,6 @@
 // useCodexVoice hook already uses successfully. See docs/superpowers/specs/
 // 2026-08-11-spoken-morning-briefs-design.md.
 window.RowVoice = (function () {
-  // Same trust tier as topbar.js's AUTH_PASS -- see api/_lib/verify-app-secret.js.
-  var ROW_APP_SECRET = '007007';
   var MAX_RECORD_MS = 30000; // safety net only -- normal use is manual tap-to-stop
 
   // fix (2026-08-12): TTS playback never actually played -- speak() called
@@ -136,8 +134,12 @@ window.RowVoice = (function () {
   // caller's own onError message ("Didn't catch that...") is the single
   // source of truth for that message, not duplicated here.
   function transcribeViaOpenAI(blob, recordedMimeType, sttPrompt) {
-    return blob.arrayBuffer().then(function (buf) {
-      var headers = { 'Content-Type': recordedMimeType, 'Authorization': 'Bearer ' + ROW_APP_SECRET };
+    // 2026-08-12 audit fix: was a client-visible shared secret, now the
+    // real owner session token -- see row-auth.js's getAccessToken().
+    return Promise.all([blob.arrayBuffer(), window.RowAuth.getAccessToken()]).then(function (results) {
+      var buf = results[0];
+      var token = results[1];
+      var headers = { 'Content-Type': recordedMimeType, 'Authorization': 'Bearer ' + token };
       if (sttPrompt) headers['X-STT-Prompt'] = sttPrompt;
       return fetch('/api/vision-talk?mode=stt', {
         method: 'POST',

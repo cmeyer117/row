@@ -12,11 +12,13 @@
 // a failed deploy: errorCode exceeded_serverless_functions_per_deployment).
 // See docs/superpowers/specs/2026-08-11-spoken-morning-briefs-design.md.
 import { createHmac } from 'node:crypto';
-import { verifyAppSecret } from './_lib/verify-app-secret.js';
+import { verifyOwner } from './_lib/verify-owner.js';
 
 export const config = { api: { bodyParser: false } };
 
 const VISION_URL = 'https://vision-backend-carlmeyer.up.railway.app';
+const SUPABASE_URL = 'https://vikpcejlyxieguorwysf.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_EvWPtfW1FBW5Vf-H6w0yHw_PcXK4imv';
 
 function sessionCookie(secret) {
   const payload = Buffer.from(JSON.stringify({ exp: Date.now() + 30 * 24 * 60 * 60 * 1000 })).toString('base64url');
@@ -135,7 +137,10 @@ export default async function handler(req, res) {
     res.status(405).json({ error: 'Method not allowed' });
     return;
   }
-  if (!verifyAppSecret(req.headers['authorization'], process.env.ROW_APP_SECRET)) {
+  // 2026-08-12 audit fix: was a client-visible shared secret (readable from
+  // page source), now the real owner session token -- see row-auth.js's
+  // getAccessToken().
+  if (!(await verifyOwner(req.headers['authorization'], SUPABASE_URL, SUPABASE_ANON_KEY))) {
     res.status(401).json({ error: 'Unauthorized' });
     return;
   }

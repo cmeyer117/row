@@ -5,7 +5,6 @@
 // framework, matching Row's existing static-page architecture. See
 // docs/superpowers/specs/2026-08-12-mini-vision-chat-bubble-design.md.
 (function () {
-  var ROW_APP_SECRET = '007007'; // same client-visible trust tier as voice-helpers.js/gym.html -- see api/_lib/verify-app-secret.js.
   var COACH_ID = 'gym';
   // Must stay >= Vision's own 60s codex-exec timeout (vision/src/codex.ts
   // EXEC_OPTIONS). A shorter client timeout can abort a call whose write
@@ -115,11 +114,13 @@
       this._historyLoaded = true; // only ever attempt once per page load
       this._setBusy(true);
       var status = this._appendMessage('status', 'Loading…');
-      fetch('/api/vision-talk?mode=history', {
+      // 2026-08-12 audit fix: was a client-visible shared secret, now the
+      // real owner session token -- see row-auth.js's getAccessToken().
+      window.RowAuth.getAccessToken().then((token) => fetch('/api/vision-talk?mode=history', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + ROW_APP_SECRET },
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
         body: JSON.stringify({ coachId: COACH_ID }),
-      }).then((res) => res.json()).then((data) => {
+      })).then((res) => res.json()).then((data) => {
         status.remove();
         var messages = window.MiniVisionChatLogic.historyToMessages(data && data.turns);
         messages.forEach((m) => this._appendMessage(m.role, m.text));
@@ -143,12 +144,14 @@
       var status = this._appendMessage('status', 'Thinking…');
       var controller = new AbortController();
       var timer = setTimeout(() => controller.abort(), TALK_TIMEOUT_MS);
-      fetch('/api/vision-talk', {
+      // 2026-08-12 audit fix: was a client-visible shared secret, now the
+      // real owner session token -- see row-auth.js's getAccessToken().
+      window.RowAuth.getAccessToken().then((token) => fetch('/api/vision-talk', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + ROW_APP_SECRET },
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
         body: JSON.stringify({ transcript: transcript, coachId: COACH_ID }),
         signal: controller.signal,
-      }).then((res) => res.json()).then((data) => {
+      })).then((res) => res.json()).then((data) => {
         clearTimeout(timer);
         status.remove();
         var reply = data && data.reply;

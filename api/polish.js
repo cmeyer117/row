@@ -1,7 +1,10 @@
 // Vercel serverless function — proxies the ✨ Polish request to Anthropic
 // so the API key stays server-side. Key lives in the Vercel env var
 // ANTHROPIC_API_KEY, never in client-shipped JS.
-import { verifyAppSecret } from './_lib/verify-app-secret.js';
+import { verifyOwner } from './_lib/verify-owner.js';
+
+const SUPABASE_URL = 'https://vikpcejlyxieguorwysf.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_EvWPtfW1FBW5Vf-H6w0yHw_PcXK4imv';
 
 export default async function handler(req, res) {
   try {
@@ -9,7 +12,9 @@ export default async function handler(req, res) {
       res.status(405).json({ error: 'Method not allowed' });
       return;
     }
-    if (!verifyAppSecret(req.headers['authorization'], process.env.ROW_APP_SECRET)) {
+    // 2026-08-12 audit fix: was a client-visible shared secret guarding a
+    // paid Anthropic call, now the real owner session token.
+    if (!(await verifyOwner(req.headers['authorization'], SUPABASE_URL, SUPABASE_ANON_KEY))) {
       res.status(401).json({ error: 'Unauthorized' });
       return;
     }

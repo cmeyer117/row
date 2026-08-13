@@ -83,5 +83,19 @@
       if (got.data.session) await supa.auth.signOut();
       return showLogin(supa);
     },
+    // Real session token for server-side verifyOwner() checks (paid-API
+    // proxies, etc.) -- replaces the old client-visible ROW_APP_SECRET
+    // shared-secret pattern, which anyone reading the page source could
+    // read and reuse to burn paid API calls (2026-08-12 audit finding).
+    // getSession() reads Supabase JS's own in-memory/localStorage cache, no
+    // network round trip on the common case. Returns null if the page
+    // somehow reaches this before authGate() resolved -- callers should
+    // treat that as "not authenticated" (server rejects with 401 either way).
+    getAccessToken: async function () {
+      if (!window.supabase) return null;
+      var supa = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+      var got = await supa.auth.getSession();
+      return (got.data.session && isOwner(got.data.session)) ? got.data.session.access_token : null;
+    },
   };
 })();
