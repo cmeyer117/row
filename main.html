@@ -1667,6 +1667,78 @@ body::after {
     window.RowVoice.speak(text);
   }
 
+  function isNonEmptyStr(s) { return typeof s === 'string' && s.trim().length > 0; }
+
+  // Drives a sequence of voice-first prompts within one phase. `steps` is
+  // an array of {key, prompt, get, set} -- get/set read and write the
+  // current value for that step (usually a session field). Each step:
+  // speaks the prompt, auto-opens the mic on speech completion, shows the
+  // transcript as an editable textarea before the step is considered
+  // answered, then advances. `onAllDone` fires once every step has a
+  // non-empty value. Renders into `container` (cleared and rebuilt each
+  // call, same pattern as the rest of this file's mlBuild* functions).
+  function mlVoiceSequence(container, phaseKey, steps, onAllDone) {
+    let idx = steps.findIndex(s => !isNonEmptyStr(s.get()));
+    if (idx === -1) idx = steps.length - 1; // all answered -- show the last one, editable
+    container.innerHTML = '';
+
+    const step = steps[idx];
+    const progress = el('div', 'ml-sub', 'Step ' + (idx + 1) + ' of ' + steps.length);
+    container.appendChild(progress);
+    container.appendChild(el('label', 'ml-prompt', step.prompt));
+
+    const ta = document.createElement('textarea');
+    ta.className = 'gm-input ml-textarea ml-voice-textarea';
+    ta.value = step.get() || '';
+    ta.setAttribute('aria-label', step.key);
+    ta.addEventListener('input', () => step.set(ta.value));
+    container.appendChild(ta);
+
+    const micBtn = el('button', 'ml-voice-mic-big', '🎤');
+    micBtn.type = 'button';
+    micBtn.setAttribute('aria-label', 'Answer by voice');
+    let controller = null;
+    function stopListening() {
+      if (controller) { controller.stop(); controller = null; }
+      micBtn.classList.remove('is-listening');
+    }
+    micBtn.addEventListener('click', () => {
+      if (controller) { stopListening(); return; }
+      if (!window.RowVoice) return;
+      micBtn.classList.add('is-listening');
+      controller = window.RowVoice.startCapture(
+        (transcript) => { stopListening(); ta.value = transcript; step.set(transcript); },
+        (msg) => { stopListening(); if (msg) progress.textContent = msg; }
+      );
+    });
+    container.appendChild(micBtn);
+    container.appendChild(el('div', 'ml-sub', 'or type instead — the field above always works'));
+
+    // Auto-open the mic once the prompt finishes speaking. Only for a
+    // freshly-empty step -- re-rendering an already-answered step (the
+    // user edited a prior answer and came back) must not yank focus into
+    // a mic capture they didn't ask for.
+    if (window.RowVoice && window.RowVoice.isSupported() && !isNonEmptyStr(step.get())) {
+      window.RowVoice.speak(step.prompt, () => { micBtn.click(); });
+    }
+
+    const nextWrap = el('div', 'ml-actions');
+    const err = el('div', 'ml-error');
+    const isLast = idx === steps.length - 1;
+    const allAnswered = steps.every(s => isNonEmptyStr(s.get()));
+    const nextBtn = el('button', 'gm-add', isLast && allAnswered ? 'Continue' : 'Next');
+    nextBtn.type = 'button';
+    nextBtn.addEventListener('click', () => {
+      stopListening();
+      if (!isNonEmptyStr(step.get())) { err.textContent = 'Answer this one before continuing.'; return; }
+      if (isLast && allAnswered) { onAllDone(); return; }
+      mlVoiceSequence(container, phaseKey, steps, onAllDone);
+    });
+    nextWrap.appendChild(nextBtn);
+    nextWrap.appendChild(err);
+    container.appendChild(nextWrap);
+  }
+
   function mlSessionKey() { return 'morning_launch:' + getActiveDateString(); }
   function mlOutcomesLoad() {
     const o = storeGet(ML_OUTCOMES_KEY);
