@@ -61,33 +61,73 @@ window.RowVoice = (function () {
   var ASR_MODEL = 'Xenova/whisper-tiny.en';
   var _asrPipelinePromise = null;
 
+  var ASR_TIMEOUT_MS = 15000; // local model load + inference budget before giving up and falling back
+
   // fix (2026-08-12): the CDN bundle is ESM-only (throws "Cannot use
   // 'import.meta' outside a module" if loaded as a classic <script src>,
   // confirmed live) -- dynamic import() works from any script context,
   // classic or module, with no HTML <script type=module> tag needed
-  // anywhere. Cached: a rejected promise (device genuinely can't run it)
-  // stays rejected for the rest of the page session rather than retrying a
-  // slow doomed load on every subsequent tap -- a page reload retries.
+  // anywhere.
   function getAsrPipeline() {
     if (_asrPipelinePromise) return _asrPipelinePromise;
-    _asrPipelinePromise = import(TRANSFORMERS_CDN).then(function (mod) {
+    var p = import(TRANSFORMERS_CDN).then(function (mod) {
       return mod.pipeline('automatic-speech-recognition', ASR_MODEL);
     });
+    // fix (2026-08-12, caught in Codex review): a rejected promise used to
+    // stay cached for the rest of the page session, so one transient
+    // CDN/network blip on the very first tap permanently reverted every
+    // later tap to paid OpenAI -- the exact cost outcome this feature
+    // exists to prevent. Clear the cache on rejection so the next tap gets
+    // a genuinely fresh attempt instead of being stuck on the first
+    // failure for the whole session.
+    p.catch(function () { _asrPipelinePromise = null; });
+    _asrPipelinePromise = p;
     return _asrPipelinePromise;
   }
 
+  // Races a promise against ASR_TIMEOUT_MS -- without this, a stalled model
+  // download or hung inference call never resolves OR rejects, so
+  // transcribeLocally() never falls back and the caller's onTranscript/
+  // onError never fires (caught in Codex review: a stuck mic with no
+  // recovery path).
+  function withAsrTimeout(promise) {
+    return new Promise(function (resolve, reject) {
+      var timer = setTimeout(function () { reject(new Error('Local transcription timed out')); }, ASR_TIMEOUT_MS);
+      promise.then(function (v) { clearTimeout(timer); resolve(v); }, function (e) { clearTimeout(timer); reject(e); });
+    });
+  }
+
+  // fix (2026-08-12, caught in Codex review + directly reproduced during
+  // testing: transcribing 1s of raw silence returned {"text":" you"}):
+  // local Whisper has no server-side no-speech/confidence filtering the
+  // OpenAI path already has (jarvis/src/api/routes/stt.ts's isHallucination
+  // check) -- a stray mic tap in a quiet gym could otherwise send a real
+  // single-filler-word "transcript" straight to Vision as if Carl said it.
+  // Same backstop word list as stt.ts's fallback filter (not the primary
+  // no_speech_prob signal, which this pipeline's default output doesn't
+  // expose) -- catches the exact reproduced case, not every possible one.
+  function isLikelyHallucination(text) {
+    var words = text.toLowerCase().replace(/[.!?,]/g, '').trim().split(/\s+/).filter(Boolean);
+    return words.length === 1 && /^(bye|thanks?|ok|okay|um|uh|hi|hello|you|the|a)$/.test(words[0]);
+  }
+
   // Transcribes locally, zero cost. Resolves to the transcript string, or
-  // null on any failure (model load failed, inference threw, empty result)
-  // -- callers fall back to transcribeViaOpenAI() on null, never throw.
+  // null on any failure (model load failed, inference threw, timed out,
+  // empty/hallucinated result) -- callers fall back to
+  // transcribeViaOpenAI() on null, never throw.
   function transcribeLocally(blob) {
-    return getAsrPipeline().then(function (transcriber) {
+    return withAsrTimeout(getAsrPipeline().then(function (transcriber) {
       var url = URL.createObjectURL(blob);
+      // fix (2026-08-12, caught in Codex review): revoke was only reachable
+      // on the success path -- a rejected transcriber() call (real
+      // inference error, not just a bad result) leaked the blob URL for
+      // the rest of the page's life. finally() runs on both paths.
       return transcriber(url).then(function (result) {
-        URL.revokeObjectURL(url);
         var text = result && result.text ? result.text.trim() : '';
-        return text || null;
-      });
-    }).catch(function () { return null; });
+        if (!text || isLikelyHallucination(text)) return null;
+        return text;
+      }).finally(function () { URL.revokeObjectURL(url); });
+    })).catch(function () { return null; });
   }
 
   // The exact OpenAI STT call that used to live inline in recorder.onstop,
