@@ -2114,6 +2114,7 @@ body::after {
       inp.type = 'text'; inp.className = 'gm-input'; inp.placeholder = 'New needle mover text'; inp.value = m.newText || '';
       inp.addEventListener('input', () => { m.newText = inp.value; mlSessionSaveQuiet(session); });
       box.appendChild(inp);
+      if (window.RowVoice) window.RowVoice.attachMic(inp);
     }
 
     const outSel = document.createElement('select');
@@ -2131,11 +2132,13 @@ body::after {
     dod.type = 'text'; dod.className = 'gm-input'; dod.placeholder = 'Definition of done'; dod.value = m.definitionOfDone || '';
     dod.addEventListener('input', () => { m.definitionOfDone = dod.value; mlSessionSaveQuiet(session); });
     box.appendChild(dod);
+    if (window.RowVoice) window.RowVoice.attachMic(dod);
 
     const fa = document.createElement('input');
     fa.type = 'text'; fa.className = 'gm-input'; fa.placeholder = 'First physical action'; fa.value = m.firstAction || '';
     fa.addEventListener('input', () => { m.firstAction = fa.value; mlSessionSaveQuiet(session); });
     box.appendChild(fa);
+    if (window.RowVoice) window.RowVoice.attachMic(fa);
 
     const est = document.createElement('input');
     est.type = 'number'; est.min = '1'; est.className = 'gm-input'; est.placeholder = 'Estimated minutes'; est.value = m.estimatedMinutes || '';
