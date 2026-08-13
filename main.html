@@ -1744,13 +1744,20 @@ body::after {
     const nextWrap = el('div', 'ml-actions');
     const err = el('div', 'ml-error');
     const isLast = idx === steps.length - 1;
+    // Label is a render-time approximation (fine for a label) -- the actual
+    // advance-vs-rerender decision in the click handler below recomputes
+    // this live, since typing into the field doesn't itself trigger a
+    // re-render (ta's input listener only quiet-saves). Using this same
+    // stale const for the decision meant filling the last field and
+    // clicking took two clicks instead of one -- caught live testing on
+    // real deployed data, not a hypothetical.
     const allAnswered = steps.every(s => isNonEmptyStr(s.get()));
     const nextBtn = el('button', 'gm-add', isLast && allAnswered ? 'Continue' : 'Next');
     nextBtn.type = 'button';
     nextBtn.addEventListener('click', () => {
       stopListening();
       if (!isNonEmptyStr(step.get())) { err.textContent = 'Answer this one before continuing.'; return; }
-      if (isLast && allAnswered) { onAllDone(); return; }
+      if (isLast && steps.every(s => isNonEmptyStr(s.get()))) { onAllDone(); return; }
       mlVoiceSequence(container, phaseKey, steps, onAllDone);
     });
     nextWrap.appendChild(nextBtn);
