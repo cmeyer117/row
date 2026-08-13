@@ -65,6 +65,27 @@ async function handleTalk(req, res, rawBody) {
   }
 }
 
+async function handleCapture(req, res, rawBody) {
+  let parsed;
+  try { parsed = JSON.parse(rawBody.toString('utf8') || '{}'); } catch { parsed = {}; }
+  const { text } = parsed;
+  if (!text || typeof text !== 'string' || !text.trim()) {
+    res.status(400).json({ error: 'Missing text' });
+    return;
+  }
+  try {
+    const upstream = await fetch(VISION_URL + '/capture', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Cookie': sessionCookie(process.env.VISION_SESSION_SECRET) },
+      body: JSON.stringify({ text: text.trim(), source: 'voice' }),
+    });
+    const data = await upstream.json();
+    res.status(upstream.status).json(data);
+  } catch (e) {
+    res.status(502).json({ error: 'Could not reach Vision' });
+  }
+}
+
 async function handleTts(req, res, rawBody) {
   let parsed;
   try { parsed = JSON.parse(rawBody.toString('utf8') || '{}'); } catch { parsed = {}; }
@@ -167,5 +188,6 @@ export default async function handler(req, res) {
   if (mode === 'tts') return handleTts(req, res, rawBody);
   if (mode === 'stt') return handleStt(req, res, rawBody);
   if (mode === 'history') return handleHistory(req, res, rawBody);
+  if (mode === 'capture') return handleCapture(req, res, rawBody);
   return handleTalk(req, res, rawBody);
 }
