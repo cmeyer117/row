@@ -2369,6 +2369,9 @@ body::after {
     const proj = ML.buildEveningShutdown(session, getGoals(todayKey()));
     const wrap = el('div', 'ml-evening');
     wrap.appendChild(el('div', 'ml-phase-title', 'Evening Shutdown'));
+    if (session.spokenCommitment) {
+      wrap.appendChild(el('div', 'ml-sub', 'This morning you said: "' + session.spokenCommitment + '"'));
+    }
     mlAppendRoutineChecklist(wrap, 'evening');
 
     if (proj.source === 'launch') {
