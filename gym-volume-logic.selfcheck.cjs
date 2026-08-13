@@ -8,7 +8,7 @@ const path = require('path');
 const sandbox = { window: {} };
 vm.createContext(sandbox);
 vm.runInContext(fs.readFileSync(path.join(__dirname, 'gym-volume-logic.js'), 'utf8'), sandbox);
-const { mondayOfDate, weeklyVolumeByDay, weeklySetsByMuscle, classifyMuscleVolume } = sandbox.window.GymVolumeLogic;
+const { mondayOfDate, weeklyVolumeByDay, weeklySetsByMuscle, classifyMuscleVolume, volumeAdvisory } = sandbox.window.GymVolumeLogic;
 
 function assertEqual(actual, expected, label) {
   if (actual !== expected) {
@@ -119,5 +119,21 @@ assertEqual(classifyMuscleVolume('Chest', 15).label, 'mav', 'classifyMuscleVolum
 assertEqual(classifyMuscleVolume('Chest', 25).label, 'mrv', 'classifyMuscleVolume: 25 sets for Chest (MRV 22) is at/above');
 assertEqual(classifyMuscleVolume('Chest', 8).mev, 8, 'classifyMuscleVolume returns the muscle\'s MEV value');
 assertEqual(classifyMuscleVolume('Chest', 8).mrv, 22, 'classifyMuscleVolume returns the muscle\'s MRV value');
+
+// volumeAdvisory — under MEV always suggests adding a set, regardless of stall.
+assertEqual(volumeAdvisory(classifyMuscleVolume('Chest', 3), false).suggestion, 'add_set', 'volumeAdvisory: under MEV suggests add_set even when not stalled');
+
+// volumeAdvisory — in MAV range, not stalled: nothing to say.
+assertEqual(volumeAdvisory(classifyMuscleVolume('Chest', 15), false), null, 'volumeAdvisory: in MAV range and not stalled returns null');
+
+// volumeAdvisory — in MAV range, but stalled: suggests adding a set (RP-style, not an automatic deload).
+assertEqual(volumeAdvisory(classifyMuscleVolume('Chest', 15), true).suggestion, 'add_set', 'volumeAdvisory: stalled but under MRV suggests add_set');
+
+// volumeAdvisory — at/above MRV: suggests pulling back, regardless of stall.
+assertEqual(volumeAdvisory(classifyMuscleVolume('Chest', 25), false).suggestion, 'pull_back', 'volumeAdvisory: at/above MRV suggests pull_back');
+assertEqual(volumeAdvisory(classifyMuscleVolume('Chest', 25), true).suggestion, 'pull_back', 'volumeAdvisory: at/above MRV suggests pull_back even when also stalled');
+
+// volumeAdvisory — unknown muscle (null band) returns null, doesn't crash.
+assertEqual(volumeAdvisory(null, true), null, 'volumeAdvisory: null band (unknown muscle) returns null');
 
 console.log('gym-volume-logic.selfcheck.cjs: all assertions passed');

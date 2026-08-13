@@ -46,4 +46,18 @@ assertTrue(
   'RIR/stall detail from reason survives into the formatted line'
 );
 
+// --- volume advisory, when present, appends to the formatted line ---
+const rxWithAdvisory = {
+  type: 'down', weight: 166.5, reps: 8, tag: 'Deload',
+  reason: 'Stuck at 185lb for 3 sessions. Drop 10%, reset, build back cleaner.',
+  volumeAdvisory: { suggestion: 'add_set', reason: 'Stalled on load, but still under MRV (22 sets/wk) for this muscle -- consider adding a set before assuming a deload is the only fix.' },
+};
+const withAdvisory = L.formatRxComparison(rxWithAdvisory, '166.5lb×8, 166.5lb×7');
+assertTrue(withAdvisory.includes('Volume note:'), 'volume advisory reason is appended when present');
+assertTrue(withAdvisory.includes('under MRV'), 'volume advisory text itself survives into the formatted line');
+
+// --- no volume advisory: no "Volume note:" text appended ---
+const rxNoAdvisory = { type: 'up', weight: 185, reps: 8, tag: 'Add weight', reason: 'You hit 8 reps.' };
+assertTrue(!L.formatRxComparison(rxNoAdvisory, '185lb×8').includes('Volume note:'), 'no volume advisory means no "Volume note:" text');
+
 console.log('gym-debrief-logic.selfcheck.cjs: all assertions passed');

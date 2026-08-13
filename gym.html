@@ -3484,7 +3484,30 @@ img, video, canvas, svg { max-width: 100%; }
     } else {
       result = { type: 'hold', weight: weight, reps: repMin, tag: 'Repeat', reason: reps + ' reps short of ' + repMin + '-' + upgradeAt + '. Repeat ' + weight + unit() + ' until you hit ' + repMin + '+ clean.', stuck: stuck };
     }
-    return applyCheckinOverride(result, last, ex, stuck);
+    // Real stall per THIS function's own decision -- not just "stuck >=
+    // stuckThreshold" alone, which also climbs during a completely normal
+    // rep-accumulation phase (same weight, climbing reps toward upgradeAt)
+    // and would misfire here. Computed from `result` (pre-checkin-override)
+    // so a pain-driven deload doesn't count as a training stall -- more
+    // volume is bad advice when the reason is pain, not a plateau.
+    const stalled = result.type === 'down' || result.tag === 'Reassess';
+    const finalResult = applyCheckinOverride(result, last, ex, stuck);
+    // Advisory only -- does not change type/weight/reps above. bw exercises
+    // have no formal stall concept in this function (no stuckThreshold
+    // check), so skipped here; they're typically accessories/finishers
+    // anyway, not primary muscle-volume targets.
+    // ponytail: weeklySetsByMuscle() recomputes across all logs on every
+    // getRx() call rather than being computed once per render pass -- fine
+    // for a single-user app's data size, revisit if Rx-card rendering ever
+    // shows up slow.
+    if (ex.muscle && window.GymVolumeLogic) {
+      const allEx = (state.exercises || []).concat(getAdhocExercises());
+      const muscleCounts = window.GymVolumeLogic.weeklySetsByMuscle(allEx, state.logs || {});
+      const band = window.GymVolumeLogic.classifyMuscleVolume(ex.muscle, muscleCounts[ex.muscle] || 0);
+      const advisory = window.GymVolumeLogic.volumeAdvisory(band, stalled);
+      if (advisory) finalResult.volumeAdvisory = advisory;
+    }
+    return finalResult;
   }
 
   // Looks up the check-in submitted on the same day as `last` (the log this

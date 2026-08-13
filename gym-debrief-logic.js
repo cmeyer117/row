@@ -16,7 +16,9 @@
   // ("Deload", "Reassess") would silently drop that detail.
   function formatRxComparison(rx, setsStr) {
     if (!rx) return setsStr + ' (first logged session, no Rx to compare)';
-    return 'Rx: ' + rx.reason + ' Actual: ' + setsStr;
+    var line = 'Rx: ' + rx.reason + ' Actual: ' + setsStr;
+    if (rx.volumeAdvisory) line += ' Volume note: ' + rx.volumeAdvisory.reason;
+    return line;
   }
 
   var api = { formatRxComparison: formatRxComparison };

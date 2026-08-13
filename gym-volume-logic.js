@@ -109,11 +109,33 @@
     return { label: label, mev: band.mev, mavLow: band.mavLow, mavHigh: band.mavHigh, mrv: band.mrv };
   }
 
+  // Turns a classifyMuscleVolume() band + whether getRx() detected a stall
+  // for this exercise into a prescriptive suggestion. Advisory only -- the
+  // caller (getRx()) attaches this alongside its existing load-based
+  // recommendation, never replaces it. 2026-08-13: closes the gap Grok's
+  // training-logic audit flagged -- getRx() was load-only with no volume
+  // lever, even though these bands/counts already existed for the Progress
+  // tab's dashboard and were never consulted prescriptively.
+  function volumeAdvisory(band, stalled) {
+    if (!band) return null;
+    if (band.label === 'under') {
+      return { suggestion: 'add_set', reason: 'Under MEV (' + band.mev + ' sets/wk) for this muscle -- there\'s real room to add volume here before load progression is even the limiting factor.' };
+    }
+    if (stalled && band.label === 'mav') {
+      return { suggestion: 'add_set', reason: 'Stalled on load, but still under MRV (' + band.mrv + ' sets/wk) for this muscle -- a plateau here is often a volume problem, not purely a load problem. Consider adding a set before assuming a deload is the only fix.' };
+    }
+    if (band.label === 'mrv') {
+      return { suggestion: 'pull_back', reason: 'At or above MRV (' + band.mrv + ' sets/wk) for this muscle -- more volume here is more likely to add fatigue than drive further growth.' };
+    }
+    return null;
+  }
+
   var api = {
     mondayOfDate: mondayOfDate,
     weeklyVolumeByDay: weeklyVolumeByDay,
     weeklySetsByMuscle: weeklySetsByMuscle,
     classifyMuscleVolume: classifyMuscleVolume,
+    volumeAdvisory: volumeAdvisory,
     MUSCLE_BANDS: MUSCLE_BANDS
   };
   if (typeof window !== 'undefined') window.GymVolumeLogic = api;
