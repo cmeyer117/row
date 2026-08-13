@@ -35,6 +35,8 @@
     '.sendBtn { background: #6ee7b7; color: #0a0a0b; }',
     '.micBtn { background: rgba(255,255,255,0.10); color: #f5f5f5; }',
     '.micBtn.listening { background: #ff4444; color: #fff; }',
+    '.captureBtn { background: rgba(255,255,255,0.10); color: #f5f5f5; }',
+    '.captureBtn.listening { background: #ff4444; color: #fff; }',
     'button:disabled, input:disabled { opacity: 0.5; cursor: default; }',
   ].join('\n');
 
@@ -44,6 +46,7 @@
     '  <div class="messages"></div>',
     '  <div class="inputRow">',
     '    <button class="micBtn" type="button" title="Talk to Vision" hidden>\u{1F3A4}</button>',
+    '    <button class="captureBtn" type="button" title="Quick capture (no reply)" hidden>\u{1F4E5}</button>',
     '    <input type="text" placeholder="Ask Vision…" />',
     '    <button class="sendBtn" type="button" title="Send">➤</button>',
     '  </div>',
@@ -65,6 +68,7 @@
       this._input = root.querySelector('.inputRow input');
       this._sendBtn = root.querySelector('.sendBtn');
       this._micBtn = root.querySelector('.micBtn');
+      this._captureBtn = root.querySelector('.captureBtn');
 
       this._historyLoaded = false;
       this._pending = false;
@@ -77,6 +81,8 @@
       if (window.RowVoice && window.RowVoice.isSupported()) {
         this._micBtn.hidden = false;
         this._micBtn.addEventListener('click', () => this._toggleMic());
+        this._captureBtn.hidden = false;
+        this._captureBtn.addEventListener('click', () => this._toggleCapture());
       }
 
       this._onPageHide = () => this._stopVoice();
@@ -196,9 +202,46 @@
       }, { sttPrompt: sttPrompt });
     }
 
+    _sendCapture(transcript) {
+      var status = this._appendMessage('status', 'Captured ✓');
+      setTimeout(() => status.remove(), 2000);
+      // 2026-08-12 audit fix pattern (matches _loadHistory/_send): real
+      // owner session token via row-auth.js, not a client-visible secret.
+      window.RowAuth.getAccessToken().then((token) => fetch('/api/vision-talk?mode=capture', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify({ text: transcript }),
+      })).then((res) => {
+        if (!res.ok) this._appendMessage('status', 'Capture failed — try again');
+      }).catch(() => {
+        this._appendMessage('status', 'Capture failed — try again');
+      });
+    }
+
+    _toggleCapture() {
+      if (this._captureController) { this._stopCapture(); return; }
+      this._captureBtn.classList.add('listening');
+      var sttPrompt = (window.__gym && window.__gym.getSttPrompt) ? window.__gym.getSttPrompt() : '';
+      this._captureController = window.RowVoice.startCapture((transcript) => {
+        this._captureController = null;
+        this._captureBtn.classList.remove('listening');
+        this._sendCapture(transcript);
+      }, (msg) => {
+        this._captureController = null;
+        this._captureBtn.classList.remove('listening');
+        this._appendMessage('status', msg);
+      }, { sttPrompt: sttPrompt });
+    }
+
+    _stopCapture() {
+      if (this._captureController) { this._captureController.stop(); this._captureController = null; }
+      if (this._captureBtn) this._captureBtn.classList.remove('listening');
+    }
+
     _stopVoice() {
       if (this._voiceController) { this._voiceController.stop(); this._voiceController = null; }
       if (this._micBtn) this._micBtn.classList.remove('listening');
+      this._stopCapture();
     }
   }
 
