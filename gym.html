@@ -3391,6 +3391,9 @@ img, video, canvas, svg { max-width: 100%; }
     } catch (e) { return null; }
   }
   function roundToStep(v, s) { return Math.round(v / s) * s; }
+  // Deload percentage/rounding logic lives in gym-rx-deload-logic.js
+  // (window.GymRxDeloadLogic.deloadWeight) -- see that file for the
+  // 2026-08-13 Codex+Grok audit rationale.
   function getFiltered() {
     const program = state.exercises.filter(e =>
       (e.gym === state.filterGym || e.gym === 'both') && e.day === state.filterDay);
@@ -3470,9 +3473,9 @@ img, video, canvas, svg { max-width: 100%; }
       if (stuckAvgRir != null && stuckAvgRir >= 3) {
         result = { type: 'hold', weight: weight, reps: repMin, tag: 'Reassess', reason: 'Stuck at ' + weight + unit() + ' for ' + stuck + ' sessions, but you\'re logging RIR ' + stuckAvgRir.toFixed(1) + ' — not near failure. Before deloading, try genuinely pushing the last set, or check form/rep range.', stuck: stuck };
       } else {
-        const dl = roundToStep(weight * 0.9, step);
+        const { weight: dl, pct } = window.GymRxDeloadLogic.deloadWeight(weight, step, repMin);
         const rirNote = stuckAvgRir != null ? ', grinding to RIR ' + stuckAvgRir.toFixed(1) : '';
-        result = { type: 'down', weight: dl, reps: repMax, tag: 'Deload', reason: 'Stuck at ' + weight + unit() + ' for ' + stuck + ' sessions' + rirNote + '. Drop 10%, reset, build back cleaner.', stuck: stuck };
+        result = { type: 'down', weight: dl, reps: repMax, tag: 'Deload', reason: 'Stuck at ' + weight + unit() + ' for ' + stuck + ' sessions' + rirNote + '. Drop ' + pct + '%, reset, build back cleaner.', stuck: stuck };
       }
     } else if (reps >= upgradeAt) {
       result = { type: 'up', weight: weight + step, reps: repMin, tag: 'Add weight', reason: 'You hit ' + reps + ' reps — time to add ' + step + unit() + '. Expect ' + repMin + '-' + (repMin + 1) + ' next session.', stuck: stuck };
@@ -3498,8 +3501,8 @@ img, video, canvas, svg { max-width: 100%; }
       if (ex.bw) {
         return { type: 'hold', weight: 0, reps: repMin, tag: 'Pain — repeat', reason: 'Logged high pain last session. Repeat at ' + repMin + ' reps, don\'t push.', bw: true, stuck: stuck };
       }
-      const dl = roundToStep(last.weight * 0.9, step);
-      return { type: 'down', weight: dl, reps: repMax, tag: 'Pain — deload', reason: 'Logged high pain last session. Drop 10%, reset, and reassess.', stuck: stuck };
+      const { weight: dl, pct } = window.GymRxDeloadLogic.deloadWeight(last.weight, step, repMin);
+      return { type: 'down', weight: dl, reps: repMax, tag: 'Pain — deload', reason: 'Logged high pain last session. Drop ' + pct + '%, reset, and reassess.', stuck: stuck };
     }
     if (checkin.recovery === 'low' && result.type === 'up') {
       if (ex.bw) {
@@ -6495,6 +6498,7 @@ img, video, canvas, svg { max-width: 100%; }
 <script src="gym-weight-photos.js"></script>
 <script src="gym-workout-events.js"></script>
 <script src="gym-rx-phase-logic.js"></script>
+<script src="gym-rx-deload-logic.js"></script>
 <script src="gym-season-logic.js"></script>
 <script src="gym-volume-logic.js"></script>
 <script src="plate-calc.js"></script>
