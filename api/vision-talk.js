@@ -101,10 +101,23 @@ async function handleStt(req, res, rawBody) {
   }
 }
 
+// Codex-review catch (2026-08-12): coachId used to go straight from the
+// request body into the outbound URL path with no check -- unlike
+// handleTalk(), which sends coachId in the JSON body, not the path. Vision's
+// own /coach/:coachId/history route validates it server-side, but this
+// proxy shouldn't rely on that alone. mini-vision-chat.js only ever sends
+// 'gym' (the only coach Row has a UI for), so an allowlist of exactly that
+// costs nothing today and closes the path-injection surface outright.
+const ALLOWED_HISTORY_COACH_IDS = ['gym'];
+
 async function handleHistory(req, res, rawBody) {
   let parsed;
   try { parsed = JSON.parse(rawBody.toString('utf8') || '{}'); } catch { parsed = {}; }
   const coachId = typeof parsed.coachId === 'string' ? parsed.coachId : 'gym';
+  if (!ALLOWED_HISTORY_COACH_IDS.includes(coachId)) {
+    res.status(400).json({ error: 'unrecognized coachId' });
+    return;
+  }
   try {
     const upstream = await fetch(`${VISION_URL}/coach/${coachId}/history`, {
       method: 'GET',

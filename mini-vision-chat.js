@@ -168,6 +168,14 @@
     _toggleMic() {
       if (this._voiceController) { this._stopVoice(); return; }
       this._micBtn.classList.add('listening');
+      // Codex-review catch (2026-08-12): a text send that completes while a
+      // voice capture is still in flight set `_pending`, which made the
+      // eventual transcript's own `_send()` call silently no-op -- the
+      // captured speech vanished with no feedback. Disabling text input/send
+      // for the duration of a capture (mic stays enabled so tap-to-stop still
+      // works) makes the two paths mutually exclusive instead of racing.
+      this._input.disabled = true;
+      this._sendBtn.disabled = true;
       // Feeds gym.html's real exercise vocabulary into STT when available
       // (window.__gym.getSttPrompt, added by gym.html itself) -- undefined
       // on the other 4 pages, which have no such vocabulary to hint with.
@@ -179,6 +187,8 @@
       }, (msg) => {
         this._voiceController = null;
         this._micBtn.classList.remove('listening');
+        this._input.disabled = false;
+        this._sendBtn.disabled = false;
         this._appendMessage('status', msg);
       }, { sttPrompt: sttPrompt });
     }
