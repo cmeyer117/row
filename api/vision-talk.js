@@ -26,9 +26,21 @@ function sessionCookie(secret) {
   return 'vision_session=' + payload + '.' + sig;
 }
 
+// 2026-08-12 audit fix: the raw body was read with no size cap -- Vercel's
+// own platform ceiling (4.5MB) bounds worst-case memory today, but real STT
+// audio (30s max recording, voice-helpers.js's own MAX_RECORD_MS) never
+// gets close to that, so a smaller explicit cap costs nothing for real
+// traffic and closes the gap without depending on the platform limit alone.
+const MAX_BODY_BYTES = 2 * 1024 * 1024; // 2MB
+
 async function readRawBody(req) {
   const chunks = [];
-  for await (const chunk of req) chunks.push(chunk);
+  let total = 0;
+  for await (const chunk of req) {
+    total += chunk.length;
+    if (total > MAX_BODY_BYTES) throw new Error('Request body too large');
+    chunks.push(chunk);
+  }
   return Buffer.concat(chunks);
 }
 
@@ -144,7 +156,13 @@ export default async function handler(req, res) {
     res.status(401).json({ error: 'Unauthorized' });
     return;
   }
-  const rawBody = await readRawBody(req);
+  let rawBody;
+  try {
+    rawBody = await readRawBody(req);
+  } catch (e) {
+    res.status(413).json({ error: 'Request body too large' });
+    return;
+  }
   const mode = (req.query && req.query.mode) || 'talk';
   if (mode === 'tts') return handleTts(req, res, rawBody);
   if (mode === 'stt') return handleStt(req, res, rawBody);
