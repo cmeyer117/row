@@ -23,6 +23,28 @@
 
   function markAuthed() { try { sessionStorage.setItem(AUTH_KEY, '1'); } catch (e) {} }
 
+  // getSession() isn't the cheap localStorage read it looks like -- when the
+  // cached token is expired or near expiry, it makes a real network call to
+  // refresh it. Under weak signal that call can hang well past any caller's
+  // own timeout, since callers only ever wrap their *fetch* in an
+  // AbortController, not this. Bound it here once, at the source, instead of
+  // in every caller (2026-08-13: root cause of "Could not reach Jarvis" on
+  // gym.html's debrief -- the request never even left the browser, Vercel
+  // logs showed zero invocations).
+  function withTimeout(promise, ms, fallback) {
+    return new Promise(function (resolve) {
+      var settled = false;
+      var timer = setTimeout(function () {
+        if (!settled) { settled = true; resolve(fallback); }
+      }, ms);
+      promise.then(function (v) {
+        if (!settled) { settled = true; clearTimeout(timer); resolve(v); }
+      }, function () {
+        if (!settled) { settled = true; clearTimeout(timer); resolve(fallback); }
+      });
+    });
+  }
+
   function appendWhenReady(node) {
     if (document.body) { document.body.appendChild(node); }
     else { document.addEventListener('DOMContentLoaded', function () { document.body.appendChild(node); }, { once: true }); }
@@ -94,7 +116,8 @@
     getAccessToken: async function () {
       if (!window.supabase) return null;
       var supa = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-      var got = await supa.auth.getSession();
+      var got = await withTimeout(supa.auth.getSession(), 6000, null);
+      if (!got) return null;
       return (got.data.session && isOwner(got.data.session)) ? got.data.session.access_token : null;
     },
   };

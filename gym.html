@@ -5576,7 +5576,7 @@ img, video, canvas, svg { max-width: 100%; }
       body.textContent = (await askJarvis(message)) || 'No response.';
     } catch (e) {
       body.textContent = e && e.status === 401
-        ? 'Jarvis rejected the request (401 — session secret mismatch). This is a config issue, not a signal issue: check JARVIS_SESSION_SECRET on the row Vercel project.'
+        ? 'Jarvis rejected the request (401 — not signed in, or your session expired). Try signing in again.'
         : e && e.status
         ? 'Jarvis returned an error (' + e.status + (e.message ? ': ' + e.message : '') + ').'
         : 'Could not reach Jarvis. Signal may be weak — try again.';
