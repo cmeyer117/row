@@ -5555,14 +5555,23 @@ img, video, canvas, svg { max-width: 100%; }
 
     const sessionLines = [];
     exercises.forEach(function(ex) {
-      const sets = (allLogs[ex.id] || []).filter(function(l) { return l.date.slice(0,10) === today; });
+      const allExLogs = allLogs[ex.id] || [];
+      const sets = allExLogs.filter(function(l) { return l.date.slice(0,10) === today; });
       if (!sets.length) return;
       const setsStr = sets.map(function(l) {
         if (l.plates != null) return l.plates + 'pl×' + l.reps;
         if (l.plateConfig) return Object.entries(l.plateConfig).map(function(kv) { return kv[1] + '×' + kv[0]; }).join('+') + '×' + l.reps;
         return l.weight + u + '×' + l.reps;
       }).join(', ');
-      sessionLines.push(ex.name + ': ' + setsStr);
+      // priorLogs excludes today's own sets so the Rx reflects what was
+      // actually prescribed going INTO today, not a same-day echo of what
+      // was just logged.
+      const priorLogs = allExLogs.filter(function(l) { return l.date.slice(0,10) < today; });
+      const rx = getRx(ex, priorLogs);
+      const line = window.GymDebriefLogic
+        ? window.GymDebriefLogic.formatRxComparison(rx, setsStr)
+        : setsStr;
+      sessionLines.push(ex.name + ': ' + line);
     });
 
     if (!sessionLines.length) {
@@ -5573,7 +5582,7 @@ img, video, canvas, svg { max-width: 100%; }
     const tag = (state.sessionTags || {})[today];
     const dayName = (state.days.find(function(d) { return d.id === state.filterDay; }) || {}).name;
     const label = tag || dayName || 'workout';
-    const message = 'Give me a 3-4 sentence post-workout debrief for today\'s ' + label + ' session. Be specific about what I hit, what to push next time, and any flags:\n\n' + sessionLines.join('\n');
+    const message = 'Give me a post-workout debrief for today\'s ' + label + ' session — planned (Rx) vs. actual per exercise below. Weigh recovery context (sleep, macro adherence) from your own data before diagnosing anything as pure training execution — don\'t default to generic "check your sleep" advice if you already have the numbers. Also flag anything notable in today\'s actual numbers themselves, not just deviation from the Rx — the Rx was set before today\'s session and can\'t predict something new. End with exactly ONE specific variable to change next session, not a list: say whether it\'s training (volume/weight/rest) or recovery (sleep/nutrition), and be concrete.\n\n' + sessionLines.join('\n');
 
     try {
       body.textContent = (await askJarvis(message)) || 'No response.';
@@ -6499,6 +6508,7 @@ img, video, canvas, svg { max-width: 100%; }
 <script src="gym-workout-events.js"></script>
 <script src="gym-rx-phase-logic.js"></script>
 <script src="gym-rx-deload-logic.js"></script>
+<script src="gym-debrief-logic.js"></script>
 <script src="gym-season-logic.js"></script>
 <script src="gym-volume-logic.js"></script>
 <script src="plate-calc.js"></script>
