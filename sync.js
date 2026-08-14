@@ -18,6 +18,13 @@
     if (SUPABASE_URL.indexOf('PASTE-') === 0 || SUPABASE_KEY.indexOf('PASTE-') === 0) return;
 
     let supa = null, pushTimer = null, suppressSync = false, lastSyncedJson = null;
+    // Unload handlers (beforeunload/pagehide) can't reliably await an async
+    // getSession() call before the page tears down, so the owner's access
+    // token is cached here on session init/refresh and read synchronously
+    // by flushOnUnload(). Falling back to the anon publishable key here is
+    // what silently broke unload writes after the 2026-08-11 RLS lockdown
+    // made app_state owner-only -- see row-audit-2026-08-14.md P1 #1.
+    let cachedAccessToken = null;
     // Nothing may push until the initial fetch has round-tripped successfully
     // at least once. Without this, a page that never got a chance to pull
     // real data (slow network, tab closed early) could still push its
@@ -136,7 +143,7 @@
     }
     function schedulePush() { clearTimeout(pushTimer); pushTimer = setTimeout(pushNow, 250); }
     function flushOnUnload() {
-      if (!syncReady) return;
+      if (!syncReady || !cachedAccessToken) return;
       const state = collect();
       if (isTrivial(state)) return;
       const json = JSON.stringify(state);
@@ -146,7 +153,7 @@
           method: 'POST',
           headers: {
             'apikey': SUPABASE_KEY,
-            'Authorization': 'Bearer ' + SUPABASE_KEY,
+            'Authorization': 'Bearer ' + cachedAccessToken,
             'Content-Type': 'application/json',
             'Prefer': 'resolution=merge-duplicates',
           },
@@ -158,6 +165,16 @@
     }
     (async function init() {
       supa = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+      async function refreshToken() {
+        try {
+          const { data } = await supa.auth.getSession();
+          cachedAccessToken = (data && data.session) ? data.session.access_token : null;
+        } catch (e) { cachedAccessToken = null; }
+      }
+      await refreshToken();
+      supa.auth.onAuthStateChange(function (_event, session) {
+        cachedAccessToken = session ? session.access_token : null;
+      });
       try {
         const { data, error } = await supa.from('app_state').select('data').eq('key', appKey).maybeSingle();
         if (!error) {
