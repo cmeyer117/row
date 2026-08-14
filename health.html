@@ -747,6 +747,7 @@ main {
       <button class="hm-tab-btn" data-hm-tab="labs">Labs</button>
       <button class="hm-tab-btn" data-hm-tab="measurements">Measurements</button>
       <button class="hm-tab-btn" data-hm-tab="sleep">Sleep</button>
+      <button class="hm-tab-btn" data-hm-tab="cardio">Cardio</button>
       <button class="hm-tab-btn" data-hm-tab="recomp">Recomp</button>
     </div>
 
@@ -837,6 +838,24 @@ main {
         <div id="hmSleepChart" class="hm-chart"></div>
       </div>
       <div id="hmSleepList" class="hm-list"></div>
+    </div>
+
+    <div id="hmView-cardio" class="hm-view" hidden>
+      <div class="hm-form-row">
+        <input id="hmCardioDate" type="date" class="stack-input" />
+        <input id="hmCardioType" type="text" placeholder="Type (e.g. Incline Walk)" class="stack-input" />
+        <input id="hmCardioDuration" type="number" step="1" placeholder="Minutes" class="stack-input" />
+        <input id="hmCardioIntensity" type="number" step="1" min="1" max="10" placeholder="Intensity (1-10)" class="stack-input" />
+        <button id="hmCardioAddBtn" class="stack-add-btn">+ Log</button>
+      </div>
+      <div class="hm-chart-wrap">
+        <select id="hmCardioMetric" class="stack-input stack-select">
+          <option value="durationMin">Duration</option>
+          <option value="intensity">Intensity</option>
+        </select>
+        <div id="hmCardioChart" class="hm-chart"></div>
+      </div>
+      <div id="hmCardioList" class="hm-list"></div>
     </div>
 
     <div id="hmView-recomp" class="hm-view" hidden>
