@@ -3519,28 +3519,47 @@ img, video, canvas, svg { max-width: 100%; }
     return finalResult;
   }
 
+  // Looks up the health:sleep entry (a separate page's localStorage key --
+  // health.html, not gym.html's own state) submitted for the same day as
+  // `last`. Same date-matching convention as state.checkins.
+  function getSleepEntryForDate(dateKey) {
+    try {
+      const list = JSON.parse(localStorage.getItem('health:sleep') || '[]');
+      return (Array.isArray(list) ? list : []).find(function (e) { return e && e.date === dateKey; }) || null;
+    } catch (e) { return null; }
+  }
+
   // Looks up the check-in submitted on the same day as `last` (the log this
   // prescription is based on) and, if present, applies the pain/recovery
-  // rules from docs/superpowers/specs/2026-07-27-adaptive-checkin-ghosts-relative-stats-design.md.
-  // Pain=high short-circuits: recovery is never checked once pain overrides.
+  // rules from docs/superpowers/specs/2026-07-27-adaptive-checkin-ghosts-relative-stats-design.md,
+  // plus the same-day health:sleep entry (2026-08-14 sleep bridge) as an
+  // independent second signal alongside low recovery.
+  // Pain=high short-circuits: recovery/sleep are never checked once pain overrides.
   // Pump is never applied here — it's informational only, surfaced in renderRx().
   function applyCheckinOverride(result, last, ex, stuck) {
     const dateKey = last.date.slice(0, 10);
-    const checkin = state.checkins[dateKey];
-    if (!checkin) return result;
+    const checkin = state.checkins[dateKey]; // may be undefined -- each branch below guards its own use
     const { repMin, repMax, step } = ex;
-    if (checkin.pain === 'high') {
+    if (checkin && checkin.pain === 'high') {
       if (ex.bw) {
         return { type: 'hold', weight: 0, reps: repMin, tag: 'Pain — repeat', reason: 'Logged high pain last session. Repeat at ' + repMin + ' reps, don\'t push.', bw: true, stuck: stuck };
       }
       const { weight: dl, pct } = window.GymRxDeloadLogic.deloadWeight(last.weight, step, repMin);
       return { type: 'down', weight: dl, reps: repMax, tag: 'Pain — deload', reason: 'Logged high pain last session. Drop ' + pct + '%, reset, and reassess.', stuck: stuck };
     }
-    if (checkin.recovery === 'low' && result.type === 'up') {
+    const recoveryLow = !!checkin && checkin.recovery === 'low';
+    const sleepEntry = getSleepEntryForDate(dateKey);
+    const sleepPoor = window.GymSleepCheckLogic ? window.GymSleepCheckLogic.isPoorSleepEntry(sleepEntry) : false;
+    if ((recoveryLow || sleepPoor) && result.type === 'up') {
+      const reasonSource = recoveryLow && sleepPoor
+        ? 'recovery was low and sleep was short/poor last time'
+        : recoveryLow
+        ? 'recovery was low last time'
+        : 'sleep was short/poor last night';
       if (ex.bw) {
-        return { type: 'hold', weight: 0, reps: last.reps + 1, tag: 'Add a rep', reason: last.reps + ' reps — strong, but recovery was low last time. Hold the push, aim for ' + (last.reps + 1) + '.', bw: true, stuck: stuck };
+        return { type: 'hold', weight: 0, reps: last.reps + 1, tag: 'Add a rep', reason: last.reps + ' reps — strong, but ' + reasonSource + '. Hold the push, aim for ' + (last.reps + 1) + '.', bw: true, stuck: stuck };
       }
-      return { type: 'hold', weight: last.weight, reps: last.reps + 1, tag: 'Add a rep', reason: last.reps + ' reps — solid, but recovery was low last time. Hold at ' + last.weight + unit() + ', push for ' + (last.reps + 1) + '.', stuck: stuck };
+      return { type: 'hold', weight: last.weight, reps: last.reps + 1, tag: 'Add a rep', reason: last.reps + ' reps — solid, but ' + reasonSource + '. Hold at ' + last.weight + unit() + ', push for ' + (last.reps + 1) + '.', stuck: stuck };
     }
     return result;
   }
@@ -6548,6 +6567,7 @@ img, video, canvas, svg { max-width: 100%; }
 <script src="gym-rx-phase-logic.js"></script>
 <script src="gym-rx-deload-logic.js"></script>
 <script src="gym-peak-phase-logic.js"></script>
+<script src="gym-sleep-check-logic.js"></script>
 <script src="gym-debrief-logic.js"></script>
 <script src="gym-season-logic.js"></script>
 <script src="gym-volume-logic.js"></script>
