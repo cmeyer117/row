@@ -158,6 +158,31 @@ html, body {
   height: 1px; background: var(--border); margin: 20px 0;
 }
 
+/* ── Posing practice log ── */
+.pose-log-card {
+  background: rgba(255,255,255,0.025); border: 1px solid var(--border);
+  border-radius: 16px; padding: 16px 18px; margin-bottom: 16px;
+}
+.pose-log-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.pose-log-input {
+  flex: 1; min-width: 100px; padding: 8px 10px; border-radius: 8px;
+  background: rgba(255,255,255,0.04); border: 1px solid var(--border);
+  color: var(--text-1); font-size: 13px; font-family: inherit;
+}
+.pose-log-add-btn {
+  padding: 8px 14px; border-radius: 8px; background: rgba(110,231,183,0.12);
+  border: 1px solid rgba(110,231,183,0.3); color: var(--accent);
+  font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit;
+}
+.pose-log-list { display: flex; flex-direction: column; gap: 6px; }
+.pose-log-item {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 10px; background: rgba(255,255,255,0.02);
+  border: 1px solid var(--border); border-radius: 8px;
+  font-size: 12px; color: var(--text-2);
+}
+.pose-log-del { color: var(--text-3); cursor: pointer; padding: 0 4px; }
+
 /* ── Gym tab bar (same as gym.html) ── */
 .gym-tabbar {
   position: fixed; left: 0; right: 0; bottom: calc(72px + env(safe-area-inset-bottom)); z-index: 60;
@@ -200,6 +225,16 @@ html, body {
       <h1 class="mob-title">Posing</h1>
       <div class="mob-subtitle">Mandatory pose practice</div>
     </div>
+  </div>
+
+  <div class="pose-log-card">
+    <div class="pose-log-row">
+      <input id="poseLogDate" type="date" class="pose-log-input" />
+      <input id="poseLogPoses" type="text" placeholder="Poses practiced" class="pose-log-input" />
+      <input id="poseLogNote" type="text" placeholder="Note (optional)" class="pose-log-input" />
+      <button id="poseLogAddBtn" class="pose-log-add-btn" type="button">+ Log</button>
+    </div>
+    <div id="poseLogList" class="pose-log-list"></div>
   </div>
 
   <div class="mob-tabs">
