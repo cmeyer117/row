@@ -113,6 +113,41 @@ const musclesLogsMixedWeeks = {
 const mixedWeekCounts = weeklySetsByMuscle([{ id: 'chest1', muscle: 'Chest' }], musclesLogsMixedWeeks);
 assertEqual(mixedWeekCounts.Chest, 1, 'weeklySetsByMuscle only counts sets from the current week, ignoring prior weeks');
 
+// weeklySetsByMuscle — a set with RIR >= 4 is excluded (not a hard set).
+const rirExercises = [{ id: 'chest1', muscle: 'Chest' }];
+const rirLogsExcluded = { chest1: [
+  { date: sameWeekA, weight: 100, reps: 10, rir: 4 },
+  { date: sameWeekB, weight: 100, reps: 8, rir: 5 },
+] };
+assertEqual(weeklySetsByMuscle(rirExercises, rirLogsExcluded).Chest, 0, 'weeklySetsByMuscle excludes sets with RIR >= 4');
+
+// weeklySetsByMuscle — a set with RIR 3 (or lower) counts as hard.
+const rirLogsIncluded = { chest1: [
+  { date: sameWeekA, weight: 100, reps: 10, rir: 3 },
+  { date: sameWeekB, weight: 100, reps: 8, rir: 0 },
+] };
+assertEqual(weeklySetsByMuscle(rirExercises, rirLogsIncluded).Chest, 2, 'weeklySetsByMuscle counts sets with RIR 3 or below as hard');
+
+// weeklySetsByMuscle — a set with no RIR logged counts (missing RIR defaults to hard).
+const rirLogsMissing = { chest1: [{ date: sameWeekA, weight: 100, reps: 10 }] };
+assertEqual(weeklySetsByMuscle(rirExercises, rirLogsMissing).Chest, 1, 'weeklySetsByMuscle counts a set with no RIR logged as hard');
+
+// weeklySetsByMuscle — an exercise in EXERCISE_MUSCLE_CONTRIBUTIONS adds
+// weighted secondary credit alongside full primary credit, same week.
+const secondaryExercises = [{ id: 'bench', name: 'Smith Machine Flat Chest Press', muscle: 'Chest' }];
+const secondaryLogs = { bench: [{ date: sameWeekA, weight: 200, reps: 8 }] };
+const secondaryCounts = weeklySetsByMuscle(secondaryExercises, secondaryLogs);
+assertEqual(secondaryCounts.Chest, 1, 'weeklySetsByMuscle gives full primary credit to Chest for a chest press');
+assertEqual(secondaryCounts.Triceps, 0.5, 'weeklySetsByMuscle gives 0.5 secondary credit to Triceps for a chest press');
+
+// weeklySetsByMuscle — an exercise with no contribution-map entry only
+// contributes to its primary muscle (no secondary credit anywhere).
+const noSecondaryExercises = [{ id: 'ext', name: 'Leg Extension', muscle: 'Quads' }];
+const noSecondaryLogs = { ext: [{ date: sameWeekA, weight: 100, reps: 12 }] };
+const noSecondaryCounts = weeklySetsByMuscle(noSecondaryExercises, noSecondaryLogs);
+assertEqual(noSecondaryCounts.Quads, 1, 'weeklySetsByMuscle gives full primary credit for an exercise with no secondary mapping');
+assertEqual(noSecondaryCounts.Hamstrings, 0, 'weeklySetsByMuscle adds no secondary credit for an exercise with no contribution-map entry');
+
 // classifyMuscleVolume — under MEV, in MAV range, at/above MRV.
 assertEqual(classifyMuscleVolume('Chest', 3).label, 'under', 'classifyMuscleVolume: 3 sets for Chest (MEV 8) is under');
 assertEqual(classifyMuscleVolume('Chest', 15).label, 'mav', 'classifyMuscleVolume: 15 sets for Chest (MAV 12-20) is in range');

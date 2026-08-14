@@ -71,15 +71,57 @@
     Abs:        { mev: 6, mavLow: 10, mavHigh: 16, mrv: 20 }
   };
 
-  // exercises: [{ id, muscle, ... }]. logs: same shape as weeklyVolumeByDay.
-  // Counts logged SETS (one log entry = one set), current week only
-  // (mondayOfDate(now) through today), keyed by muscle name. Every muscle
-  // in MUSCLE_BANDS is present in the result even at 0 — a muscle with no
-  // work this week should show as a real gap, not disappear.
+  // Name-keyed map of exercises with a well-established (EMG-supported),
+  // textbook secondary muscle mover -- not an exhaustive biomechanical
+  // model, just the strong/obvious cases. Keyed by exercise .name (stable),
+  // same convention as coaching-exercise-meta.js's META. An exercise absent
+  // from this map contributes only to its primary (.muscle) -- that's the
+  // expected case for isolation moves, not an omission.
+  // Sourced 2026-08-14, see docs/superpowers/specs/2026-08-14-volume-progression-datamodel-design.md
+  // for the full citation/reasoning trail (includes a Gemini independent
+  // fact-check pass -- confirmed the RIR>=4 threshold and the pressing/
+  // rowing secondary-mover claims as scientifically standard; the RDL
+  // glute weight below was revised from an initial 0.5 to 0.7 after that
+  // check argued 0.5 underweights glutes, since hip extension is the
+  // PRIMARY joint action in a hip hinge, not a secondary one).
+  var EXERCISE_MUSCLE_CONTRIBUTIONS = {
+    'Neutral Grip Shoulder Press Machine': { muscle: 'Triceps', weight: 0.5 },
+    'Smith Machine Flat Chest Press':      { muscle: 'Triceps', weight: 0.5 },
+    'Chest Dip':                           { muscle: 'Triceps', weight: 0.5 },
+    'Dumbbell Incline Chest Press':        { muscle: 'Triceps', weight: 0.5 },
+    'Smith Machine Narrow Grip Bench':     { muscle: 'Chest', weight: 0.5 },
+
+    // Flat 0.5 regardless of grip -- a known simplification (a pronated/
+    // overhand pull recruits meaningfully less biceps than neutral/
+    // supinated; plain 'Lat Pulldown' with no grip in its name, as
+    // distinct from 'Neutral Grip Lat Pulldown' below, is the likeliest
+    // candidate to be overstated by this). Revisit if grip ever becomes
+    // its own tracked exercise attribute.
+    'Lat Pulldown':                    { muscle: 'Biceps', weight: 0.5 },
+    'Cable Seated Row (Neutral Grip)': { muscle: 'Biceps', weight: 0.5 },
+    'Machine High Row':                { muscle: 'Biceps', weight: 0.5 },
+    'Machine Low Row':                 { muscle: 'Biceps', weight: 0.5 },
+    'Chest Supported T-Bar Row':       { muscle: 'Biceps', weight: 0.5 },
+    'Neutral Grip Lat Pulldown':       { muscle: 'Biceps', weight: 0.5 },
+
+    'Hack Squat':                   { muscle: 'Glutes', weight: 0.3 },
+    'Cybex Leg Press':              { muscle: 'Glutes', weight: 0.3 },
+    'Dumbbell Heel Elevated Lunge': { muscle: 'Glutes', weight: 0.2 },
+    'Dumbbell B-Stance RDL':        { muscle: 'Glutes', weight: 0.7 },
+    'Smith Machine RDL':            { muscle: 'Glutes', weight: 0.7 }
+  };
+
+  // exercises: [{ id, name, muscle, ... }]. logs: same shape as
+  // weeklyVolumeByDay. Counts weighted HARD sets (one log entry = 1.0 to
+  // its primary muscle, plus EXERCISE_MUSCLE_CONTRIBUTIONS[name]'s weight
+  // to its secondary muscle if mapped), current week only. A set with
+  // log.rir explicitly >= 4 is excluded (not near enough to failure to
+  // count as training volume) -- missing RIR or RIR < 4 counts. Every
+  // muscle in MUSCLE_BANDS is present in the result even at 0.
   function weeklySetsByMuscle(exercises, logs) {
-    var muscleById = {};
+    var exByI = {};
     (exercises || []).forEach(function (ex) {
-      if (ex && ex.muscle) muscleById[ex.id] = ex.muscle;
+      if (ex && ex.muscle) exByI[ex.id] = ex;
     });
 
     var counts = {};
@@ -87,12 +129,15 @@
 
     var thisMonday = mondayOfDate(new Date());
     Object.keys(logs || {}).forEach(function (exId) {
-      var muscle = muscleById[exId];
-      if (!muscle) return; // untagged (custom/adhoc) exercise — excluded, not bucketed
+      var ex = exByI[exId];
+      if (!ex) return; // untagged (custom/adhoc) exercise — excluded, not bucketed
+      var secondary = EXERCISE_MUSCLE_CONTRIBUTIONS[ex.name];
       (logs[exId] || []).forEach(function (log) {
         if (!log || !log.date) return;
         if (mondayOfDate(new Date(log.date)) !== thisMonday) return;
-        counts[muscle] = (counts[muscle] || 0) + 1;
+        if (log.rir != null && log.rir >= 4) return; // not a hard set
+        counts[ex.muscle] = (counts[ex.muscle] || 0) + 1;
+        if (secondary) counts[secondary.muscle] = (counts[secondary.muscle] || 0) + secondary.weight;
       });
     });
     return counts;
@@ -136,7 +181,8 @@
     weeklySetsByMuscle: weeklySetsByMuscle,
     classifyMuscleVolume: classifyMuscleVolume,
     volumeAdvisory: volumeAdvisory,
-    MUSCLE_BANDS: MUSCLE_BANDS
+    MUSCLE_BANDS: MUSCLE_BANDS,
+    EXERCISE_MUSCLE_CONTRIBUTIONS: EXERCISE_MUSCLE_CONTRIBUTIONS
   };
   if (typeof window !== 'undefined') window.GymVolumeLogic = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
