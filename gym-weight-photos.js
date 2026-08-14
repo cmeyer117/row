@@ -460,8 +460,16 @@
         .from('progress-photos')
         .upload(filename, blob, { contentType: 'image/jpeg', upsert: false });
       if (error) return null;
-      const { data } = window.__gym.pcSupa.storage.from('progress-photos').getPublicUrl(filename);
-      return data ? data.publicUrl : null;
+      // ponytail: bucket is private now (2026-08-14); sign once at upload
+      // time with a long expiry rather than re-signing on every render,
+      // since photos[] persists .url directly and every render site reads
+      // it synchronously. Upgrade to re-sign-on-render if a shorter/
+      // revocable expiry is ever needed.
+      const { data, error: signError } = await window.__gym.pcSupa.storage
+        .from('progress-photos')
+        .createSignedUrl(filename, 60 * 60 * 24 * 365 * 10);
+      if (signError) return null;
+      return data ? data.signedUrl : null;
     } catch (e) { return null; }
   }
 
