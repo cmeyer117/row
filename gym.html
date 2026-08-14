@@ -3503,8 +3503,8 @@ img, video, canvas, svg { max-width: 100%; }
     if (ex.muscle && window.GymVolumeLogic) {
       const allEx = (state.exercises || []).concat(getAdhocExercises());
       const muscleCounts = window.GymVolumeLogic.weeklySetsByMuscle(allEx, state.logs || {});
-      const band = window.GymVolumeLogic.classifyMuscleVolume(ex.muscle, muscleCounts[ex.muscle] || 0);
-      const advisory = window.GymVolumeLogic.volumeAdvisory(band, stalled);
+      const band = window.GymVolumeLogic.classifyMuscleVolume(ex.muscle, muscleCounts[ex.muscle] || 0, seasonPhase);
+      const advisory = window.GymVolumeLogic.volumeAdvisory(band, stalled, seasonPhase);
       if (advisory) finalResult.volumeAdvisory = advisory;
     }
     return finalResult;
@@ -4497,13 +4497,20 @@ img, video, canvas, svg { max-width: 100%; }
     var muscleCounts = window.GymVolumeLogic.weeklySetsByMuscle(allEx, state.logs || {});
     var muscleListEl = $('volMuscleList');
     var labelText = { under: 'under MEV', mav: 'in range', mrv: 'at/above MRV' };
+    var volSeasonPhase = null;
+    try { var vs = JSON.parse(localStorage.getItem('po_coach_season') || 'null'); volSeasonPhase = vs ? vs.phase : null; } catch (e) {}
     muscleListEl.innerHTML = Object.keys(muscleCounts).sort().map(function(muscle) {
       var count = muscleCounts[muscle];
-      var band = window.GymVolumeLogic.classifyMuscleVolume(muscle, count);
+      var band = window.GymVolumeLogic.classifyMuscleVolume(muscle, count, volSeasonPhase);
       var rangeStr = band.mavLow + '-' + band.mavHigh;
+      // Weighted secondary contributions can make count fractional (e.g.
+      // 6.5) -- round to 1 decimal for display, but keep the raw count
+      // feeding classifyMuscleVolume above unrounded so band comparisons
+      // stay exact.
+      var countDisplay = (Math.round(count * 10) / 10).toString();
       return '<div class="prog-card"><div class="prog-card-top"><span class="prog-card-name">' + escape(muscle) + '</span>'
         + '<div class="prog-card-badge' + (band.label === 'mrv' ? ' prog-card-badge-stalled' : '') + '">' + labelText[band.label] + '</div></div>'
-        + '<div class="prog-stat"><span class="prog-stat-label">Sets this week</span><span class="prog-stat-val">' + count + '</span></div>'
+        + '<div class="prog-stat"><span class="prog-stat-label">Sets this week</span><span class="prog-stat-val">' + countDisplay + '</span></div>'
         + '<div class="prog-stat"><span class="prog-stat-label">MEV / MAV / MRV</span><span class="prog-stat-val" style="font-size:12px;color:var(--text-2)">' + band.mev + ' / ' + rangeStr + ' / ' + band.mrv + '</span></div></div>';
     }).join('');
   }
