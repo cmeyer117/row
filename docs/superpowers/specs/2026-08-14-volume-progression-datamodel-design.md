@@ -23,7 +23,8 @@ Out of scope (explicitly deferred, not forgotten): a week-review UI showing plan
 ## Design decisions (confirmed with Carl)
 
 - **Hard-set threshold:** a set with RIR explicitly logged at ≥4 is excluded from the count. A set with no RIR logged, or RIR <4, counts. This reuses the exact RIR≥3 "not near failure" threshold already established in `getRx()`'s stall-reassessment logic (rounds up to 4 as the exclusion floor so a logged RIR of exactly 3 — "one more clean rep left" — still counts as hard), and defaulting missing-RIR to "counts" avoids retroactively invalidating months of pre-RIR-field historical data.
-- **Contribution weights:** primary muscle gets weight 1.0 per hard set; a curated secondary-muscle map (below) adds 0.5 where the synergist relationship is a well-established, textbook one (EMG-supported) — not every minor stabilizer. Carl asked for these to be scientifically defensible defaults he can hand-tune later, not an exhaustive biomechanical model.
+- **Contribution weights:** primary muscle gets weight 1.0 per hard set; a curated secondary-muscle map (below) adds 0.5 where the synergist relationship is a well-established, textbook one (EMG-supported) — not every minor stabilizer — except RDL-pattern glute credit, bumped to 0.7 after an independent Gemini fact-check (see the map's own comment). Carl asked for these to be scientifically defensible defaults he can hand-tune later, not an exhaustive biomechanical model.
+- **Known simplification, not fixed for this pass:** biceps secondary credit on rows/pulldowns is a flat 0.5 regardless of grip, even though a pronated/overhand pull recruits meaningfully less biceps than a neutral or supinated one (Gemini fact-check caveat, 2026-08-14). Modeling grip would need a new per-exercise dimension — deferred until the flat weights have been used in practice for a while. Ceiling: this overstates true biceps volume specifically for overhand-grip pulls (of the six biceps-tagged rows here, `Lat Pulldown` — the one entry with no explicit grip in its name, as distinct from the separately-tagged `Neutral Grip Lat Pulldown` — is the most likely candidate for a wide/pronated grip and therefore the most likely to be overstated).
 - **Phase targets:** applied uniformly across all muscles (no per-muscle priority weighting yet). `growth` → target = `mavHigh` (climb toward the top of the effective range). `cut`/`show_prep`/`reverse_diet` → target = `mavLow` (hold at minimum-effective; reverse diet does not auto-ramp toward `mavHigh` in this pass — that's the deferred auto-ramp feature above). `peak`/no season set/unrecognized phase → no target (falls back to today's exact stall-only behavior, unchanged).
 
 ## Data model
@@ -59,13 +60,19 @@ var EXERCISE_MUSCLE_CONTRIBUTIONS = {
   // Hip-hinge/squat patterns -- glutes are a major, well-documented
   // secondary mover in RDLs (often near-primary) and squat-pattern moves.
   // Weight is lower (0.3) for squat/press-style leg moves where quads
-  // clearly dominate, higher (0.5) for RDLs where hip extension is a
-  // primary driver of the movement, not incidental.
+  // clearly dominate, higher (0.7) for RDLs, where hip extension is the
+  // PRIMARY joint action of the movement -- glutes and hamstrings are
+  // closer to co-primary than primary/secondary in a true hip hinge
+  // (Gemini fact-check, 2026-08-14: flagged an initial 0.5 as an
+  // underweight for exactly this reason -- 0.7 lands between its
+  // suggested 0.8-1.0 and the "still secondary in this app's bookkeeping"
+  // constraint of not fully double-counting one set as full credit toward
+  // two separate muscles' MEV/MAV/MRV progressions).
   'Hack Squat':                   { muscle: 'Glutes', weight: 0.3 },
   'Cybex Leg Press':              { muscle: 'Glutes', weight: 0.3 },
   'Dumbbell Heel Elevated Lunge': { muscle: 'Glutes', weight: 0.2 }, // heel-elevated is deliberately quad-biased
-  'Dumbbell B-Stance RDL':        { muscle: 'Glutes', weight: 0.5 },
-  'Smith Machine RDL':            { muscle: 'Glutes', weight: 0.5 },
+  'Dumbbell B-Stance RDL':        { muscle: 'Glutes', weight: 0.7 },
+  'Smith Machine RDL':            { muscle: 'Glutes', weight: 0.7 },
 
   // Everything else (isolation moves: flies, raises, curls, extensions,
   // leg extension/curl, calf raises; and quad-biased-by-design moves like
