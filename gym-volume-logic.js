@@ -143,15 +143,37 @@
     return counts;
   }
 
-  // Classifies a weekly set count against a muscle's evidence-based band.
-  // Returns { label: 'under'|'mav'|'mrv', mev, mavLow, mavHigh, mrv } —
-  // label is 'under' below MEV, 'mav' from MEV through MRV-1, 'mrv' at or
-  // above MRV. Unknown muscle name returns null.
-  function classifyMuscleVolume(muscle, count) {
+  // Maps a muscle + training phase to a specific weekly-hard-set target, or
+  // null if this phase shouldn't push a target (falls back to the static
+  // band's stall-only advisory behavior). growth climbs toward the top of
+  // the effective range; cut/show_prep/reverse_diet hold at the bottom
+  // (minimum-effective) rather than chasing more volume while other levers
+  // (diet) are doing the work. peak/null/any unrecognized phase: no target,
+  // today's exact pre-phase behavior.
+  function phaseTarget(muscle, phase) {
+    var band = MUSCLE_BANDS[muscle];
+    if (!band) return null;
+    if (phase === 'growth') return band.mavHigh;
+    if (phase === 'cut' || phase === 'show_prep' || phase === 'reverse_diet') return band.mavLow;
+    return null;
+  }
+
+  // Classifies a weekly set count against a muscle's evidence-based band,
+  // optionally against a phase-specific target too. Returns
+  // { label: 'under'|'mav'|'mrv', mev, mavLow, mavHigh, mrv, target,
+  // belowTarget } -- label is 'under' below MEV, 'mav' from MEV through
+  // MRV-1, 'mrv' at or above MRV. target is phaseTarget(muscle, phase),
+  // possibly null (no phase, peak, or unrecognized phase). belowTarget is
+  // true only when a target exists AND count is below it. Unknown muscle
+  // name returns null. phase is optional -- omitting it (or passing an
+  // unrecognized value) reproduces today's exact pre-phase behavior.
+  function classifyMuscleVolume(muscle, count, phase) {
     var band = MUSCLE_BANDS[muscle];
     if (!band) return null;
     var label = count < band.mev ? 'under' : (count >= band.mrv ? 'mrv' : 'mav');
-    return { label: label, mev: band.mev, mavLow: band.mavLow, mavHigh: band.mavHigh, mrv: band.mrv };
+    var target = phaseTarget(muscle, phase);
+    var belowTarget = target != null && count < target;
+    return { label: label, mev: band.mev, mavLow: band.mavLow, mavHigh: band.mavHigh, mrv: band.mrv, target: target, belowTarget: belowTarget };
   }
 
   // Turns a classifyMuscleVolume() band + whether getRx() detected a stall
@@ -161,16 +183,28 @@
   // training-logic audit flagged -- getRx() was load-only with no volume
   // lever, even though these bands/counts already existed for the Progress
   // tab's dashboard and were never consulted prescriptively.
-  function volumeAdvisory(band, stalled) {
+  // phase is optional and only affects the in-MAV-range case: when the band
+  // carries a phase target (band.belowTarget), that takes priority over the
+  // stall check, with phase-flavored wording -- growth frames it as pushing
+  // toward the top of the range, cut/show_prep/reverse_diet frames it as
+  // holding at the minimum-effective floor. With no phase target, behavior
+  // is identical to before phase-awareness existed (stall-only).
+  function volumeAdvisory(band, stalled, phase) {
     if (!band) return null;
     if (band.label === 'under') {
       return { suggestion: 'add_set', reason: 'Under MEV (' + band.mev + ' sets/wk) for this muscle -- there\'s real room to add volume here before load progression is even the limiting factor.' };
     }
-    if (stalled && band.label === 'mav') {
-      return { suggestion: 'add_set', reason: 'Stalled on load, but still under MRV (' + band.mrv + ' sets/wk) for this muscle -- a plateau here is often a volume problem, not purely a load problem. Consider adding a set before assuming a deload is the only fix.' };
-    }
     if (band.label === 'mrv') {
       return { suggestion: 'pull_back', reason: 'At or above MRV (' + band.mrv + ' sets/wk) for this muscle -- more volume here is more likely to add fatigue than drive further growth.' };
+    }
+    if (band.belowTarget) {
+      if (phase === 'growth') {
+        return { suggestion: 'add_set', reason: 'Growth phase target is ' + band.target + ' sets/wk for this muscle -- still room to push toward MAV, and this phase is where added volume is a real lever.' };
+      }
+      return { suggestion: 'add_set', reason: 'This phase\'s minimum-effective target is ' + band.target + ' sets/wk for this muscle -- worth adding a set to hold there while other levers do the heavy lifting.' };
+    }
+    if (stalled) {
+      return { suggestion: 'add_set', reason: 'Stalled on load, but still under MRV (' + band.mrv + ' sets/wk) for this muscle -- a plateau here is often a volume problem, not purely a load problem. Consider adding a set before assuming a deload is the only fix.' };
     }
     return null;
   }
@@ -181,6 +215,7 @@
     weeklySetsByMuscle: weeklySetsByMuscle,
     classifyMuscleVolume: classifyMuscleVolume,
     volumeAdvisory: volumeAdvisory,
+    phaseTarget: phaseTarget,
     MUSCLE_BANDS: MUSCLE_BANDS,
     EXERCISE_MUSCLE_CONTRIBUTIONS: EXERCISE_MUSCLE_CONTRIBUTIONS
   };

@@ -148,6 +148,45 @@ const noSecondaryCounts = weeklySetsByMuscle(noSecondaryExercises, noSecondaryLo
 assertEqual(noSecondaryCounts.Quads, 1, 'weeklySetsByMuscle gives full primary credit for an exercise with no secondary mapping');
 assertEqual(noSecondaryCounts.Hamstrings, 0, 'weeklySetsByMuscle adds no secondary credit for an exercise with no contribution-map entry');
 
+// phaseTarget — growth targets mavHigh, cut/show_prep/reverse_diet target
+// mavLow, peak/null/unrecognized has no target (falls back to static bands).
+assertEqual(classifyMuscleVolume('Chest', 15, 'growth').target, 20, 'classifyMuscleVolume: growth phase targets mavHigh');
+assertEqual(classifyMuscleVolume('Chest', 15, 'cut').target, 12, 'classifyMuscleVolume: cut phase targets mavLow');
+assertEqual(classifyMuscleVolume('Chest', 15, 'show_prep').target, 12, 'classifyMuscleVolume: show_prep phase targets mavLow');
+assertEqual(classifyMuscleVolume('Chest', 15, 'reverse_diet').target, 12, 'classifyMuscleVolume: reverse_diet phase targets mavLow');
+assertEqual(classifyMuscleVolume('Chest', 15, 'peak').target, null, 'classifyMuscleVolume: peak phase has no target');
+assertEqual(classifyMuscleVolume('Chest', 15, null).target, null, 'classifyMuscleVolume: no phase has no target');
+assertEqual(classifyMuscleVolume('Chest', 15, 'not_a_real_phase').target, null, 'classifyMuscleVolume: unrecognized phase string has no target');
+assertEqual(classifyMuscleVolume('Chest', 15).target, null, 'classifyMuscleVolume: omitted phase argument has no target (backward compatible)');
+
+// classifyMuscleVolume — belowTarget compares count against the phase target.
+assertEqual(classifyMuscleVolume('Chest', 15, 'growth').belowTarget, true, 'classifyMuscleVolume: 15 sets is below growth\'s target of 20');
+assertEqual(classifyMuscleVolume('Chest', 20, 'growth').belowTarget, false, 'classifyMuscleVolume: 20 sets is not below growth\'s target of 20');
+assertEqual(classifyMuscleVolume('Chest', 15, null).belowTarget, false, 'classifyMuscleVolume: belowTarget is always false with no phase target');
+
+// volumeAdvisory — in MAV range, below the phase target: add_set with
+// phase-flavored wording, even when NOT stalled (the new proactive case).
+const growthAdvisory = volumeAdvisory(classifyMuscleVolume('Chest', 15, 'growth'), false, 'growth');
+assertEqual(growthAdvisory.suggestion, 'add_set', 'volumeAdvisory: below growth target suggests add_set even when not stalled');
+assertEqual(growthAdvisory.reason.indexOf('growth') !== -1 || growthAdvisory.reason.toLowerCase().indexOf('push') !== -1, true, 'volumeAdvisory: growth-phase reason is phase-flavored');
+
+const cutAdvisory = volumeAdvisory(classifyMuscleVolume('Chest', 9, 'cut'), false, 'cut');
+assertEqual(cutAdvisory.suggestion, 'add_set', 'volumeAdvisory: below cut target suggests add_set even when not stalled');
+assertEqual(cutAdvisory.reason.toLowerCase().indexOf('minimum') !== -1, true, 'volumeAdvisory: cut-phase reason mentions minimum-effective framing');
+
+// volumeAdvisory — in MAV, AT/ABOVE the phase target, not stalled: same
+// today's-behavior null (the regression guard for the common growth case
+// where volume is already at the phase's ceiling).
+assertEqual(volumeAdvisory(classifyMuscleVolume('Chest', 20, 'growth'), false, 'growth'), null, 'volumeAdvisory: at growth target and not stalled returns null');
+
+// volumeAdvisory — no phase set, in MAV, not stalled: unchanged from today
+// (the core no-regression check for users without an active season).
+assertEqual(volumeAdvisory(classifyMuscleVolume('Chest', 15, null), false, null), null, 'volumeAdvisory: no phase, in MAV, not stalled returns null (unchanged)');
+
+// volumeAdvisory — under MEV and at/above MRV are phase-independent.
+assertEqual(volumeAdvisory(classifyMuscleVolume('Chest', 3, 'growth'), false, 'growth').suggestion, 'add_set', 'volumeAdvisory: under MEV suggests add_set regardless of phase');
+assertEqual(volumeAdvisory(classifyMuscleVolume('Chest', 25, 'cut'), false, 'cut').suggestion, 'pull_back', 'volumeAdvisory: at/above MRV suggests pull_back regardless of phase');
+
 // classifyMuscleVolume — under MEV, in MAV range, at/above MRV.
 assertEqual(classifyMuscleVolume('Chest', 3).label, 'under', 'classifyMuscleVolume: 3 sets for Chest (MEV 8) is under');
 assertEqual(classifyMuscleVolume('Chest', 15).label, 'mav', 'classifyMuscleVolume: 15 sets for Chest (MAV 12-20) is in range');
