@@ -72,3 +72,8 @@ test('buildClientUpdateByCustomerRequest: PATCH filtered by stripe_customer_id',
   assert.equal(req.options.method, 'PATCH');
   assert.deepEqual(JSON.parse(req.options.body), { billing_status: 'paid' });
 });
+
+test('buildClientUpdateByCustomerRequest: requests return=representation so a zero-row match is detectable', () => {
+  const req = buildClientUpdateByCustomerRequest('https://x.supabase.co', 'key123', 'cus_abc', { billing_status: 'paid' });
+  assert.equal(req.options.headers.Prefer, 'return=representation');
+});

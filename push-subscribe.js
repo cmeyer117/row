@@ -16,6 +16,13 @@
     if (Notification.permission === 'denied') return;
     if (localStorage.getItem('row_push_subscribed')) return;
 
+    // Check auth before prompting -- an unsigned-in visitor shouldn't get a
+    // notification-permission prompt and a real browser push subscription
+    // registered for a write we're going to reject anyway (Codex catch
+    // 2026-08-14, row-audit-2026-08-14.md P1 #4).
+    const token = window.RowAuth ? await window.RowAuth.getAccessToken() : null;
+    if (!token) return; // not signed in yet -- retry on next page load's subscribeToPush() call
+
     const permission = await Notification.requestPermission();
     if (permission !== 'granted') return;
 
@@ -24,9 +31,6 @@
       userVisibleOnly: true,
       applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
     });
-
-    const token = window.RowAuth ? await window.RowAuth.getAccessToken() : null;
-    if (!token) return; // not signed in yet -- retry on next page load's subscribeToPush() call
 
     const res = await fetch('/api/subscribe-push', {
       method: 'POST',

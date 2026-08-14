@@ -54,7 +54,12 @@ export function buildClientUpdateByCustomerRequest(supabaseUrl, supabaseKey, str
     url: supabaseUrl + '/rest/v1/coaching_clients?stripe_customer_id=eq.' + encodeURIComponent(stripeCustomerId),
     options: {
       method: 'PATCH',
-      headers: { apikey: supabaseKey, Authorization: 'Bearer ' + supabaseKey, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      // return=representation (not return=minimal) so the caller can see how
+      // many rows matched -- a stripe_customer_id with no matching client
+      // still returns a 2xx/204 from PostgREST with zero rows affected,
+      // which return=minimal makes indistinguishable from a real update
+      // (row-audit-2026-08-14.md P1 #3 follow-up, Codex catch 2026-08-14).
+      headers: { apikey: supabaseKey, Authorization: 'Bearer ' + supabaseKey, 'Content-Type': 'application/json', Prefer: 'return=representation' },
       body: JSON.stringify(patch),
     },
   };

@@ -60,15 +60,25 @@ export default async function handler(req, res) {
   try {
     const { url, options } = buildClientUpdateByCustomerRequest(SUPABASE_URL, SUPABASE_KEY, stripeCustomerId, patch);
     const updateRes = await fetch(url, options);
+    // The patch itself is idempotent (same billing_status/subscription_id
+    // in, same out), so letting Stripe retry a genuine write failure is
+    // safe and self-healing -- unlike the old always-200 behavior, which
+    // silently left a paid customer stuck at a stale billing_status until
+    // someone noticed by hand (row-audit-2026-08-14.md P1 #3).
     if (!updateRes.ok) {
       console.error('Supabase update failed for customer ' + stripeCustomerId + ': ' + updateRes.status);
-      // The patch is idempotent (same billing_status/subscription_id in,
-      // same out), so letting Stripe retry is safe and self-healing --
-      // unlike the old always-200 behavior, which silently left a paid
-      // customer stuck at a stale billing_status until someone noticed by
-      // hand (row-audit-2026-08-14.md P1 #3).
       res.status(502).json({ ok: false, error: 'Supabase update failed' });
       return;
+    }
+    // return=representation means a 2xx with zero matched rows is
+    // distinguishable from a real update -- without this check, an unknown
+    // stripe_customer_id (bad/missing mapping) silently no-ops and Stripe
+    // never retries, since the PATCH itself still returns 2xx (Codex catch
+    // 2026-08-14). Not retryable (retrying won't make the customer exist),
+    // but worth a loud log for manual follow-up.
+    const updatedRows = await updateRes.json();
+    if (!Array.isArray(updatedRows) || updatedRows.length === 0) {
+      console.error('Stripe webhook: no coaching_clients row matched stripe_customer_id ' + stripeCustomerId);
     }
   } catch (e) {
     console.error('Failed to update billing status for customer ' + stripeCustomerId, e);
