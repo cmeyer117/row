@@ -3532,9 +3532,11 @@ img, video, canvas, svg { max-width: 100%; }
   // Looks up the check-in submitted on the same day as `last` (the log this
   // prescription is based on) and, if present, applies the pain/recovery
   // rules from docs/superpowers/specs/2026-07-27-adaptive-checkin-ghosts-relative-stats-design.md,
-  // plus the same-day health:sleep entry (2026-08-14 sleep bridge) as an
-  // independent second signal alongside low recovery.
-  // Pain=high short-circuits: recovery/sleep are never checked once pain overrides.
+  // plus two independent signals alongside low recovery: the same-day
+  // health:sleep entry (2026-08-14 sleep bridge) and yesterday's macro
+  // adherence (2026-08-14 macro-adherence bridge, macroAdherencePoor --
+  // cached by a one-time prefetch, see prefetchMacroAdherence() below).
+  // Pain=high short-circuits: recovery/sleep/macros are never checked once pain overrides.
   // Pump is never applied here — it's informational only, surfaced in renderRx().
   function applyCheckinOverride(result, last, ex, stuck) {
     const dateKey = last.date.slice(0, 10);
@@ -3554,12 +3556,12 @@ img, video, canvas, svg { max-width: 100%; }
       // never touches.
       const sleepEntry = getSleepEntryForDate(dateKey);
       const sleepPoor = window.GymSleepCheckLogic ? window.GymSleepCheckLogic.isPoorSleepEntry(sleepEntry) : false;
-      if (recoveryLow || sleepPoor) {
-        const reasonSource = recoveryLow && sleepPoor
-          ? 'recovery was low and sleep was short/poor last time'
-          : recoveryLow
-          ? 'recovery was low last time'
-          : 'sleep was short/poor last night';
+      if (recoveryLow || sleepPoor || macroAdherencePoor) {
+        const reasons = [];
+        if (recoveryLow) reasons.push('recovery was low last time');
+        if (sleepPoor) reasons.push('sleep was short/poor last night');
+        if (macroAdherencePoor) reasons.push('macros were under target yesterday');
+        const reasonSource = reasons.join(' and ');
         if (ex.bw) {
           return { type: 'hold', weight: 0, reps: last.reps + 1, tag: 'Add a rep', reason: last.reps + ' reps — strong, but ' + reasonSource + '. Hold the push, aim for ' + (last.reps + 1) + '.', bw: true, stuck: stuck };
         }
@@ -6576,6 +6578,7 @@ img, video, canvas, svg { max-width: 100%; }
 <script src="gym-debrief-logic.js"></script>
 <script src="gym-season-logic.js"></script>
 <script src="gym-volume-logic.js"></script>
+<script src="macro-calc.js"></script>
 <script src="plate-calc.js"></script>
 <script src="gym-state-merge-logic.js"></script><script src="hype-audio.js"></script>
 <script>
@@ -6643,6 +6646,12 @@ document.addEventListener('DOMContentLoaded', function () {
   // can't await getSession(), and the anon key is now rejected by the
   // 2026-08-11 RLS lockdown (row-audit-2026-08-14.md P1 #1).
   let pcAccessToken = null;
+  // Cached result of the one-time macro-adherence prefetch below -- null
+  // means "no data yet, or nothing to classify" (query hasn't resolved,
+  // not signed in, no target set, or zero food_log rows yesterday), true/
+  // false is a real classification. applyCheckinOverride() reads this
+  // synchronously; it is never awaited directly.
+  let macroAdherencePoor = null;
   // gym-weight-photos.js's uploadPhotoToStorage() needs to read pcSupa —
   // expose it live since it's reassigned below once the client connects.
   Object.defineProperty(window.__gym, 'pcSupa', { get: () => pcSupa });
@@ -7098,6 +7107,28 @@ document.addEventListener('DOMContentLoaded', function () {
         if (pcMaybeApplyRemote(payload.new.data)) pcSchedulePush();
       })
       .subscribe();
+  })();
+
+  // One-time macro-adherence prefetch. Queries yesterday's food_log (not
+  // today's -- today's log is still accumulating during the day, which
+  // would show a misleadingly large "remaining" gap for anyone training
+  // before their meals are logged). Zero rows for yesterday is treated as
+  // "no data" (most likely the app just wasn't used that day), not "poor" --
+  // leaves macroAdherencePoor at null rather than falsely flagging it.
+  (async function prefetchMacroAdherence() {
+    if (!window.supabase || !window.MacroCalc) return;
+    try {
+      const targets = JSON.parse(localStorage.getItem('macro_targets') || 'null');
+      if (!targets) return;
+      const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      const yesterdayKey = yesterday.getFullYear() + '-' + String(yesterday.getMonth() + 1).padStart(2, '0') + '-' + String(yesterday.getDate()).padStart(2, '0');
+      const { data, error } = await client.from('food_log').select('*').eq('log_date', yesterdayKey);
+      if (error || !data || data.length === 0) return;
+      const { consumed } = window.MacroCalc.remainingBudget(targets, data);
+      macroAdherencePoor = window.MacroCalc.isPoorMacroAdherence(consumed, targets);
+    } catch (e) { /* macroAdherencePoor stays null */ }
   })();
 
   document.addEventListener('focusout', () => {
