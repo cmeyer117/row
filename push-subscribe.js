@@ -25,11 +25,15 @@
       applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
     });
 
-    await fetch('/api/subscribe-push', {
+    const token = window.RowAuth ? await window.RowAuth.getAccessToken() : null;
+    if (!token) return; // not signed in yet -- retry on next page load's subscribeToPush() call
+
+    const res = await fetch('/api/subscribe-push', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
       body: JSON.stringify(sub.toJSON()),
     });
+    if (!res.ok) return; // leave row_push_subscribed unset so the next load retries
 
     localStorage.setItem('row_push_subscribed', '1');
   }
