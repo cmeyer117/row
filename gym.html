@@ -3449,6 +3449,15 @@ img, video, canvas, svg { max-width: 100%; }
       } else break;
     }
     const stuckAvgRir = stuckRirs.length ? stuckRirs.reduce((a, b) => a + b, 0) / stuckRirs.length : null;
+    if (seasonPhase === 'peak') {
+      const frozen = window.GymPeakPhaseLogic
+        ? window.GymPeakPhaseLogic.peakFreezeResult(ex, last, stuck)
+        : { type: 'hold', weight: bw ? 0 : weight, reps: reps, tag: 'Peak — hold', bw: bw, stuck: stuck };
+      frozen.reason = bw
+        ? 'Peak week: holding at ' + last.reps + ' reps, no autonomous changes. Flag anything off (pain, unusual fatigue, missed lifts) to your coach directly.'
+        : 'Peak week: holding at ' + last.weight + unit() + ' × ' + last.reps + ', no autonomous changes. Flag anything off (pain, unusual fatigue, missed lifts) to your coach directly.';
+      return applyCheckinOverride(frozen, last, ex, stuck);
+    }
     if (bw) {
       // Bodyweight exercises track reps, not weight — "stalled" here means
       // consecutive sessions logging the same rep count, not the same weight.
@@ -6538,6 +6547,7 @@ img, video, canvas, svg { max-width: 100%; }
 <script src="gym-workout-events.js"></script>
 <script src="gym-rx-phase-logic.js"></script>
 <script src="gym-rx-deload-logic.js"></script>
+<script src="gym-peak-phase-logic.js"></script>
 <script src="gym-debrief-logic.js"></script>
 <script src="gym-season-logic.js"></script>
 <script src="gym-volume-logic.js"></script>
