@@ -1029,7 +1029,7 @@ main {
   }
 
   function hmSwitchTab(tab) {
-    ['vitals', 'labs', 'measurements', 'sleep', 'recomp'].forEach((t) => {
+    ['vitals', 'labs', 'measurements', 'sleep', 'cardio', 'recomp'].forEach((t) => {
       document.getElementById('hmView-' + t).hidden = t !== tab;
     });
     document.querySelectorAll('.hm-tab-btn').forEach((btn) => {
@@ -1277,9 +1277,54 @@ main {
 
   renderSleep();
 
+  function getCardio() { return _get('health:cardio') || []; }
+  function setCardio(list) { _set('health:cardio', list); }
+
+  function renderCardio() {
+    const list = getCardio();
+    const listEl = document.getElementById('hmCardioList');
+    listEl.innerHTML = list.slice().reverse().map((e) =>
+      '<div class="hm-list-row"><span>' + e.date +
+      ' — ' + (e.type ?? '—') + ' · ' + (e.durationMin ?? '—') + 'min · intensity ' + (e.intensity ?? '—') +
+      '</span><span class="hm-list-del" data-del-date="' + e.date + '">✕</span></div>'
+    ).join('');
+
+    const metric = document.getElementById('hmCardioMetric').value;
+    const vals = list.filter((e) => e[metric] != null).map((e) => e[metric]);
+    const chartEl = document.getElementById('hmCardioChart');
+    chartEl.innerHTML = vals.length >= 2
+      ? buildMiniSpark(vals, 300, 90)
+      : '<div class="hm-chart-empty">Need 2+ entries for a trend</div>';
+  }
+
+  document.getElementById('hmCardioAddBtn').addEventListener('click', () => {
+    const date = document.getElementById('hmCardioDate').value || new Date().toISOString().slice(0, 10);
+    const fields = {
+      type: document.getElementById('hmCardioType').value || null,
+      durationMin: document.getElementById('hmCardioDuration').value ? Number(document.getElementById('hmCardioDuration').value) : null,
+      intensity: document.getElementById('hmCardioIntensity').value ? Number(document.getElementById('hmCardioIntensity').value) : null,
+    };
+    setCardio(upsertByDate(getCardio(), date, fields));
+    document.getElementById('hmCardioType').value = '';
+    document.getElementById('hmCardioDuration').value = '';
+    document.getElementById('hmCardioIntensity').value = '';
+    renderCardio();
+  });
+
+  document.getElementById('hmCardioMetric').addEventListener('change', renderCardio);
+
+  document.getElementById('hmCardioList').addEventListener('click', (e) => {
+    const del = e.target.closest('[data-del-date]');
+    if (!del) return;
+    setCardio(getCardio().filter((entry) => entry.date !== del.dataset.delDate));
+    renderCardio();
+  });
+
+  renderCardio();
+
   window.RowHealthMarkers = {
     _get, _set, upsertByDate, buildMiniSpark,
-    rerenderAll: () => { renderVitals(); renderLabs(); renderMeasurements(); renderSleep(); renderRecomp(); }
+    rerenderAll: () => { renderVitals(); renderLabs(); renderMeasurements(); renderSleep(); renderCardio(); renderRecomp(); }
   };
 })();
 </script>
@@ -1753,7 +1798,7 @@ document.addEventListener('DOMContentLoaded', function () {
   if (typeof initCloudSync !== 'function') return;
   initCloudSync({
     appKey: 'health',
-    syncedKeys: ['stack:items', 'stack:version', 'stack:low', 'macro_targets', 'health:vitals', 'health:labs', 'health:measurements', 'health:sleep'],
+    syncedKeys: ['stack:items', 'stack:version', 'stack:low', 'macro_targets', 'health:vitals', 'health:labs', 'health:measurements', 'health:sleep', 'health:cardio'],
     syncedPrefixes: ['stack:taken:'],
     onApplied: function () {
       window.dispatchEvent(new Event('storage'));
