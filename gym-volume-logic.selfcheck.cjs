@@ -168,7 +168,7 @@ assertEqual(classifyMuscleVolume('Chest', 15, null).belowTarget, false, 'classif
 // phase-flavored wording, even when NOT stalled (the new proactive case).
 const growthAdvisory = volumeAdvisory(classifyMuscleVolume('Chest', 15, 'growth'), false, 'growth');
 assertEqual(growthAdvisory.suggestion, 'add_set', 'volumeAdvisory: below growth target suggests add_set even when not stalled');
-assertEqual(growthAdvisory.reason.indexOf('growth') !== -1 || growthAdvisory.reason.toLowerCase().indexOf('push') !== -1, true, 'volumeAdvisory: growth-phase reason is phase-flavored');
+assertEqual(growthAdvisory.reason.toLowerCase().indexOf('growth') !== -1 && growthAdvisory.reason.toLowerCase().indexOf('push') !== -1, true, 'volumeAdvisory: growth-phase reason is phase-flavored');
 
 const cutAdvisory = volumeAdvisory(classifyMuscleVolume('Chest', 9, 'cut'), false, 'cut');
 assertEqual(cutAdvisory.suggestion, 'add_set', 'volumeAdvisory: below cut target suggests add_set even when not stalled');
