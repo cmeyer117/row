@@ -16,7 +16,7 @@ const sandbox = { window: {} };
 vm.createContext(sandbox);
 vm.runInContext(fs.readFileSync(path.join(__dirname, 'macro-calc.js'), 'utf8'), sandbox);
 vm.runInContext(fs.readFileSync(path.join(__dirname, 'staple-foods.js'), 'utf8'), sandbox);
-const { calculateMacros, resolveServingMacros, remainingBudget, hasCompleteServingData, sumIngredients, dedupeByRecency, rankByFrequency, rankByFrecency } = sandbox.window.MacroCalc;
+const { calculateMacros, resolveServingMacros, remainingBudget, hasCompleteServingData, sumIngredients, dedupeByRecency, rankByFrequency, rankByFrecency, isPoorMacroAdherence } = sandbox.window.MacroCalc;
 const { FOODS } = sandbox.window.StapleFoods;
 
 function assertEqual(actual, expected, label) {
@@ -80,6 +80,25 @@ assertEqual(b2.protein_g, 180, 'remainingBudget with no entries returns full tar
 const b3 = remainingBudget(targets, [{ protein_g: 'not-a-number', carb_g: null, fat_g: undefined, calories: 100 }]);
 assertEqual(b3.protein_g, 180, 'remainingBudget treats non-numeric fields as 0 instead of propagating NaN');
 assertEqual(b3.calories, 2142, 'remainingBudget still counts the valid numeric field on the same row');
+
+// isPoorMacroAdherence — both calories and protein at/above target: not poor.
+assertEqual(isPoorMacroAdherence({ protein_g: 280, carb_g: 397, fat_g: 58, calories: 3201 }, { proteinG: 280, carbG: 397, fatG: 58, calories: 3201 }), false, 'isPoorMacroAdherence: exactly at target is not poor');
+
+// isPoorMacroAdherence — calories under 80% of target: poor.
+assertEqual(isPoorMacroAdherence({ protein_g: 280, carb_g: 397, fat_g: 58, calories: 2000 }, { proteinG: 280, carbG: 397, fatG: 58, calories: 3201 }), true, 'isPoorMacroAdherence: calories under 80% of target is poor');
+
+// isPoorMacroAdherence — protein under 80% of target: poor.
+assertEqual(isPoorMacroAdherence({ protein_g: 150, carb_g: 397, fat_g: 58, calories: 3201 }, { proteinG: 280, carbG: 397, fatG: 58, calories: 3201 }), true, 'isPoorMacroAdherence: protein under 80% of target is poor');
+
+// isPoorMacroAdherence — both calories and protein under 80%: still poor (not double-counted, just true).
+assertEqual(isPoorMacroAdherence({ protein_g: 100, carb_g: 397, fat_g: 58, calories: 1800 }, { proteinG: 280, carbG: 397, fatG: 58, calories: 3201 }), true, 'isPoorMacroAdherence: both under 80% is poor');
+
+// isPoorMacroAdherence — carb/fat shortfall alone (calories/protein fine) does NOT trigger it.
+assertEqual(isPoorMacroAdherence({ protein_g: 280, carb_g: 50, fat_g: 10, calories: 3201 }, { proteinG: 280, carbG: 397, fatG: 58, calories: 3201 }), false, 'isPoorMacroAdherence: carb/fat shortfall alone does not trigger poor');
+
+// isPoorMacroAdherence — missing consumed or targets returns false, doesn't throw.
+assertEqual(isPoorMacroAdherence(null, { proteinG: 280, carbG: 397, fatG: 58, calories: 3201 }), false, 'isPoorMacroAdherence: null consumed is not poor');
+assertEqual(isPoorMacroAdherence({ protein_g: 280, carb_g: 397, fat_g: 58, calories: 3201 }, null), false, 'isPoorMacroAdherence: null targets is not poor');
 
 // sumIngredients — Carl's own example: 200g White Rice + 200g Chicken
 // Breast + 50g Broccoli. Hand-computed expected total:

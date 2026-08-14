@@ -104,6 +104,18 @@
     };
   }
 
+  // consumed: { protein_g, carb_g, fat_g, calories } (remainingBudget(...).consumed).
+  // targets: { proteinG, carbG, fatG, calories }. Poor adherence = calories
+  // or protein fell meaningfully short (< 80%) of target -- these two drive
+  // training performance/recovery most directly; a carb/fat gap alone
+  // (calories/protein still on target) does not trigger this on its own.
+  function isPoorMacroAdherence(consumed, targets) {
+    if (!consumed || !targets) return false;
+    const calLow = (targets.calories || 0) > 0 && consumed.calories < 0.8 * targets.calories;
+    const proteinLow = (targets.proteinG || 0) > 0 && consumed.protein_g < 0.8 * targets.proteinG;
+    return calLow || proteinLow;
+  }
+
   // rows: [{ foodName, grams }]. foods: an array shaped like
   // StapleFoods.FOODS ({ name, protein_100g, carb_100g, fat_100g,
   // calories_100g }) — passed in rather than imported, keeping this file
@@ -215,7 +227,7 @@
       .map((name) => toQuickAddItem(latest[name]));
   }
 
-  const api = { calculateMacros, resolveServingMacros, remainingBudget, hasCompleteServingData, sumIngredients, dedupeByRecency, rankByFrequency, rankByFrecency };
+  const api = { calculateMacros, resolveServingMacros, remainingBudget, hasCompleteServingData, sumIngredients, dedupeByRecency, rankByFrequency, rankByFrecency, isPoorMacroAdherence };
   if (typeof window !== 'undefined') window.MacroCalc = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })();
