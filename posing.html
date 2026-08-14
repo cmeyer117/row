@@ -646,5 +646,71 @@ html, body {
   });
 })();
 </script>
+<script>
+(function () {
+  'use strict';
+
+  const _get = (k) => { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } };
+  const _set = (k, v) => localStorage.setItem(k, JSON.stringify(v));
+
+  function upsertByDate(list, date, fields) {
+    const cleanFields = {};
+    Object.keys(fields).forEach((k) => {
+      if (fields[k] !== null && fields[k] !== undefined && fields[k] !== '') cleanFields[k] = fields[k];
+    });
+    if (Object.keys(cleanFields).length === 0) return list;
+    const existing = list.find((e) => e.date === date);
+    if (existing) {
+      Object.assign(existing, cleanFields);
+    } else {
+      list.push(Object.assign({ date: date }, cleanFields));
+    }
+    return list;
+  }
+
+  function getPosingLog() { return _get('posing:log') || []; }
+  function setPosingLog(list) { _set('posing:log', list); }
+
+  function renderPosingLog() {
+    const list = getPosingLog();
+    const listEl = document.getElementById('poseLogList');
+    listEl.innerHTML = list.slice().reverse().map((e) =>
+      '<div class="pose-log-item"><span>' + e.date +
+      ' — ' + (e.poses ?? '—') + (e.note ? ' · ' + e.note : '') +
+      '</span><span class="pose-log-del" data-del-date="' + e.date + '">✕</span></div>'
+    ).join('');
+  }
+
+  document.getElementById('poseLogAddBtn').addEventListener('click', () => {
+    const date = document.getElementById('poseLogDate').value || new Date().toISOString().slice(0, 10);
+    const fields = {
+      poses: document.getElementById('poseLogPoses').value || null,
+      note: document.getElementById('poseLogNote').value || null,
+    };
+    setPosingLog(upsertByDate(getPosingLog(), date, fields));
+    document.getElementById('poseLogPoses').value = '';
+    document.getElementById('poseLogNote').value = '';
+    renderPosingLog();
+  });
+
+  document.getElementById('poseLogList').addEventListener('click', (e) => {
+    const del = e.target.closest('[data-del-date]');
+    if (!del) return;
+    setPosingLog(getPosingLog().filter((entry) => entry.date !== del.dataset.delDate));
+    renderPosingLog();
+  });
+
+  renderPosingLog();
+
+  document.addEventListener('DOMContentLoaded', function () {
+    if (typeof initCloudSync !== 'function') return;
+    initCloudSync({
+      appKey: 'posing',
+      syncedKeys: ['posing:log'],
+      onApplied: renderPosingLog,
+    });
+  });
+})();
+</script>
 </body>
 </html>
