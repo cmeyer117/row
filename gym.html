@@ -3548,18 +3548,23 @@ img, video, canvas, svg { max-width: 100%; }
       return { type: 'down', weight: dl, reps: repMax, tag: 'Pain — deload', reason: 'Logged high pain last session. Drop ' + pct + '%, reset, and reassess.', stuck: stuck };
     }
     const recoveryLow = !!checkin && checkin.recovery === 'low';
-    const sleepEntry = getSleepEntryForDate(dateKey);
-    const sleepPoor = window.GymSleepCheckLogic ? window.GymSleepCheckLogic.isPoorSleepEntry(sleepEntry) : false;
-    if ((recoveryLow || sleepPoor) && result.type === 'up') {
-      const reasonSource = recoveryLow && sleepPoor
-        ? 'recovery was low and sleep was short/poor last time'
-        : recoveryLow
-        ? 'recovery was low last time'
-        : 'sleep was short/poor last night';
-      if (ex.bw) {
-        return { type: 'hold', weight: 0, reps: last.reps + 1, tag: 'Add a rep', reason: last.reps + ' reps — strong, but ' + reasonSource + '. Hold the push, aim for ' + (last.reps + 1) + '.', bw: true, stuck: stuck };
+    if (result.type === 'up') {
+      // Sleep lookup only runs when it could actually matter -- no point
+      // parsing health:sleep on a 'hold'/'down' result that this branch
+      // never touches.
+      const sleepEntry = getSleepEntryForDate(dateKey);
+      const sleepPoor = window.GymSleepCheckLogic ? window.GymSleepCheckLogic.isPoorSleepEntry(sleepEntry) : false;
+      if (recoveryLow || sleepPoor) {
+        const reasonSource = recoveryLow && sleepPoor
+          ? 'recovery was low and sleep was short/poor last time'
+          : recoveryLow
+          ? 'recovery was low last time'
+          : 'sleep was short/poor last night';
+        if (ex.bw) {
+          return { type: 'hold', weight: 0, reps: last.reps + 1, tag: 'Add a rep', reason: last.reps + ' reps — strong, but ' + reasonSource + '. Hold the push, aim for ' + (last.reps + 1) + '.', bw: true, stuck: stuck };
+        }
+        return { type: 'hold', weight: last.weight, reps: last.reps + 1, tag: 'Add a rep', reason: last.reps + ' reps — solid, but ' + reasonSource + '. Hold at ' + last.weight + unit() + ', push for ' + (last.reps + 1) + '.', stuck: stuck };
       }
-      return { type: 'hold', weight: last.weight, reps: last.reps + 1, tag: 'Add a rep', reason: last.reps + ' reps — solid, but ' + reasonSource + '. Hold at ' + last.weight + unit() + ', push for ' + (last.reps + 1) + '.', stuck: stuck };
     }
     return result;
   }
