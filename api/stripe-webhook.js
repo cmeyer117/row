@@ -62,12 +62,18 @@ export default async function handler(req, res) {
     const updateRes = await fetch(url, options);
     if (!updateRes.ok) {
       console.error('Supabase update failed for customer ' + stripeCustomerId + ': ' + updateRes.status);
+      // The patch is idempotent (same billing_status/subscription_id in,
+      // same out), so letting Stripe retry is safe and self-healing --
+      // unlike the old always-200 behavior, which silently left a paid
+      // customer stuck at a stale billing_status until someone noticed by
+      // hand (row-audit-2026-08-14.md P1 #3).
+      res.status(502).json({ ok: false, error: 'Supabase update failed' });
+      return;
     }
   } catch (e) {
-    // Always ack 200 once the event itself is understood — Stripe retries
-    // on non-2xx, and a transient Supabase blip here is fixable by hand,
-    // not worth an infinite webhook retry storm.
     console.error('Failed to update billing status for customer ' + stripeCustomerId, e);
+    res.status(502).json({ ok: false, error: 'Supabase update failed' });
+    return;
   }
 
   res.status(200).json({ ok: true });
