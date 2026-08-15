@@ -94,16 +94,35 @@
     });
   }
 
+  // Memoized so concurrent callers (topbar.js's own page-wide authGate()
+  // plus any page's own explicit RowAuth.ensure() call, e.g. gym.html/
+  // macros.html) share one in-flight/resolved result instead of each
+  // independently calling showLogin() and rendering its own overlay --
+  // found live 2026-08-15 on macros.html (two stacked login forms).
+  // Cleared on rejection, not just left unresolved forever, so a transient
+  // failure (e.g. Supabase CDN script not yet loaded) can be retried by a
+  // later call rather than permanently wedging every future ensure() call
+  // -- same "permanently-cached auth failure" class already fixed once for
+  // Vessel's equivalent gate.
+  var _ensurePromise = null;
+
   window.RowAuth = {
     // Resolves once the owner has a real Supabase Auth session. Caller is
     // responsible for hiding page content until this resolves.
-    ensure: async function () {
-      if (!window.supabase) throw new Error('RowAuth.ensure() called before the Supabase CDN script loaded');
-      var supa = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-      var got = await supa.auth.getSession();
-      if (got.data.session && isOwner(got.data.session)) { markAuthed(); return got.data.session; }
-      if (got.data.session) await supa.auth.signOut();
-      return showLogin(supa);
+    ensure: function () {
+      if (_ensurePromise) return _ensurePromise;
+      _ensurePromise = (async function () {
+        if (!window.supabase) throw new Error('RowAuth.ensure() called before the Supabase CDN script loaded');
+        var supa = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        var got = await supa.auth.getSession();
+        if (got.data.session && isOwner(got.data.session)) { markAuthed(); return got.data.session; }
+        if (got.data.session) await supa.auth.signOut();
+        return showLogin(supa);
+      })().catch(function (err) {
+        _ensurePromise = null;
+        throw err;
+      });
+      return _ensurePromise;
     },
     // Real session token for server-side verifyOwner() checks (paid-API
     // proxies, etc.) -- replaces the old client-visible ROW_APP_SECRET

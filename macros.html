@@ -818,8 +818,19 @@ $('mtTabHistory').addEventListener('click', () => {
   renderHistory();
 });
 
-refresh();
-renderCoachPlan();
+// row-auth.js is `defer`'d and hasn't necessarily run yet at this point --
+// this inline block runs synchronously during parsing. DOMContentLoaded
+// fires only after every deferred script (row-auth.js among them) has
+// already executed, guaranteeing window.RowAuth exists here. Without this
+// gate, refresh()/renderCoachPlan() raced the login prompt and always lost
+// -- every food_log call ran on an unauthenticated client and silently
+// failed against food_log's authenticated-only RLS policy.
+document.addEventListener('DOMContentLoaded', function () {
+  window.RowAuth.ensure().then(function () {
+    refresh();
+    renderCoachPlan();
+  });
+});
 
 // A tab left open across local midnight would otherwise keep showing
 // yesterday's budget/list until something happens to call refresh() —

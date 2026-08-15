@@ -560,6 +560,14 @@ body::after {
   (async function initMacroChip() {
     try {
       if (!window.supabase || !window.MacroCalc) return;
+      // This is a small non-critical chip on the main dashboard, which has
+      // no login gate today -- unlike gym.html/macros.html, don't force a
+      // blocking RowAuth.ensure() login prompt here. Check silently for an
+      // already-persisted session (e.g. from signing in on gym.html/
+      // macros.html) and skip the chip gracefully if there isn't one yet.
+      if (document.readyState === 'loading') {
+        await new Promise((resolve) => document.addEventListener('DOMContentLoaded', resolve, { once: true }));
+      }
       const client = window.supabase.createClient(
         'https://vikpcejlyxieguorwysf.supabase.co',
         'sb_publishable_EvWPtfW1FBW5Vf-H6w0yHw_PcXK4imv'

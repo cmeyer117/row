@@ -7061,6 +7061,17 @@ document.addEventListener('DOMContentLoaded', function () {
   // realtime updates so other devices' changes appear instantly.
   (async function pcInitCloudSync() {
     if (!window.supabase || !SUPABASE_URL || !SUPABASE_KEY) return;
+    // row-auth.js is `defer`'d and this script tag isn't, so window.RowAuth
+    // isn't guaranteed to exist at parse time (same race sync.js/
+    // initCloudSync has above, same fix). Without this, pcSupa never had a
+    // real session, pcAccessToken stayed null forever, and both the
+    // macro-adherence prefetch below and logWorkoutEvent's workout_events
+    // write silently no-op'd against food_log/workout_events' authenticated-
+    // only RLS -- found live 2026-08-15, food_log had zero rows ever.
+    if (document.readyState === 'loading') {
+      await new Promise((resolve) => document.addEventListener('DOMContentLoaded', resolve, { once: true }));
+    }
+    if (window.RowAuth) await window.RowAuth.ensure();
     // Skip if the placeholder values are still in place (local-only mode)
     if (SUPABASE_URL.indexOf('PASTE-') === 0 || SUPABASE_KEY.indexOf('PASTE-') === 0) return;
     // Never sync from a local/dev host — this file hardcodes prod credentials
@@ -7118,6 +7129,12 @@ document.addEventListener('DOMContentLoaded', function () {
   (async function prefetchMacroAdherence() {
     if (!window.supabase || !window.MacroCalc) return;
     try {
+      // Same defer race as pcInitCloudSync above -- wait for RowAuth to
+      // exist and for a real session before querying food_log directly.
+      if (document.readyState === 'loading') {
+        await new Promise((resolve) => document.addEventListener('DOMContentLoaded', resolve, { once: true }));
+      }
+      if (window.RowAuth) await window.RowAuth.ensure();
       const targets = JSON.parse(localStorage.getItem('macro_targets') || 'null');
       if (!targets) return;
       const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
