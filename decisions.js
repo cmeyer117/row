@@ -29,4 +29,41 @@
       return res;
     });
   };
+
+  // Returns the most recent open+due decision for a given category, or
+  // null if none is blocking. "Due" matches the SQL shape documented in
+  // the shared decision-memory spec: status='open' AND (review_date IS
+  // NULL OR review_date <= today).
+  window.getOpenDueDecision = function (category) {
+    if (!window.supabase) return Promise.reject(new Error('supabase-js not loaded'));
+    const today = new Date().toISOString().slice(0, 10);
+    const supa = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    return supa.from('decisions')
+      .select('*')
+      .eq('app', 'row')
+      .eq('category', category)
+      .eq('status', 'open')
+      .or(`review_date.is.null,review_date.lte.${today}`)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .then(function (res) {
+        if (res.error) throw new Error('getOpenDueDecision failed: ' + res.error.message);
+        return res.data && res.data[0] ? res.data[0] : null;
+      });
+  };
+
+  window.closeDecision = function (id, verdict, outcomeNote) {
+    if (!window.supabase) return Promise.reject(new Error('supabase-js not loaded'));
+    if (!id || !verdict) return Promise.reject(new Error('id and verdict are required'));
+    const supa = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    return supa.from('decisions').update({
+      verdict: verdict,
+      outcome_note: outcomeNote || null,
+      status: 'reviewed',
+      reviewed_at: new Date().toISOString(),
+    }).eq('id', id).then(function (res) {
+      if (res.error) throw new Error('closeDecision failed: ' + res.error.message);
+      return res;
+    });
+  };
 })();
