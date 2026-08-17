@@ -65,15 +65,24 @@ button {
 <script>
 const MUSCLES = Object.keys(window.GymVolumeLogic.MUSCLE_BANDS);
 
+// Memoized: the closeout flow and the immediately-following new-decision
+// form both need this same po-coach row within one page load, and nothing
+// on this page logs a set in between (found in code review 2026-08-17 —
+// was 2 identical Supabase round-trips back to back on the common path).
+let _gymStatePromise = null;
 async function fetchGymState() {
-  const res = await fetch('https://vikpcejlyxieguorwysf.supabase.co/rest/v1/app_state?key=eq.po-coach&select=data', {
-    headers: {
-      apikey: 'sb_publishable_EvWPtfW1FBW5Vf-H6w0yHw_PcXK4imv',
-      Authorization: 'Bearer sb_publishable_EvWPtfW1FBW5Vf-H6w0yHw_PcXK4imv',
-    },
-  });
-  const rows = await res.json();
-  return (rows[0] && rows[0].data && rows[0].data.po_coach_v1) || { exercises: [], logs: {} };
+  if (_gymStatePromise) return _gymStatePromise;
+  _gymStatePromise = (async () => {
+    const res = await fetch('https://vikpcejlyxieguorwysf.supabase.co/rest/v1/app_state?key=eq.po-coach&select=data', {
+      headers: {
+        apikey: 'sb_publishable_EvWPtfW1FBW5Vf-H6w0yHw_PcXK4imv',
+        Authorization: 'Bearer sb_publishable_EvWPtfW1FBW5Vf-H6w0yHw_PcXK4imv',
+      },
+    });
+    const rows = await res.json();
+    return (rows[0] && rows[0].data && rows[0].data.po_coach_v1) || { exercises: [], logs: {} };
+  })();
+  return _gymStatePromise;
 }
 
 async function fetchCoachRead() {
@@ -89,9 +98,13 @@ async function fetchCoachRead() {
 }
 
 // 'health' and 'posing' are owner-only RLS-scoped app_state keys (unlike
-// 'po-coach', which is on the anon-readable allowlist) — fetchGymState's
-// raw anon-key request wouldn't work here, so this mirrors fetchCoachRead's
-// real-owner-token pattern instead.
+// 'po-coach', which is on the anon-readable allowlist), so fetchGymState's
+// raw anon-key request wouldn't work here. Unlike fetchCoachRead (which
+// proxies through /api/coach-read, a server route that authenticates the
+// caller then reads Supabase itself with the service-role key), this sends
+// the client's own owner JWT directly to Supabase's REST endpoint — same
+// request shape fetchGymState uses, but with a real per-user token instead
+// of the anon key, since RLS on these two keys requires it.
 async function fetchAppStateKey(key) {
   try {
     const token = await window.RowAuth.getAccessToken();
@@ -122,6 +135,19 @@ function countEntriesInWeek(entries, monday, sunday) {
   return (entries || []).filter(e => e && e.date && e.date >= monday && e.date <= sunday).length;
 }
 
+// gym-volume-logic.js's mondayOfDate() buckets by UTC calendar day. Carl's
+// real local day is America/New_York (see api/_lib/workout-nudge-logic.js) --
+// a decision recorded Sunday evening Eastern (after ~7-8pm, once the UTC
+// date has already rolled to Monday) would otherwise get bucketed a full
+// week later than the week Carl actually reviewed (found in code review
+// 2026-08-17: this is literally the weekly-review page, Sunday evening is
+// a plausible time to use it). Converts to Carl's local calendar date
+// first so mondayOfDate() reads the weekday he actually experienced.
+function easternCalendarDate(date) {
+  const ymd = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
+  return new Date(ymd + 'T00:00:00.000Z');
+}
+
 // Builds the auto-computed follow-through scorecard for the week the
 // decision governed (the 7 days starting the Monday after it was made —
 // review_date is created_at + 7 days, so this lands on the same week
@@ -133,7 +159,8 @@ function countEntriesInWeek(entries, monday, sunday) {
 // either — deliberately not attempting free-text matching against lift
 // names for a v1).
 async function computeScorecard(decision) {
-  const scoreWeekRef = new Date(new Date(decision.created_at).getTime() + 7 * 24 * 60 * 60 * 1000);
+  const scoreWeekRef = easternCalendarDate(new Date(decision.created_at));
+  scoreWeekRef.setUTCDate(scoreWeekRef.getUTCDate() + 7);
   const { monday, sunday } = weekWindow(scoreWeekRef);
 
   const [gymState, health, posing] = await Promise.all([
@@ -164,7 +191,8 @@ async function computeScorecard(decision) {
 function renderScorecard(scorecard) {
   const volumeHtml = scorecard.volumeRows.length
     ? scorecard.volumeRows.map(r => {
-        const dirLabel = r.action === 'add_set' ? 'add' : r.action === 'pull_back' ? 'reduce' : 'keep';
+        const known = window.GymVolumeLogic.VOLUME_ACTIONS[r.action];
+        const dirLabel = known ? known.label : 'unrecognized';
         const baselineLabel = r.baseline != null ? r.baseline : '?';
         const badge = r.matched === null ? '' : r.matched
           ? `<span style="color:var(--good);">✓ followed</span>`
@@ -197,13 +225,23 @@ async function renderCloseout(decision) {
   el.style.display = 'block';
   el.innerHTML = `<p style="color:var(--text-3);font-size:13px;">Scoring last week's follow-through...</p>`;
 
-  const scorecard = await computeScorecard(decision);
+  // Never let a failed scorecard fetch (offline, flaky wifi -- plausible for
+  // a gym app) leave Carl stuck on "Scoring..." with no way to close out the
+  // open decision (found in code review 2026-08-17). The verdict picker is
+  // the invariant that must always render; the scorecard is a bonus on top.
+  let scorecardHtml = '';
+  try {
+    scorecardHtml = renderScorecard(await computeScorecard(decision));
+  } catch (err) {
+    console.error('computeScorecard failed:', err);
+    scorecardHtml = `<p style="color:var(--warn);font-size:13px;margin-bottom:12px;">Couldn't load follow-through data (connection issue) — pick a verdict from memory.</p>`;
+  }
 
   el.innerHTML = `
     <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:16px;">
       <p style="color:var(--text-2);font-size:13px;">Close out last week's decision before starting a new one:</p>
       <p style="color:var(--text-1);font-size:14px;margin:8px 0;">${decision.decision_text}</p>
-      ${renderScorecard(scorecard)}
+      ${scorecardHtml}
       <select id="verdictSelect" style="width:100%;padding:8px;margin-bottom:8px;">
         <option value="">Verdict...</option>
         <option value="worked">Worked</option>
@@ -224,6 +262,18 @@ async function renderCloseout(decision) {
   };
 }
 
+// <option> values/order sourced from the single VOLUME_ACTIONS map
+// (gym-volume-logic.js) instead of a 3rd independent hardcoded copy --
+// display text just title-cases the same label matchesVolumeDecision's
+// comparator and the closeout scorecard's dirLabel both already use.
+function volumeActionOptions(suggested) {
+  return ['add_set', 'keep', 'pull_back'].map(action => {
+    const label = window.GymVolumeLogic.VOLUME_ACTIONS[action].label;
+    const text = label.charAt(0).toUpperCase() + label.slice(1);
+    return `<option value="${action}" ${suggested === action ? 'selected' : ''}>${text}</option>`;
+  }).join('');
+}
+
 async function renderNewDecisionForm() {
   const [gymState, coachRead] = await Promise.all([fetchGymState(), fetchCoachRead()]);
   const counts = window.GymVolumeLogic.weeklySetsByMuscle(gymState.exercises || [], gymState.logs || {});
@@ -235,11 +285,7 @@ async function renderNewDecisionForm() {
     const suggested = advisory ? advisory.suggestion : 'keep';
     return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);">
       <span style="color:var(--text-1);font-size:13px;">${m} (${counts[m] || 0} sets)</span>
-      <select data-muscle="${m}" class="muscleSelect" style="padding:4px;">
-        <option value="add_set" ${suggested === 'add_set' ? 'selected' : ''}>Add</option>
-        <option value="keep" ${suggested === 'keep' ? 'selected' : ''}>Keep</option>
-        <option value="pull_back" ${suggested === 'pull_back' ? 'selected' : ''}>Reduce</option>
-      </select>
+      <select data-muscle="${m}" class="muscleSelect" style="padding:4px;">${volumeActionOptions(suggested)}</select>
     </div>`;
   }).join('');
 

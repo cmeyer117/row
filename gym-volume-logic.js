@@ -211,18 +211,36 @@
     return null;
   }
 
+  // Single source of truth for the 3 volume-decision actions -- shared
+  // between matchesVolumeDecision's comparator below and weekly-review.html's
+  // <select> options / display labels, so renaming or adding an action only
+  // touches one place instead of three independently-hardcoded copies
+  // (found in code review 2026-08-17).
+  var VOLUME_ACTIONS = {
+    add_set:   { label: 'add' },
+    pull_back: { label: 'reduce' },
+    keep:      { label: 'keep' }
+  };
+
   // Did actual hard sets for a muscle follow the direction a weekly-review
   // decision chose ('add_set'/'pull_back'/'keep')? Used by the
   // decision-to-execution scoreboard (weekly-review.html) to auto-score
   // volume follow-through instead of asking Carl to eyeball it. Returns
-  // null (no call made) when there's no baseline to compare against —
-  // e.g. a decision recorded before this field existed.
+  // null when there's no baseline to compare against (a decision recorded
+  // before this field existed) or the action isn't one of the 3 known
+  // values. 'keep' allows a +/-1 set tolerance rather than exact equality
+  // -- actual/baseline can be fractional (secondary-muscle contribution
+  // weighting, see EXERCISE_MUSCLE_CONTRIBUTIONS) and even whole-number
+  // counts naturally drift by a set or two week-to-week for reasons that
+  // have nothing to do with whether Carl actually kept the same volume
+  // (an extra warm-up logged, one exercise swapped for a near-equivalent).
+  // Exact equality flagged genuine "kept it about the same" weeks as
+  // "not followed" far too often (found in code review 2026-08-17).
   function matchesVolumeDecision(action, baseline, actual) {
-    if (baseline == null) return null;
+    if (baseline == null || !VOLUME_ACTIONS[action]) return null;
     if (action === 'add_set') return actual > baseline;
     if (action === 'pull_back') return actual < baseline;
-    if (action === 'keep') return actual === baseline;
-    return null;
+    return Math.abs(actual - baseline) <= 1;
   }
 
   var api = {
@@ -233,6 +251,7 @@
     volumeAdvisory: volumeAdvisory,
     phaseTarget: phaseTarget,
     matchesVolumeDecision: matchesVolumeDecision,
+    VOLUME_ACTIONS: VOLUME_ACTIONS,
     MUSCLE_BANDS: MUSCLE_BANDS,
     EXERCISE_MUSCLE_CONTRIBUTIONS: EXERCISE_MUSCLE_CONTRIBUTIONS
   };
