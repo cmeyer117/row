@@ -17,7 +17,7 @@ const sandbox = { window: {} };
 vm.createContext(sandbox);
 const source = fs.readFileSync(path.join(__dirname, 'gym-workout-events.js'), 'utf8');
 vm.runInContext(source, sandbox);
-const { classifyWorkoutEvent } = sandbox.window.GymWorkoutEvents;
+const { classifyWorkoutEvent, totalLoad } = sandbox.window.GymWorkoutEvents;
 
 function assertEqual(actual, expected, label) {
   if (actual !== expected) {
@@ -81,11 +81,60 @@ assertEqual(
   'bodyweight reps under repMin is a miss'
 );
 
-// --- weightBasis guard: plate-mode weight is per-side, lb-mode is total load ---
+// --- totalLoad: resolve a logged set to the real load moved ---
 
-// A 90 lb/side plate log must not read as a PR against a 225 lb total-load prior,
-// and must not read as a miss/grind by falling through to rep rules either --
-// there is no comparable history, so it fires nothing.
+const smithEx = { bw: false, repMin: 4, repMax: 8, loadType: 'perSidePlusBar', barWeight: 25 };
+const machineEx = { bw: false, repMin: 8, repMax: 12, loadType: 'perSide' };
+const dipEx = { bw: false, repMin: 8, repMax: 12, loadType: 'plates' };
+const cableEx = { bw: false, repMin: 8, repMax: 16, loadType: 'total' };
+
+// lb-mode entries are already total load, whatever the loadType says.
+assertEqual(totalLoad({ weight: 225, weightBasis: 'totalLbs' }, smithEx), 225, 'lb-mode entry passes through unconverted');
+
+// Per-side plate entries convert according to loadType.
+assertEqual(totalLoad({ weight: 90, weightBasis: 'platesPerSide' }, smithEx), 205, 'perSidePlusBar doubles and adds the bar');
+assertEqual(totalLoad({ weight: 90, weightBasis: 'platesPerSide' }, machineEx), 180, 'perSide doubles with no bar');
+assertEqual(totalLoad({ weight: 100, weightBasis: 'platesPerSide' }, dipEx), 100, 'plates (single horn) passes through');
+assertEqual(totalLoad({ weight: 80, weightBasis: 'platesPerSide' }, cableEx), 80, 'total (stack) passes through');
+
+// perSidePlusBar with no explicit barWeight falls back to a 45 lb bar.
+assertEqual(
+  totalLoad({ weight: 90, weightBasis: 'platesPerSide' }, { loadType: 'perSidePlusBar' }),
+  225,
+  'perSidePlusBar defaults to a 45 lb bar'
+);
+
+// Unknown loadType on a per-side entry is null (not comparable), never 0 or a guess.
+assertEqual(totalLoad({ weight: 90, weightBasis: 'platesPerSide' }, weightedEx), null, 'per-side entry with no loadType is null');
+
+// Legacy plateConfig rows are inferred as per-side and convert the same way.
+assertEqual(totalLoad({ weight: 90, plateConfig: { 45: 2 } }, machineEx), 180, 'legacy plateConfig row is inferred as per-side');
+
+// --- classification across logging modes, once loadType can resolve them ---
+
+// 90/side + 25 bar = 205 total, which is NOT a pr over a 225 lb total-load prior.
+assertEqual(
+  classifyWorkoutEvent(
+    { weight: 90, reps: 5, weightBasis: 'platesPerSide' },
+    [{ weight: 225, reps: 5, weightBasis: 'totalLbs' }],
+    smithEx
+  ),
+  null,
+  'plate-mode set below a lb-mode prior in real load is not a pr'
+);
+
+// 110/side + 25 bar = 245 total, which IS a pr over the same 225 prior.
+assertEqual(
+  classifyWorkoutEvent(
+    { weight: 110, reps: 5, weightBasis: 'platesPerSide' },
+    [{ weight: 225, reps: 5, weightBasis: 'totalLbs' }],
+    smithEx
+  ),
+  'pr',
+  'plate-mode set above a lb-mode prior in real load is a pr'
+);
+
+// Without loadType the two bases stay incomparable -- fires nothing rather than guessing.
 assertEqual(
   classifyWorkoutEvent(
     { weight: 90, reps: 5, weightBasis: 'platesPerSide' },
@@ -93,40 +142,18 @@ assertEqual(
     weightedEx
   ),
   null,
-  'plate-mode set with only lb-mode history fires nothing'
+  'unresolvable per-side entry fires nothing'
 );
 
-// The reverse direction: a 225 total-load set is not a PR over a 90/side prior.
-assertEqual(
-  classifyWorkoutEvent(
-    { weight: 225, reps: 5, weightBasis: 'totalLbs' },
-    [{ weight: 90, reps: 5, weightBasis: 'platesPerSide' }],
-    weightedEx
-  ),
-  null,
-  'lb-mode set with only plate-mode history fires nothing'
-);
-
-// Same basis still compares normally, with the mismatched prior ignored.
+// Same basis still compares normally.
 assertEqual(
   classifyWorkoutEvent(
     { weight: 100, reps: 5, weightBasis: 'platesPerSide' },
-    [{ weight: 90, reps: 5, weightBasis: 'platesPerSide' }, { weight: 405, reps: 5, weightBasis: 'totalLbs' }],
-    weightedEx
+    [{ weight: 90, reps: 5, weightBasis: 'platesPerSide' }],
+    machineEx
   ),
   'pr',
-  'same-basis comparison still detects a pr and ignores the other basis'
-);
-
-// Legacy rows have no weightBasis: a plateConfig means it came from the picker.
-assertEqual(
-  classifyWorkoutEvent(
-    { weight: 100, reps: 5, plateConfig: { 45: 2, 10: 1 } },
-    [{ weight: 90, reps: 5, plateConfig: { 45: 2 } }],
-    weightedEx
-  ),
-  'pr',
-  'legacy plateConfig rows are inferred as platesPerSide and compare to each other'
+  'same-basis comparison still detects a pr'
 );
 
 // Legacy rows without plateConfig are inferred as total lbs -- unchanged behavior.

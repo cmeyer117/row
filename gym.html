@@ -79,39 +79,39 @@ const CONFIG = {
     // ── Push ──
     { name: "Neutral Grip Shoulder Press Machine", gym: "comm", day: "push", muscle: "Shoulders", repMin: 4,  repMax: 8,  step: 5,   startWeight: 185, numSets: 2,
       subs: [{ name: "Dumbbell Neutral Grip Shoulder Press", stars: 4 }, { name: "Smith Incline Machine Chest Press", stars: 3 }] },
-    { name: "Smith Machine Flat Chest Press",      gym: "comm", day: "push", muscle: "Chest", repMin: 4,  repMax: 8,  step: 5,   startWeight: 250, numSets: 2,
+    { name: "Smith Machine Flat Chest Press",      gym: "comm", day: "push", muscle: "Chest", loadType: 'perSidePlusBar', barWeight: 25, repMin: 4,  repMax: 8,  step: 5,   startWeight: 250, numSets: 2,
       subs: [{ name: "Machine Flat Chest Press", stars: 5 }, { name: "Barbell / Dumbbell Flat Chest Press", stars: 4 }, { name: "Seated Cable Flat Chest Press", stars: 4 }] },
-    { name: "Chest Dip",                           gym: "comm", day: "push", muscle: "Chest", repMin: 8,  repMax: 12, step: 5,   startWeight: 0,   numSets: 2,
+    { name: "Chest Dip",                           gym: "comm", day: "push", muscle: "Chest", loadType: 'plates', repMin: 8,  repMax: 12, step: 5,   startWeight: 0,   numSets: 2,
       subs: [{ name: "Dip Machine (Chest Bias)", stars: 5 }, { name: "Chest Dip (RG Variant)", stars: 5 }, { name: "Other Dip Variations", stars: 3 }] },
-    { name: "Incline Cable Pec Fly",               gym: "comm", day: "push", muscle: "Chest", repMin: 8,  repMax: 12, step: 5,   startWeight: 52.5,numSets: 2,
+    { name: "Incline Cable Pec Fly",               gym: "comm", day: "push", muscle: "Chest", loadType: 'total', repMin: 8,  repMax: 12, step: 5,   startWeight: 52.5,numSets: 2,
       subs: [{ name: "Pec Dec Fly (Upper Chest Bias)", stars: 5 }, { name: "Incline Dumbbell Pec Fly", stars: 4 }] },
     { name: "Dumbbell Lateral Raise",              gym: "comm", day: "push", muscle: "Shoulders", repMin: 8,  repMax: 16, step: 2.5, startWeight: 35,  numSets: 2,
       subs: [{ name: "Low Cable Lateral Raise", stars: 5 }, { name: "Seated Machine Lateral Raise", stars: 4 }, { name: "Standing Machine Lateral Raise", stars: 4 }] },
-    { name: "Cable Front Raise",                   gym: "comm", day: "push", muscle: "Shoulders", repMin: 8,  repMax: 16, step: 5,   startWeight: 30,  numSets: 2,
+    { name: "Cable Front Raise",                   gym: "comm", day: "push", muscle: "Shoulders", loadType: 'total', repMin: 8,  repMax: 16, step: 5,   startWeight: 30,  numSets: 2,
       subs: [{ name: "Dumbbell Front Raise", stars: 4 }] },
-    { name: "Cable Triceps Overhead Extension",    gym: "comm", day: "push", muscle: "Triceps", repMin: 8,  repMax: 16, step: 5,   startWeight: 50,  numSets: 4,
+    { name: "Cable Triceps Overhead Extension",    gym: "comm", day: "push", muscle: "Triceps", loadType: 'total', repMin: 8,  repMax: 16, step: 5,   startWeight: 50,  numSets: 4,
       subs: [{ name: "Dumbbell Overhead Extension", stars: 5 }, { name: "Machine Overhead Triceps Extension", stars: 5 }, { name: "Machine Triceps Extension", stars: 4 }] },
     // ── Pull ──
     { name: "Lat Pulldown",                        gym: "comm", day: "pull", muscle: "Back", repMin: 4,  repMax: 8,  step: 5,   startWeight: 100, numSets: 2,
       subs: [{ name: "Wide Grip Pullup", stars: 4 }, { name: "Lat Pulldown Machine", stars: 4 }] },
-    { name: "Cable Seated Row (Neutral Grip)",     gym: "comm", day: "pull", muscle: "Back", repMin: 4,  repMax: 8,  step: 5,   startWeight: 245, numSets: 2,
+    { name: "Cable Seated Row (Neutral Grip)",     gym: "comm", day: "pull", muscle: "Back", loadType: 'total', repMin: 4,  repMax: 8,  step: 5,   startWeight: 245, numSets: 2,
       subs: [{ name: "Smith Machine UH Barbell Row", stars: 5 }, { name: "Underhand Grip Barbell Row", stars: 4 }] },
-    { name: "Machine High Row",                    gym: "comm", day: "pull", muscle: "Back", repMin: 8,  repMax: 12, step: 5,   startWeight: 135, numSets: 2,
+    { name: "Machine High Row",                    gym: "comm", day: "pull", muscle: "Back", loadType: 'perSide', repMin: 8,  repMax: 12, step: 5,   startWeight: 135, numSets: 2,
       subs: [{ name: "Cable High Row", stars: 5 }, { name: "Nautilus Lat Pulldown", stars: 5 }, { name: "High Row Setup on Lat Pulldown", stars: 5 }] },
-    { name: "Machine Low Row",                     gym: "comm", day: "pull", muscle: "Back", repMin: 8,  repMax: 12, step: 5,   startWeight: 90,  numSets: 2,
+    { name: "Machine Low Row",                     gym: "comm", day: "pull", muscle: "Back", loadType: 'perSide', repMin: 8,  repMax: 12, step: 5,   startWeight: 90,  numSets: 2,
       subs: [{ name: "Cable Low Row", stars: 5 }, { name: "Single Arm Landmine Row", stars: 4 }] },
-    { name: "Cable Lat Pushdown/Pullover",         gym: "comm", day: "pull", muscle: "Back", repMin: 8,  repMax: 16, step: 5,   startWeight: 72.5,numSets: 2,
+    { name: "Cable Lat Pushdown/Pullover",         gym: "comm", day: "pull", muscle: "Back", loadType: 'total', repMin: 8,  repMax: 16, step: 5,   startWeight: 72.5,numSets: 2,
       subs: [{ name: "Machine Lat Pullover", stars: 5 }, { name: "Dumbbell Lat Pullover", stars: 4 }] },
-    { name: "Cable Rear Delt Fly",                 gym: "comm", day: "pull", muscle: "Shoulders", repMin: 8,  repMax: 16, step: 5,   startWeight: 15,  numSets: 2,
+    { name: "Cable Rear Delt Fly",                 gym: "comm", day: "pull", muscle: "Shoulders", loadType: 'total', repMin: 8,  repMax: 16, step: 5,   startWeight: 15,  numSets: 2,
       subs: [{ name: "Machine Rear Delt Fly", stars: 5 }, { name: "Dumbbell Rear Delt Fly", stars: 4 }] },
-    { name: "Seated Behind-the-Back Cable Curl",   gym: "comm", day: "pull", muscle: "Biceps", repMin: 8,  repMax: 16, step: 2.5, startWeight: 35,  numSets: 4,
+    { name: "Seated Behind-the-Back Cable Curl",   gym: "comm", day: "pull", muscle: "Biceps", loadType: 'total', repMin: 8,  repMax: 16, step: 2.5, startWeight: 35,  numSets: 4,
       subs: [{ name: "Bayesian Cable Curl", stars: 5 }, { name: "Seated Incline Dumbbell Curl", stars: 4 }] },
     // ── Legs A ──
-    { name: "Hack Squat",                          gym: "comm", day: "legsA", muscle: "Quads", repMin: 4,  repMax: 8,  step: 10,  startWeight: 200, numSets: 2,
+    { name: "Hack Squat",                          gym: "comm", day: "legsA", muscle: "Quads", loadType: 'perSide', repMin: 4,  repMax: 8,  step: 10,  startWeight: 200, numSets: 2,
       subs: [{ name: "Pendulum Squat", stars: 5 }, { name: "Smith Machine Squat (Quad Bias)", stars: 5 }, { name: "Barbell Squat (Quad Bias)", stars: 4 }] },
     { name: "Sissy Leg Press",                     gym: "comm", day: "legsA", muscle: "Quads", repMin: 8,  repMax: 12, step: 10,  startWeight: 540, numSets: 2,
       subs: [{ name: "Hack Squat Sissy Squats", stars: 4 }, { name: "Sissy Squat on Sissy Stand", stars: 4 }, { name: "Leg Press Quad Bias", stars: 4 }] },
-    { name: "Seated Hamstrings Curl",              gym: "comm", day: "legsA", muscle: "Hamstrings", repMin: 8,  repMax: 12, step: 5,   startWeight: 110, numSets: 2,
+    { name: "Seated Hamstrings Curl",              gym: "comm", day: "legsA", muscle: "Hamstrings", loadType: 'perSide', repMin: 8,  repMax: 12, step: 5,   startWeight: 110, numSets: 2,
       subs: [{ name: "Lying Hamstrings Curl", stars: 5 }, { name: "Glute Ham Raise", stars: 3 }] },
     { name: "Dumbbell B-Stance RDL",               gym: "comm", day: "legsA", muscle: "Hamstrings", repMin: 8,  repMax: 16, step: 5,   startWeight: 55,  numSets: 2,
       subs: [{ name: "Cable Hip Extension Machine", stars: 6 }, { name: "Single Leg Hip Extension", stars: 5 }, { name: "V-Squat Good Morning", stars: 4 }, { name: "Barbell Good Morning", stars: 4 }] },
@@ -124,7 +124,7 @@ const CONFIG = {
       subs: [{ name: "Machine Incline Chest Press", stars: 5 }, { name: "Smith Incline Machine Chest Press", stars: 5 }] },
     { name: "Chest Supported T-Bar Row",           gym: "comm", day: "upper", muscle: "Back", repMin: 4,  repMax: 8,  step: 5,   startWeight: 135, numSets: 2,
       subs: [{ name: "Smith Machine Barbell Row", stars: 5 }, { name: "Landmine T-Bar Row", stars: 5 }, { name: "Barbell Row", stars: 4 }] },
-    { name: "Smith Machine Narrow Grip Bench",     gym: "comm", day: "upper", muscle: "Triceps", repMin: 4,  repMax: 8,  step: 5,   startWeight: 225, numSets: 2,
+    { name: "Smith Machine Narrow Grip Bench",     gym: "comm", day: "upper", muscle: "Triceps", loadType: 'perSidePlusBar', barWeight: 25, repMin: 4,  repMax: 8,  step: 5,   startWeight: 225, numSets: 2,
       subs: [{ name: "Barbell Narrow Grip Bench Press", stars: 5 }, { name: "Machine Narrow Grip Chest Press", stars: 4 }, { name: "Narrow Grip Push-up", stars: 3 }] },
     { name: "Neutral Grip Lat Pulldown",           gym: "comm", day: "upper", muscle: "Back", repMin: 4,  repMax: 8,  step: 5,   startWeight: 100, numSets: 2,
       subs: [{ name: "Nautilus Lat Pulldown Machine", stars: 5 }, { name: "Single Arm Lat Pulldown", stars: 4 }] },
@@ -5967,9 +5967,9 @@ img, video, canvas, svg { max-width: 100%; }
       // The plate picker collects plates PER SIDE (see platePickerSummary's "lb/side"),
       // so `weight` here is per-side plate load — no bar, no ×2 — while lb-mode `weight`
       // is total load. Stamp the basis so consumers never silently compare the two.
-      // ponytail: label only, no conversion — ×2+bar is right for barbell/Smith, wrong for a
-      // single-horn plate machine, meaningless for a cable stack, and the exercise has no
-      // loadType field to tell them apart yet. Add loadType + computed total, then convert.
+      // `weight` deliberately stays raw as entered. The exercise's `loadType`
+      // resolves it to real load at read time via GymWorkoutEvents.totalLoad(),
+      // so a wrong loadType mis-displays but can never corrupt a logged set.
       entry.weightBasis = 'platesPerSide';
     } else {
       w = parseFloat($('weightInput').value) || 0;
