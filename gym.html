@@ -2756,6 +2756,7 @@ img, video, canvas, svg { max-width: 100%; }
       <div class="po-seg-row">
         <span class="po-seg-label" id="daySegLabel">Day</span>
         <div class="po-seg-control" id="daySeg"></div>
+        <button class="po-icon-btn" id="manageBonusIconBtn" type="button" title="Manage bonus workouts" aria-label="Manage bonus workouts" style="display:none">⚙</button>
         <button class="po-seg-btn" id="bonusModeToggle" type="button">Bonus</button>
       </div>
       <div class="po-seg-row">
@@ -3808,9 +3809,10 @@ img, video, canvas, svg { max-width: 100%; }
     $('bonusModeToggle').classList.toggle('active', state.viewMode === 'bonus');
     if (state.viewMode === 'bonus') {
       $('daySegLabel').textContent = 'Bonus';
+      $('daySeg').className = 'po-bonus-chip-row';
       $('daySeg').innerHTML = state.bonusTemplates.map(t =>
         '<button class="po-seg-btn ' + (t.id === state.filterBonusTemplateId ? 'active' : '') + '" data-bonus-template="' + t.id + '">' + escape(t.name) + '</button>'
-      ).join('') + '<button class="po-seg-btn" id="manageBonusBtn" type="button">⚙ Manage</button>';
+      ).join('');
       $('daySeg').querySelectorAll('[data-bonus-template]').forEach(b => {
         b.addEventListener('click', () => {
           state.filterBonusTemplateId = b.dataset.bonusTemplate;
@@ -3818,9 +3820,10 @@ img, video, canvas, svg { max-width: 100%; }
           saveState(); renderAll();
         });
       });
-      const manageBtn = document.getElementById('manageBonusBtn');
-      if (manageBtn) manageBtn.addEventListener('click', openManageBonusModal);
+      document.getElementById('manageBonusIconBtn').style.display = 'flex';
     } else {
+      $('daySeg').className = 'po-seg-control';
+      document.getElementById('manageBonusIconBtn').style.display = 'none';
       $('daySegLabel').textContent = 'Day';
       $('daySeg').innerHTML = state.days.map(d =>
         '<button class="po-seg-btn ' + (d.id === state.filterDay ? 'active' : '') + '" data-day="' + d.id + '">' + escape(d.name) + '</button>'
@@ -3847,6 +3850,7 @@ img, video, canvas, svg { max-width: 100%; }
     state.currentEx = null;
     saveState(); renderAll();
   });
+  $('manageBonusIconBtn').addEventListener('click', openManageBonusModal);
 
   let _manageBonusEditingId = null;
 
