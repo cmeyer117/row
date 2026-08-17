@@ -110,6 +110,11 @@ assertEqual(totalLoad({ weight: 90, weightBasis: 'platesPerSide' }, weightedEx),
 // Legacy plateConfig rows are inferred as per-side and convert the same way.
 assertEqual(totalLoad({ weight: 90, plateConfig: { 45: 2 } }, machineEx), 180, 'legacy plateConfig row is inferred as per-side');
 
+// Single-horn plate machines (e.g. T-bar row style, Seated Hamstrings Curl in
+// Carl's gym) must not be doubled -- confirmed live 2026-08-17, was
+// mistagged perSide until Carl corrected it.
+assertEqual(totalLoad({ weight: 135, plateConfig: { 45: 3 } }, dipEx), 135, 'single-horn (plates) loadType is never doubled');
+
 // --- classification across logging modes, once loadType can resolve them ---
 
 // 90/side + 25 bar = 205 total, which is NOT a pr over a 225 lb total-load prior.
