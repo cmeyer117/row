@@ -346,6 +346,26 @@ img, video, canvas, svg { max-width: 100%; }
   flex: none; min-width: 64px;
   background: rgba(255,255,255,0.04); border: 1px solid var(--border);
 }
+/* ----- Bonus template chip strip (horizontally scrollable, unbounded
+   count/length -- unlike day pills, template names are user-typed and the
+   list can grow, so equal-flex squeeze/ellipsis breaks down here) ----- */
+.po-bonus-chip-row {
+  display: flex; flex: 1; overflow-x: auto; gap: 6px;
+  scrollbar-width: none; -ms-overflow-style: none;
+  background: rgba(110,231,183,0.05);
+  border: 1px solid var(--border);
+  border-left: 2px solid rgba(110,231,183,0.5);
+  border-radius: 12px; padding: 4px 4px 4px 8px;
+}
+.po-bonus-chip-row::-webkit-scrollbar { display: none; }
+.po-bonus-chip-row .po-seg-btn {
+  flex: 0 0 auto; white-space: nowrap;
+}
+#manageBonusIconBtn {
+  flex: none; width: 42px; height: 42px; min-width: 42px;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0; margin-left: 6px; font-size: 16px;
+}
 .po-seg-btn.active {
   background: linear-gradient(135deg, #6EE7B7 0%, #34D399 100%);
   color: #052e16;
