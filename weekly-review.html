@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0a0b">
+<link rel="manifest" href="/manifest.json" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Row" />
+<title>Weekly Review — Row</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="row-auth.js" defer></script>
+<script src="topbar.js" defer></script>
+<script src="gym-volume-logic.js"></script>
+<script src="decisions.js"></script>
+<style>
+:root {
+  --bg: #000000;
+  --bg-card: #111113;
+  --text-1: #F4F1EA;
+  --text-2: rgba(244,241,234,0.6);
+  --text-3: rgba(244,241,234,0.4);
+  --text-4: rgba(244,241,234,0.25);
+  --border: rgba(255,255,255,0.08);
+  --border-strong: rgba(255,255,255,0.16);
+  --accent: #6ee7b7;
+  --good: #6ee7b7;
+  --warn: #fbbf24;
+  --bad: #ff8a8a;
+  --font: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SF Mono, Menlo, Consolas, monospace;
+}
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; padding: 0;
+  background: radial-gradient(ellipse 80% 60% at 75% 0%, rgba(110,231,183,0.06) 0%, #0a0a0b 60%);
+  color: var(--text-1);
+  font-family: var(--font);
+  -webkit-font-smoothing: antialiased;
+  -webkit-text-size-adjust: 100%;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+select, textarea, input {
+  background: var(--bg-card); color: var(--text-1); border: 1px solid var(--border);
+  border-radius: 8px; font-family: var(--font); font-size: 13px;
+}
+button {
+  background: var(--accent); color: #06120c; border: none; border-radius: 8px;
+  font-family: var(--font); font-weight: 600; cursor: pointer;
+}
+</style>
+</head>
+<body>
+<div id="app" style="max-width:640px;margin:0 auto;padding:24px 16px 100px;">
+  <h1 style="font-family:var(--font);font-size:22px;color:var(--text-1);">Weekly Coach Decision Loop</h1>
+  <div id="loading" style="color:var(--text-3);">Loading...</div>
+  <div id="closeoutSection" style="display:none;"></div>
+  <div id="newDecisionSection" style="display:none;"></div>
+</div>
+<script>
+const MUSCLES = Object.keys(window.GymVolumeLogic.MUSCLE_BANDS);
+
+async function fetchGymState() {
+  const res = await fetch('https://vikpcejlyxieguorwysf.supabase.co/rest/v1/app_state?key=eq.po-coach&select=data', {
+    headers: {
+      apikey: 'sb_publishable_EvWPtfW1FBW5Vf-H6w0yHw_PcXK4imv',
+      Authorization: 'Bearer sb_publishable_EvWPtfW1FBW5Vf-H6w0yHw_PcXK4imv',
+    },
+  });
+  const rows = await res.json();
+  return (rows[0] && rows[0].data && rows[0].data.po_coach_v1) || { exercises: [], logs: {} };
+}
+
+async function fetchCoachRead() {
+  try {
+    const token = await window.RowAuth.getAccessToken();
+    const res = await fetch('/api/coach-read', { headers: { Authorization: 'Bearer ' + token } });
+    if (!res.ok) return null;
+    const body = await res.json();
+    return body.coachRead;
+  } catch {
+    return null;
+  }
+}
+
+function renderCloseout(decision) {
+  const el = document.getElementById('closeoutSection');
+  el.style.display = 'block';
+  el.innerHTML = `
+    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:16px;">
+      <p style="color:var(--text-2);font-size:13px;">Close out last week's decision before starting a new one:</p>
+      <p style="color:var(--text-1);font-size:14px;margin:8px 0;">${decision.decision_text}</p>
+      <select id="verdictSelect" style="width:100%;padding:8px;margin-bottom:8px;">
+        <option value="">Verdict...</option>
+        <option value="worked">Worked</option>
+        <option value="partly_worked">Partly worked</option>
+        <option value="wrong">Wrong</option>
+        <option value="inconclusive">Inconclusive</option>
+      </select>
+      <textarea id="outcomeNote" placeholder="What actually happened?" style="width:100%;padding:8px;min-height:60px;margin-bottom:8px;"></textarea>
+      <button id="closeoutSave" style="padding:10px 16px;">Save & Continue</button>
+    </div>`;
+  document.getElementById('closeoutSave').onclick = async () => {
+    const verdict = document.getElementById('verdictSelect').value;
+    if (!verdict) { alert('Pick a verdict first.'); return; }
+    const note = document.getElementById('outcomeNote').value;
+    await window.closeDecision(decision.id, verdict, note);
+    el.style.display = 'none';
+    await renderNewDecisionForm();
+  };
+}
+
+async function renderNewDecisionForm() {
+  const [gymState, coachRead] = await Promise.all([fetchGymState(), fetchCoachRead()]);
+  const counts = window.GymVolumeLogic.weeklySetsByMuscle(gymState.exercises || [], gymState.logs || {});
+  const phase = coachRead && coachRead.phase;
+
+  const muscleRows = MUSCLES.map(m => {
+    const band = window.GymVolumeLogic.classifyMuscleVolume(m, counts[m] || 0, phase);
+    const advisory = window.GymVolumeLogic.volumeAdvisory(band, false, phase);
+    const suggested = advisory ? advisory.suggestion : 'keep';
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);">
+      <span style="color:var(--text-1);font-size:13px;">${m} (${counts[m] || 0} sets)</span>
+      <select data-muscle="${m}" class="muscleSelect" style="padding:4px;">
+        <option value="add_set" ${suggested === 'add_set' ? 'selected' : ''}>Add</option>
+        <option value="keep" ${suggested === 'keep' ? 'selected' : ''}>Keep</option>
+        <option value="pull_back" ${suggested === 'pull_back' ? 'selected' : ''}>Reduce</option>
+      </select>
+    </div>`;
+  }).join('');
+
+  const el = document.getElementById('newDecisionSection');
+  el.style.display = 'block';
+  el.innerHTML = `
+    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:16px;margin-top:16px;">
+      ${coachRead ? `<p style="color:var(--text-2);font-size:13px;">${coachRead.narrative}</p>` : `<p style="color:var(--text-3);font-size:13px;">Signal narrative unavailable this week.</p>`}
+      <h3 style="color:var(--text-1);font-size:14px;margin-top:12px;">Volume by muscle</h3>
+      ${muscleRows}
+      <textarea id="anchorLifts" placeholder="Anchor lift progress/hold/regress calls" style="width:100%;padding:8px;margin-top:12px;min-height:50px;"></textarea>
+      <textarea id="cardioRx" placeholder="Cardio/posing prescription" style="width:100%;padding:8px;margin-top:8px;min-height:50px;"></textarea>
+      <label style="display:block;color:var(--text-2);font-size:13px;margin-top:8px;">
+        <input type="checkbox" id="painFlag" /> Recovery/pain flag
+      </label>
+      <textarea id="painNote" placeholder="Pain/recovery note" style="width:100%;padding:8px;margin-top:4px;min-height:40px;"></textarea>
+      <textarea id="rationale" placeholder="Rationale" style="width:100%;padding:8px;margin-top:8px;min-height:50px;"></textarea>
+      <button id="saveDecision" style="padding:10px 16px;margin-top:8px;">Save This Week's Decision</button>
+    </div>`;
+
+  document.getElementById('saveDecision').onclick = async () => {
+    const muscleGroups = {};
+    document.querySelectorAll('.muscleSelect').forEach(sel => { muscleGroups[sel.dataset.muscle] = sel.value; });
+    const reviewDate = new Date();
+    reviewDate.setDate(reviewDate.getDate() + 7);
+    const summary = 'Week of ' + new Date().toISOString().slice(0, 10) + ' coach decision recorded.';
+    await window.recordDecision({
+      category: 'weekly-coach-loop',
+      decision_text: summary,
+      rationale: document.getElementById('rationale').value,
+      review_date: reviewDate.toISOString().slice(0, 10),
+      details: {
+        muscle_groups: muscleGroups,
+        anchor_lifts: document.getElementById('anchorLifts').value,
+        cardio_rx: document.getElementById('cardioRx').value,
+        posing_rx: document.getElementById('cardioRx').value,
+        pain_flags: document.getElementById('painFlag').checked ? [document.getElementById('painNote').value] : [],
+      },
+    });
+    alert('Saved.');
+    location.reload();
+  };
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+  const existing = await window.getOpenDueDecision('weekly-coach-loop');
+  document.getElementById('loading').style.display = 'none';
+  if (existing) {
+    renderCloseout(existing);
+  } else {
+    renderNewDecisionForm();
+  }
+});
+</script>
+</body>
+</html>
