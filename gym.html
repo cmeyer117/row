@@ -5012,11 +5012,13 @@ img, video, canvas, svg { max-width: 100%; }
           + '<div class="po-tw-past-sets">' + chips + '</div>'
           + '</div>';
       }).join('');
+      const isBonus = !!(state.bonusSessionDates || {})[dk];
       return '<div class="po-tw-past-day" data-dk="' + dk + '">'
         + '<div class="po-tw-past-day-h">'
         +   '<span class="po-tw-past-day-date">' + fmtPastDate(dk) + '</span>'
         +   '<span class="po-tw-past-day-summary">'
         +     sum.totalSets + ' sets'
+        +     (isBonus ? ' <span class="po-tw-past-day-done">BONUS</span>' : '')
         +     (isDone ? ' <span class="po-tw-past-day-done">DONE</span>' : '')
         +   '</span>'
         + '</div>'
@@ -5061,6 +5063,10 @@ img, video, canvas, svg { max-width: 100%; }
       delete doneDays[todayKey];
     } else {
       doneDays[todayKey] = new Date().toISOString();
+      if (state.viewMode === 'bonus') {
+        state.bonusSessionDates[todayKey] = true;
+        saveState();
+      }
     }
     saveDoneDays(doneDays);
     renderTodaysWorkout();
