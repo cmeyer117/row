@@ -8,7 +8,7 @@ const path = require('path');
 const sandbox = { window: {} };
 vm.createContext(sandbox);
 vm.runInContext(fs.readFileSync(path.join(__dirname, 'gym-volume-logic.js'), 'utf8'), sandbox);
-const { mondayOfDate, weeklyVolumeByDay, weeklySetsByMuscle, classifyMuscleVolume, volumeAdvisory } = sandbox.window.GymVolumeLogic;
+const { mondayOfDate, weeklyVolumeByDay, weeklySetsByMuscle, classifyMuscleVolume, volumeAdvisory, matchesVolumeDecision } = sandbox.window.GymVolumeLogic;
 
 function assertEqual(actual, expected, label) {
   if (actual !== expected) {
@@ -112,6 +112,12 @@ const musclesLogsMixedWeeks = {
 };
 const mixedWeekCounts = weeklySetsByMuscle([{ id: 'chest1', muscle: 'Chest' }], musclesLogsMixedWeeks);
 assertEqual(mixedWeekCounts.Chest, 1, 'weeklySetsByMuscle only counts sets from the current week, ignoring prior weeks');
+
+// weeklySetsByMuscle — an explicit refDate counts THAT week instead of the
+// current week (used by the decision-to-execution scoreboard to score a
+// past week's follow-through, not just "now").
+const refDateCounts = weeklySetsByMuscle([{ id: 'chest1', muscle: 'Chest' }], musclesLogsMixedWeeks, new Date(priorMonday + 'T12:00:00.000Z'));
+assertEqual(refDateCounts.Chest, 1, 'weeklySetsByMuscle with an explicit refDate counts that week\'s set, not the current week\'s');
 
 // weeklySetsByMuscle — a set with RIR >= 4 is excluded (not a hard set).
 const rirExercises = [{ id: 'chest1', muscle: 'Chest' }];
