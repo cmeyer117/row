@@ -62,7 +62,8 @@
       (!pillars || pillars.indexOf(c.pillar) !== -1)
     );
     if (pool.length === 0) return null;
-    return pool[Math.floor(Math.random() * pool.length)];
+    const eligible = filterEligiblePool(pool);
+    return eligible[Math.floor(Math.random() * eligible.length)];
   }
 
   // Case-insensitive substring match across title + transcript_text. A
@@ -134,6 +135,40 @@
   let randomFilter = null;
   let repeatClip = null;
 
+  // 1-day cooldown, set explicitly via toggleDislikeCooldown -- see
+  // docs/superpowers/specs/2026-08-17-smarter-shuffle-design.md.
+  const DISLIKE_COOLDOWN_MS = 24 * 60 * 60 * 1000;
+
+  function isOnCooldown(clip) {
+    return !!(clip && clip.disliked_until && clip.disliked_until > Date.now());
+  }
+
+  function toggleDislikeCooldown(clipId) {
+    const clip = listClips().find(function (c) { return c.id === clipId; });
+    if (!clip) return;
+    updateClip(clipId, { disliked_until: isOnCooldown(clip) ? null : Date.now() + DISLIKE_COOLDOWN_MS });
+  }
+
+  // Ephemeral, never synced -- reset by every mode-starter (playClip,
+  // playRepeat, playFromList, playRandomLoop, playFavoritesWeightedLoop)
+  // and by stopPlayback, same trigger points as errorStreak. Scoped to "the
+  // current playback session," not to any one filter -- without the reset,
+  // clips played via one pool (e.g. a broad moment loop) would suppress
+  // themselves from an unrelated pool's picks too (code review, 2026-08-17).
+  let recentlyPlayed = [];
+  const RECENT_WINDOW = 5;
+
+  // Narrows `pool` by cooldown + recency, each with a fallback to
+  // guarantee a non-empty result whenever `pool` itself is non-empty -- so
+  // a 2-clip mentality where both are cooling down still plays something,
+  // and a pool of exactly the 5 most-recent clips still plays something.
+  function filterEligiblePool(pool) {
+    const notOnCooldown = pool.filter(function (c) { return !isOnCooldown(c); });
+    const base = notOnCooldown.length ? notOnCooldown : pool;
+    const notRecent = base.filter(function (c) { return recentlyPlayed.indexOf(c.id) === -1; });
+    return notRecent.length ? notRecent : base;
+  }
+
   function notifyChange() { if (onChangeCb) onChangeCb(); }
 
   // Subscribe to play/pause/end state changes so the UI can re-render the
@@ -191,8 +226,9 @@
       (!pillars || pillars.indexOf(c.pillar) !== -1)
     );
     if (pool.length === 0) return null;
+    const eligible = filterEligiblePool(pool);
     const weighted = [];
-    pool.forEach(function (c) {
+    eligible.forEach(function (c) {
       const weight = c.favorite ? 4 : 1;
       for (let i = 0; i < weight; i++) weighted.push(c);
     });
@@ -209,6 +245,7 @@
     repeatClip = null;
     randomFilter = null;
     errorStreak = 0;
+    recentlyPlayed = [];
     const clip = pickFavoriteWeighted(filter);
     if (!clip) { favoritesFilter = null; return null; }
     favoritesFilter = filter || {};
@@ -329,6 +366,8 @@
         // (repeat mode reuses one object forever, so counts never accumulated).
         const fresh = listClips().find(function (c) { return c.id === clip.id; });
         updateClip(clip.id, { play_count: ((fresh && fresh.play_count) || 0) + 1 });
+        recentlyPlayed.push(clip.id);
+        if (recentlyPlayed.length > RECENT_WINDOW) recentlyPlayed.shift();
       }
       notifyChange();
     };
@@ -378,15 +417,19 @@
     notifyChange();
   }
 
-  // Every mode-starter resets errorStreak: the guard is per playback
-  // session, and a streak left over from an earlier failed queue would
-  // otherwise stop a brand-new session on its first error.
+  // Every mode-starter resets errorStreak and recentlyPlayed: both guards
+  // are per playback session -- a streak or recency window left over from
+  // an earlier session would otherwise leak into a brand-new one (an
+  // earlier-session streak could false-stop it on the first error; an
+  // earlier-session recentlyPlayed could suppress clips in a pool that
+  // never actually played anything yet).
   function playClip(clip) {
     queue = null;
     randomFilter = null;
     repeatClip = null;
     favoritesFilter = null;
     errorStreak = 0;
+    recentlyPlayed = [];
     return playSingle(clip);
   }
 
@@ -398,6 +441,7 @@
     repeatClip = clip;
     favoritesFilter = null;
     errorStreak = 0;
+    recentlyPlayed = [];
     return playSingle(clip);
   }
 
@@ -411,6 +455,7 @@
     repeatClip = null;
     favoritesFilter = null;
     errorStreak = 0;
+    recentlyPlayed = [];
     queue = { clips: clips, index: idx };
     return playSingle(clips[idx]);
   }
@@ -423,6 +468,7 @@
     repeatClip = null;
     favoritesFilter = null;
     errorStreak = 0;
+    recentlyPlayed = [];
     const clip = pickRandom(filter);
     if (!clip) { randomFilter = null; return null; }
     randomFilter = filter || {};
@@ -438,6 +484,7 @@
     currentAudio = null;
     currentClipId = null;
     errorStreak = 0;
+    recentlyPlayed = [];
     notifyChange();
   }
 
@@ -615,6 +662,8 @@
       migrateMentalityCasing: migrateMentalityCasing,
       migrateGogginsToMindset: migrateGogginsToMindset,
       migrateCarlToOwnPillar: migrateCarlToOwnPillar,
+      isOnCooldown: isOnCooldown,
+      toggleDislikeCooldown: toggleDislikeCooldown,
     };
     setupMediaSessionHandlers();
   }
@@ -648,6 +697,8 @@
       migrateMentalityCasing: migrateMentalityCasing,
       migrateGogginsToMindset: migrateGogginsToMindset,
       migrateCarlToOwnPillar: migrateCarlToOwnPillar,
+      isOnCooldown: isOnCooldown,
+      toggleDislikeCooldown: toggleDislikeCooldown,
       uploadClipFile: uploadClipFile,
     };
   }
