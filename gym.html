@@ -5351,6 +5351,8 @@ img, video, canvas, svg { max-width: 100%; }
       // silently kill the hype clip a fraction of a second in and still
       // increment its play_count for a clip nobody actually heard.
       if (restTimerEventType === 'pr') window.HypeAudio.playPrRant();
+      else if (restTimerEventType === 'grind') window.HypeAudio.playStateMode('need_discipline');
+      else if (restTimerEventType === 'miss') window.HypeAudio.playStateMode('post_failure_reset');
       else window.HypeAudio.playMidSetHype();
     }
     restTimerInterval = setInterval(function() {
