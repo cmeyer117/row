@@ -339,6 +339,13 @@ img, video, canvas, svg { max-width: 100%; }
   -webkit-tap-highlight-color: transparent;
 }
 .po-seg-btn:hover { color: var(--text-2); background: rgba(255,255,255,0.04); }
+/* bonusModeToggle sits as a sibling of .po-seg-control (not a pill inside
+   it), so it must NOT inherit .po-seg-btn's flex:1 -- that made it compete
+   equally with the entire day-pill cluster for row width. */
+#bonusModeToggle {
+  flex: none; min-width: 64px;
+  background: rgba(255,255,255,0.04); border: 1px solid var(--border);
+}
 .po-seg-btn.active {
   background: linear-gradient(135deg, #6EE7B7 0%, #34D399 100%);
   color: #052e16;
