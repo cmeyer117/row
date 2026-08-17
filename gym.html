@@ -3421,6 +3421,11 @@ img, video, canvas, svg { max-width: 100%; }
   // (window.GymRxDeloadLogic.deloadWeight) -- see that file for the
   // 2026-08-13 Codex+Grok audit rationale.
   function getFiltered() {
+    if (state.viewMode === 'bonus') {
+      const tmpl = state.bonusTemplates.find(t => t.id === state.filterBonusTemplateId);
+      if (!tmpl) return [];
+      return window.GymBonusTemplatesLogic.resolveTemplateExercises(tmpl, state.exercises, state.filterGym);
+    }
     const program = state.exercises.filter(e =>
       (e.gym === state.filterGym || e.gym === 'both') && e.day === state.filterDay);
     const adhoc = getAdhocExercises().filter(a => a.day === state.filterDay);
@@ -3779,11 +3784,20 @@ img, video, canvas, svg { max-width: 100%; }
     const listEl = document.getElementById('wlList');
     if (!listEl) return;
 
-    // Program-only (no adhoc) for the selected gym+day
-    const exercises = state.exercises.filter(e =>
-      (e.gym === state.filterGym || e.gym === 'both') && e.day === state.filterDay);
-    // Today's extras — all adhoc for today regardless of day tag
-    const adhoc = getAdhocExercises();
+    let exercises, adhoc;
+    if (state.viewMode === 'bonus') {
+      // No adhoc concept in bonus mode -- templates reference the real
+      // catalog by design, so there's nothing to type-in-a-name for here.
+      const tmpl = state.bonusTemplates.find(t => t.id === state.filterBonusTemplateId);
+      exercises = tmpl ? window.GymBonusTemplatesLogic.resolveTemplateExercises(tmpl, state.exercises, state.filterGym) : [];
+      adhoc = [];
+    } else {
+      // Program-only (no adhoc) for the selected gym+day
+      exercises = state.exercises.filter(e =>
+        (e.gym === state.filterGym || e.gym === 'both') && e.day === state.filterDay);
+      // Today's extras — all adhoc for today regardless of day tag
+      adhoc = getAdhocExercises();
+    }
 
     listEl.innerHTML = '';
 
@@ -3791,7 +3805,9 @@ img, video, canvas, svg { max-width: 100%; }
     const adhocItems   = adhoc.map(a  => ({ ex: a,  isAdhoc: true  }));
 
     if (!programItems.length && !adhocItems.length) {
-      listEl.innerHTML = '<div class="po-no-ex">No exercises for this day — add one below.</div>';
+      listEl.innerHTML = state.viewMode === 'bonus'
+        ? '<div class="po-no-ex">No exercises in this template yet — add some in Manage Bonus Workouts.</div>'
+        : '<div class="po-no-ex">No exercises for this day — add one below.</div>';
       return;
     }
 
