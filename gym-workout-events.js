@@ -10,13 +10,27 @@
     return w * (1 + r / 30);
   }
 
-  // entry: { weight, reps } — the set that was just logged.
-  // priorLogs: array of { weight, reps } logged before this entry, for the
-  //   same exercise+variant. Must NOT include the entry itself.
+  // A set logged in plate mode stores per-side plate load; one logged in lb mode
+  // stores total load. Comparing across the two invents PRs and misses out of a
+  // mode switch, so weights are only ever compared within the same basis.
+  // Legacy entries predate the field — a plateConfig means it came from the picker.
+  function weightBasis(l) {
+    return l.weightBasis || (l.plateConfig ? 'platesPerSide' : 'totalLbs');
+  }
+
+  // entry: { weight, reps, weightBasis? } — the set that was just logged.
+  // priorLogs: array of { weight, reps, weightBasis? } logged before this entry,
+  //   for the same exercise+variant. Must NOT include the entry itself.
   // ex: { bw, repMin } — the exercise definition.
   // Returns 'pr' | 'grind' | 'miss' | null.
   function classifyWorkoutEvent(entry, priorLogs, ex) {
     if (!priorLogs || !priorLogs.length) return null;
+
+    if (!ex.bw) {
+      const basis = weightBasis(entry);
+      priorLogs = priorLogs.filter(function (l) { return weightBasis(l) === basis; });
+      if (!priorLogs.length) return null;
+    }
 
     if (ex.bw) {
       const priorMaxReps = Math.max.apply(null, priorLogs.map(function (l) { return l.reps; }));

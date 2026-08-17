@@ -81,4 +81,70 @@ assertEqual(
   'bodyweight reps under repMin is a miss'
 );
 
+// --- weightBasis guard: plate-mode weight is per-side, lb-mode is total load ---
+
+// A 90 lb/side plate log must not read as a PR against a 225 lb total-load prior,
+// and must not read as a miss/grind by falling through to rep rules either --
+// there is no comparable history, so it fires nothing.
+assertEqual(
+  classifyWorkoutEvent(
+    { weight: 90, reps: 5, weightBasis: 'platesPerSide' },
+    [{ weight: 225, reps: 5, weightBasis: 'totalLbs' }],
+    weightedEx
+  ),
+  null,
+  'plate-mode set with only lb-mode history fires nothing'
+);
+
+// The reverse direction: a 225 total-load set is not a PR over a 90/side prior.
+assertEqual(
+  classifyWorkoutEvent(
+    { weight: 225, reps: 5, weightBasis: 'totalLbs' },
+    [{ weight: 90, reps: 5, weightBasis: 'platesPerSide' }],
+    weightedEx
+  ),
+  null,
+  'lb-mode set with only plate-mode history fires nothing'
+);
+
+// Same basis still compares normally, with the mismatched prior ignored.
+assertEqual(
+  classifyWorkoutEvent(
+    { weight: 100, reps: 5, weightBasis: 'platesPerSide' },
+    [{ weight: 90, reps: 5, weightBasis: 'platesPerSide' }, { weight: 405, reps: 5, weightBasis: 'totalLbs' }],
+    weightedEx
+  ),
+  'pr',
+  'same-basis comparison still detects a pr and ignores the other basis'
+);
+
+// Legacy rows have no weightBasis: a plateConfig means it came from the picker.
+assertEqual(
+  classifyWorkoutEvent(
+    { weight: 100, reps: 5, plateConfig: { 45: 2, 10: 1 } },
+    [{ weight: 90, reps: 5, plateConfig: { 45: 2 } }],
+    weightedEx
+  ),
+  'pr',
+  'legacy plateConfig rows are inferred as platesPerSide and compare to each other'
+);
+
+// Legacy rows without plateConfig are inferred as total lbs -- unchanged behavior.
+assertEqual(
+  classifyWorkoutEvent({ weight: 225, reps: 5 }, [{ weight: 205, reps: 5 }], weightedEx),
+  'pr',
+  'legacy rows with no basis and no plateConfig still compare as before'
+);
+
+// Bodyweight ignores basis entirely (weight is always 0).
+assertEqual(
+  classifyWorkoutEvent(
+    { weight: 0, reps: 15, weightBasis: 'totalLbs' },
+    [{ weight: 0, reps: 12, plateConfig: { 45: 1 } }],
+    bwEx
+  ),
+  'pr',
+  'bodyweight classification is unaffected by weightBasis'
+);
+
 console.log('gym-workout-events.selfcheck.cjs: all assertions passed');
