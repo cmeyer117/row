@@ -6059,7 +6059,13 @@ img, video, canvas, svg { max-width: 100%; }
     if (ex && ex.bw) return l.reps + ' reps' + rirSuffix;
     if (l.plateConfig) {
       var parts = Object.entries(l.plateConfig).map(function(kv) { return kv[1] + '×' + kv[0]; });
-      return parts.join(' + ') + ' × ' + l.reps + rirSuffix;
+      var plateStr = parts.join(' + ') + ' × ' + l.reps + rirSuffix;
+      // Show the resolved total alongside the per-side breakdown once the
+      // exercise's loadType can compute one — the plate notation alone reads
+      // as the load to a glance, and for perSidePlusBar/perSide it isn't.
+      var total = window.GymWorkoutEvents ? window.GymWorkoutEvents.totalLoad(l, ex) : null;
+      if (total != null && total !== l.weight) plateStr += ' (' + total + unit() + ')';
+      return plateStr;
     }
     if (l.plates != null) {
       var pStr = l.plates + (l.plates === 1 ? ' plate' : ' plates');
