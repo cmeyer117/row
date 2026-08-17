@@ -3234,6 +3234,32 @@ img, video, canvas, svg { max-width: 100%; }
     // each exercise's own last-log date, not "today", so it stays correct
     // no matter how many days later that exercise is next trained.
     if (!s.checkins || typeof s.checkins !== 'object') s.checkins = {};
+    // Bonus workout templates -- separate from the coach's plan (state.days
+    // stays untouched). Seeded once, empty, with stable ids so re-seeding
+    // never duplicates them. Carl fills in exercises himself via the
+    // Manage Bonus Workouts view -- CONFIG.defaultExercises is stale
+    // first-run seed data, not a reliable source to pre-fill from.
+    if (!Array.isArray(s.bonusTemplates)) {
+      s.bonusTemplates = [
+        { id: 'bonus_seed_shoulders_arms', name: 'Shoulders & Arms', exerciseNames: [] },
+        { id: 'bonus_seed_chest_back', name: 'Chest & Back', exerciseNames: [] },
+        { id: 'bonus_seed_push', name: 'Push', exerciseNames: [] },
+        { id: 'bonus_seed_pull', name: 'Pull', exerciseNames: [] },
+      ];
+    }
+    // 'plan' (default) shows the coach's day tabs; 'bonus' shows bonus
+    // templates instead. Deliberately NOT reusing filterDay for this --
+    // normalize() itself (below) and a second guard at the modal-day-picker
+    // reset filterDay to a valid plan day whenever it isn't found in
+    // s.days, which would silently clobber a bonus template id every load.
+    if (s.viewMode !== 'plan' && s.viewMode !== 'bonus') s.viewMode = 'plan';
+    if (typeof s.filterBonusTemplateId !== 'string' || !s.bonusTemplates.find(function (t) { return t.id === s.filterBonusTemplateId; })) {
+      s.filterBonusTemplateId = s.bonusTemplates[0].id;
+    }
+    // Dates where a bonus (not plan-day) session was marked done -- purely
+    // for the Past Workouts "Bonus" badge today; a future plan-compliance
+    // feature should read this to exclude bonus dates from plan-day math.
+    if (!s.bonusSessionDates || typeof s.bonusSessionDates !== 'object') s.bonusSessionDates = {};
     s.filterGym = s.filterGym || s.gyms[0].id;
     s.filterDay = s.filterDay || s.days[0].id;
     // Ensure filterDay is a valid day (not "rest" or a stale value)
@@ -5758,9 +5784,17 @@ img, video, canvas, svg { max-width: 100%; }
       const cfg = getPlateConfig();
       entry.plates = null; // not the old single-plate format
       entry.plateConfig = cfg;
+      // The plate picker collects plates PER SIDE (see platePickerSummary's "lb/side"),
+      // so `weight` here is per-side plate load — no bar, no ×2 — while lb-mode `weight`
+      // is total load. Stamp the basis so consumers never silently compare the two.
+      // ponytail: label only, no conversion — ×2+bar is right for barbell/Smith, wrong for a
+      // single-horn plate machine, meaningless for a cable stack, and the exercise has no
+      // loadType field to tell them apart yet. Add loadType + computed total, then convert.
+      entry.weightBasis = 'platesPerSide';
     } else {
       w = parseFloat($('weightInput').value) || 0;
       if (w <= 0) { alert('Enter a weight.'); return; }
+      entry.weightBasis = 'totalLbs';
     }
     const dateKey = getChipDate('logDateInput');
     const isoDate = new Date(dateKey + 'T12:00:00').toISOString();
@@ -5771,7 +5805,7 @@ img, video, canvas, svg { max-width: 100%; }
     arr.sort((a, b) => a.date.localeCompare(b.date));
     state.logs[ex.id] = arr;
     const eventType = window.GymWorkoutEvents
-      ? window.GymWorkoutEvents.classifyWorkoutEvent({ weight: w, reps: reps }, priorLogs, ex)
+      ? window.GymWorkoutEvents.classifyWorkoutEvent({ weight: w, reps: reps, weightBasis: entry.weightBasis }, priorLogs, ex)
       : null;
     if (eventType && window.__gym && typeof window.__gym.logWorkoutEvent === 'function') {
       window.__gym.logWorkoutEvent(ex.name, eventType, w, reps, !!ex.bw);
@@ -6578,6 +6612,7 @@ img, video, canvas, svg { max-width: 100%; }
 <script src="gym-rx-deload-logic.js"></script>
 <script src="gym-peak-phase-logic.js"></script>
 <script src="gym-sleep-check-logic.js"></script>
+<script src="gym-bonus-templates-logic.js"></script>
 <script src="gym-debrief-logic.js"></script>
 <script src="gym-season-logic.js"></script>
 <script src="gym-volume-logic.js"></script>
