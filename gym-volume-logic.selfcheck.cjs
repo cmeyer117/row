@@ -8,7 +8,7 @@ const path = require('path');
 const sandbox = { window: {} };
 vm.createContext(sandbox);
 vm.runInContext(fs.readFileSync(path.join(__dirname, 'gym-volume-logic.js'), 'utf8'), sandbox);
-const { mondayOfDate, weeklyVolumeByDay, weeklySetsByMuscle, classifyMuscleVolume, volumeAdvisory } = sandbox.window.GymVolumeLogic;
+const { mondayOfDate, weeklyVolumeByDay, weeklySetsByMuscle, classifyMuscleVolume, volumeAdvisory, matchesVolumeDecision } = sandbox.window.GymVolumeLogic;
 
 function assertEqual(actual, expected, label) {
   if (actual !== expected) {
@@ -113,6 +113,12 @@ const musclesLogsMixedWeeks = {
 const mixedWeekCounts = weeklySetsByMuscle([{ id: 'chest1', muscle: 'Chest' }], musclesLogsMixedWeeks);
 assertEqual(mixedWeekCounts.Chest, 1, 'weeklySetsByMuscle only counts sets from the current week, ignoring prior weeks');
 
+// weeklySetsByMuscle — an explicit refDate counts THAT week instead of the
+// current week (used by the decision-to-execution scoreboard to score a
+// past week's follow-through, not just "now").
+const refDateCounts = weeklySetsByMuscle([{ id: 'chest1', muscle: 'Chest' }], musclesLogsMixedWeeks, new Date(priorMonday + 'T12:00:00.000Z'));
+assertEqual(refDateCounts.Chest, 1, 'weeklySetsByMuscle with an explicit refDate counts that week\'s set, not the current week\'s');
+
 // weeklySetsByMuscle — a set with RIR >= 4 is excluded (not a hard set).
 const rirExercises = [{ id: 'chest1', muscle: 'Chest' }];
 const rirLogsExcluded = { chest1: [
@@ -209,5 +215,29 @@ assertEqual(volumeAdvisory(classifyMuscleVolume('Chest', 25), true).suggestion, 
 
 // volumeAdvisory — unknown muscle (null band) returns null, doesn't crash.
 assertEqual(volumeAdvisory(null, true), null, 'volumeAdvisory: null band (unknown muscle) returns null');
+
+// matchesVolumeDecision — add_set is followed only if actual exceeds baseline.
+assertEqual(matchesVolumeDecision('add_set', 10, 12), true, 'matchesVolumeDecision: add_set followed when actual > baseline');
+assertEqual(matchesVolumeDecision('add_set', 10, 10), false, 'matchesVolumeDecision: add_set not followed when actual === baseline');
+assertEqual(matchesVolumeDecision('add_set', 10, 8), false, 'matchesVolumeDecision: add_set not followed when actual < baseline');
+
+// matchesVolumeDecision — pull_back is followed only if actual falls under baseline.
+assertEqual(matchesVolumeDecision('pull_back', 10, 8), true, 'matchesVolumeDecision: pull_back followed when actual < baseline');
+assertEqual(matchesVolumeDecision('pull_back', 10, 10), false, 'matchesVolumeDecision: pull_back not followed when actual === baseline');
+assertEqual(matchesVolumeDecision('pull_back', 10, 12), false, 'matchesVolumeDecision: pull_back not followed when actual > baseline');
+
+// matchesVolumeDecision — keep allows +/-1 tolerance (fractional secondary-muscle
+// credit and normal week-to-week set-count drift shouldn't false-negative a
+// genuine "kept it about the same" week).
+assertEqual(matchesVolumeDecision('keep', 10, 10), true, 'matchesVolumeDecision: keep followed on exact match');
+assertEqual(matchesVolumeDecision('keep', 10, 9), true, 'matchesVolumeDecision: keep followed within -1 tolerance');
+assertEqual(matchesVolumeDecision('keep', 10, 11), true, 'matchesVolumeDecision: keep followed within +1 tolerance');
+assertEqual(matchesVolumeDecision('keep', 8.5, 8), true, 'matchesVolumeDecision: keep followed within tolerance for a fractional secondary-credit baseline');
+assertEqual(matchesVolumeDecision('keep', 10, 8), false, 'matchesVolumeDecision: keep not followed beyond tolerance');
+
+// matchesVolumeDecision — no baseline (old-format decisions) or an
+// unrecognized action both return null (no verdict, not a false negative).
+assertEqual(matchesVolumeDecision('add_set', null, 12), null, 'matchesVolumeDecision: null baseline returns null (old-format decision)');
+assertEqual(matchesVolumeDecision('not_a_real_action', 10, 12), null, 'matchesVolumeDecision: unrecognized action returns null');
 
 console.log('gym-volume-logic.selfcheck.cjs: all assertions passed');

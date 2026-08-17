@@ -114,11 +114,13 @@
   // exercises: [{ id, name, muscle, ... }]. logs: same shape as
   // weeklyVolumeByDay. Counts weighted HARD sets (one log entry = 1.0 to
   // its primary muscle, plus EXERCISE_MUSCLE_CONTRIBUTIONS[name]'s weight
-  // to its secondary muscle if mapped), current week only. A set with
-  // log.rir explicitly >= 4 is excluded (not near enough to failure to
-  // count as training volume) -- missing RIR or RIR < 4 counts. Every
-  // muscle in MUSCLE_BANDS is present in the result even at 0.
-  function weeklySetsByMuscle(exercises, logs) {
+  // to its secondary muscle if mapped), for the week containing refDate
+  // (defaults to now — every existing caller passing 2 args keeps
+  // counting the current week unchanged). A set with log.rir explicitly
+  // >= 4 is excluded (not near enough to failure to count as training
+  // volume) -- missing RIR or RIR < 4 counts. Every muscle in
+  // MUSCLE_BANDS is present in the result even at 0.
+  function weeklySetsByMuscle(exercises, logs, refDate) {
     var exByI = {};
     (exercises || []).forEach(function (ex) {
       if (ex && ex.muscle) exByI[ex.id] = ex;
@@ -127,14 +129,14 @@
     var counts = {};
     Object.keys(MUSCLE_BANDS).forEach(function (m) { counts[m] = 0; });
 
-    var thisMonday = mondayOfDate(new Date());
+    var targetMonday = mondayOfDate(refDate || new Date());
     Object.keys(logs || {}).forEach(function (exId) {
       var ex = exByI[exId];
       if (!ex) return; // untagged (custom/adhoc) exercise — excluded, not bucketed
       var secondary = EXERCISE_MUSCLE_CONTRIBUTIONS[ex.name];
       (logs[exId] || []).forEach(function (log) {
         if (!log || !log.date) return;
-        if (mondayOfDate(new Date(log.date)) !== thisMonday) return;
+        if (mondayOfDate(new Date(log.date)) !== targetMonday) return;
         if (log.rir != null && log.rir >= 4) return; // not a hard set
         counts[ex.muscle] = (counts[ex.muscle] || 0) + 1;
         if (secondary) counts[secondary.muscle] = (counts[secondary.muscle] || 0) + secondary.weight;
@@ -209,6 +211,38 @@
     return null;
   }
 
+  // Single source of truth for the 3 volume-decision actions -- shared
+  // between matchesVolumeDecision's comparator below and weekly-review.html's
+  // <select> options / display labels, so renaming or adding an action only
+  // touches one place instead of three independently-hardcoded copies
+  // (found in code review 2026-08-17).
+  var VOLUME_ACTIONS = {
+    add_set:   { label: 'add' },
+    pull_back: { label: 'reduce' },
+    keep:      { label: 'keep' }
+  };
+
+  // Did actual hard sets for a muscle follow the direction a weekly-review
+  // decision chose ('add_set'/'pull_back'/'keep')? Used by the
+  // decision-to-execution scoreboard (weekly-review.html) to auto-score
+  // volume follow-through instead of asking Carl to eyeball it. Returns
+  // null when there's no baseline to compare against (a decision recorded
+  // before this field existed) or the action isn't one of the 3 known
+  // values. 'keep' allows a +/-1 set tolerance rather than exact equality
+  // -- actual/baseline can be fractional (secondary-muscle contribution
+  // weighting, see EXERCISE_MUSCLE_CONTRIBUTIONS) and even whole-number
+  // counts naturally drift by a set or two week-to-week for reasons that
+  // have nothing to do with whether Carl actually kept the same volume
+  // (an extra warm-up logged, one exercise swapped for a near-equivalent).
+  // Exact equality flagged genuine "kept it about the same" weeks as
+  // "not followed" far too often (found in code review 2026-08-17).
+  function matchesVolumeDecision(action, baseline, actual) {
+    if (baseline == null || !VOLUME_ACTIONS[action]) return null;
+    if (action === 'add_set') return actual > baseline;
+    if (action === 'pull_back') return actual < baseline;
+    return Math.abs(actual - baseline) <= 1;
+  }
+
   var api = {
     mondayOfDate: mondayOfDate,
     weeklyVolumeByDay: weeklyVolumeByDay,
@@ -216,6 +250,8 @@
     classifyMuscleVolume: classifyMuscleVolume,
     volumeAdvisory: volumeAdvisory,
     phaseTarget: phaseTarget,
+    matchesVolumeDecision: matchesVolumeDecision,
+    VOLUME_ACTIONS: VOLUME_ACTIONS,
     MUSCLE_BANDS: MUSCLE_BANDS,
     EXERCISE_MUSCLE_CONTRIBUTIONS: EXERCISE_MUSCLE_CONTRIBUTIONS
   };
