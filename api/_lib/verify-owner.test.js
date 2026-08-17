@@ -16,4 +16,13 @@ const cases = [
 for (const [label, header, f, expected] of cases) {
   assert.equal(await verifyOwner(header, 'https://u', 'anon', f), expected, label);
 }
+
+// A stalled network call must not hang the caller forever -- resolves false
+// once the timeout elapses, regardless of whether the fetch ever settles.
+const neverResolves = async () => new Promise(() => {});
+const start = Date.now();
+const timedOut = await verifyOwner('Bearer x', 'https://u', 'anon', neverResolves, 50);
+assert.equal(timedOut, false, 'stalled fetch times out to false');
+assert.ok(Date.now() - start < 500, 'timeout bound was actually respected, not a real hang');
+
 console.log('verify-owner: all cases pass');
