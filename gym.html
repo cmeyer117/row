@@ -906,6 +906,19 @@ img, video, canvas, svg { max-width: 100%; }
 }
 .po-coach-btn.hype:active { background: rgba(224,51,47,0.2); }
 
+/* ----- Manage Bonus Workouts modal ----- */
+#manageBonusModal {
+  display: none; position: fixed; inset: 0; z-index: 9100;
+  background: rgba(0,0,0,0.6); align-items: flex-end; justify-content: center;
+}
+#manageBonusModal.show { display: flex; }
+#manageBonusTemplateList { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; }
+.po-bonus-tmpl-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 12px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; }
+.po-bonus-tmpl-row-name { font-weight: 600; }
+.po-bonus-tmpl-row-count { color: var(--text-3); font-size: 12px; }
+#manageBonusExerciseResults { max-height: 40vh; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; margin: 10px 0; }
+.po-bonus-ex-row { display: flex; align-items: center; gap: 10px; padding: 8px 10px; }
+
 /* ----- Debrief modal ----- */
 #debriefModal {
   display: none; position: fixed; inset: 0; z-index: 9000;
@@ -2489,6 +2502,21 @@ img, video, canvas, svg { max-width: 100%; }
     </div>
   </div>
 
+  <!-- Manage Bonus Workouts Modal -->
+  <div id="manageBonusModal">
+    <div class="po-debrief-sheet">
+      <div class="po-debrief-title">Manage Bonus Workouts</div>
+      <div id="manageBonusTemplateList"></div>
+      <div id="manageBonusExercisePicker" style="display:none">
+        <input type="text" id="manageBonusSearchInput" placeholder="Search exercises…" />
+        <div id="manageBonusMuscleChips"></div>
+        <div id="manageBonusExerciseResults"></div>
+        <button class="po-debrief-close" id="manageBonusPickerDone" type="button">Done</button>
+      </div>
+      <button class="po-debrief-close" id="manageBonusClose" type="button">Close</button>
+    </div>
+  </div>
+
   <!-- Debrief Modal -->
   <div id="debriefModal">
     <div class="po-debrief-sheet">
@@ -3792,6 +3820,112 @@ img, video, canvas, svg { max-width: 100%; }
     state.currentEx = null;
     saveState(); renderAll();
   });
+
+  let _manageBonusEditingId = null;
+
+  function openManageBonusModal() {
+    _manageBonusEditingId = null;
+    renderManageBonusTemplateList();
+    document.getElementById('manageBonusExercisePicker').style.display = 'none';
+    document.getElementById('manageBonusModal').classList.add('show');
+  }
+
+  function renderManageBonusTemplateList() {
+    const listEl = document.getElementById('manageBonusTemplateList');
+    listEl.innerHTML = state.bonusTemplates.map(t =>
+      '<div class="po-bonus-tmpl-row" data-tmpl-id="' + t.id + '">'
+      + '<div><div class="po-bonus-tmpl-row-name">' + escape(t.name) + '</div>'
+      + '<div class="po-bonus-tmpl-row-count">' + t.exerciseNames.length + ' exercises</div></div>'
+      + '<div><button class="po-seg-btn" data-action="edit">Edit</button> '
+      + '<button class="po-seg-btn" data-action="delete">Delete</button></div>'
+      + '</div>'
+    ).join('') + '<button class="po-seg-btn" id="manageBonusAddTmpl" type="button">+ New template</button>';
+
+    listEl.querySelectorAll('[data-action="edit"]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const id = e.target.closest('.po-bonus-tmpl-row').dataset.tmplId;
+        _manageBonusEditingId = id;
+        renderManageBonusExercisePicker();
+      });
+    });
+    listEl.querySelectorAll('[data-action="delete"]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const id = e.target.closest('.po-bonus-tmpl-row').dataset.tmplId;
+        if (!confirm('Delete this bonus template? This does not delete any logged history.')) return;
+        state.bonusTemplates = window.GymBonusTemplatesLogic.deleteTemplate(state.bonusTemplates, id);
+        if (state.filterBonusTemplateId === id) state.filterBonusTemplateId = state.bonusTemplates[0] ? state.bonusTemplates[0].id : null;
+        saveState();
+        renderManageBonusTemplateList();
+        renderAll();
+      });
+    });
+    const addBtn = document.getElementById('manageBonusAddTmpl');
+    addBtn.addEventListener('click', () => {
+      const name = prompt('New bonus workout name (e.g. "Arms & Abs"):');
+      if (!name || !name.trim()) return;
+      state.bonusTemplates = window.GymBonusTemplatesLogic.createTemplate(state.bonusTemplates, name);
+      saveState();
+      renderManageBonusTemplateList();
+      renderAll();
+    });
+  }
+
+  function renderManageBonusExercisePicker() {
+    document.getElementById('manageBonusExercisePicker').style.display = 'block';
+    const tmpl = state.bonusTemplates.find(t => t.id === _manageBonusEditingId);
+    if (!tmpl) return;
+
+    const muscles = Array.from(new Set(state.exercises.map(e => e.muscle).filter(Boolean))).sort();
+    const chipsEl = document.getElementById('manageBonusMuscleChips');
+    let activeMuscle = null;
+    chipsEl.innerHTML = muscles.map(m => '<button class="po-seg-btn" data-muscle="' + escape(m) + '">' + escape(m) + '</button>').join('');
+
+    function renderResults(filterText, filterMuscle) {
+      const seen = new Set();
+      const catalog = state.exercises.filter(e => {
+        if (seen.has(e.name)) return false;
+        seen.add(e.name);
+        if (filterMuscle && e.muscle !== filterMuscle) return false;
+        if (filterText && e.name.toLowerCase().indexOf(filterText.toLowerCase()) === -1) return false;
+        return true;
+      });
+      const resultsEl = document.getElementById('manageBonusExerciseResults');
+      resultsEl.innerHTML = catalog.map(e => {
+        const checked = tmpl.exerciseNames.indexOf(e.name) !== -1;
+        return '<label class="po-bonus-ex-row"><input type="checkbox" data-ex-name="' + escape(e.name) + '" ' + (checked ? 'checked' : '') + ' /> ' + escape(e.name) + '</label>';
+      }).join('');
+      resultsEl.querySelectorAll('input[type=checkbox]').forEach(cb => {
+        cb.addEventListener('change', () => {
+          const name = cb.dataset.exName;
+          state.bonusTemplates = cb.checked
+            ? window.GymBonusTemplatesLogic.addExerciseToTemplate(state.bonusTemplates, tmpl.id, name)
+            : window.GymBonusTemplatesLogic.removeExerciseFromTemplate(state.bonusTemplates, tmpl.id, name);
+          saveState();
+        });
+      });
+    }
+    renderResults('', null);
+
+    document.getElementById('manageBonusSearchInput').oninput = (e) => renderResults(e.target.value, activeMuscle);
+    chipsEl.querySelectorAll('[data-muscle]').forEach(chip => {
+      chip.addEventListener('click', () => {
+        activeMuscle = activeMuscle === chip.dataset.muscle ? null : chip.dataset.muscle;
+        chipsEl.querySelectorAll('[data-muscle]').forEach(c => c.classList.toggle('active', c.dataset.muscle === activeMuscle));
+        renderResults(document.getElementById('manageBonusSearchInput').value, activeMuscle);
+      });
+    });
+  }
+
+  document.getElementById('manageBonusPickerDone').addEventListener('click', () => {
+    document.getElementById('manageBonusExercisePicker').style.display = 'none';
+    renderManageBonusTemplateList();
+    renderAll();
+  });
+  document.getElementById('manageBonusClose').addEventListener('click', () => {
+    document.getElementById('manageBonusModal').classList.remove('show');
+    renderAll();
+  });
+
   $('sessionTagBtn').addEventListener('click', function() {
     if (!state.sessionTags) state.sessionTags = {};
     const dk = getActiveDate();
