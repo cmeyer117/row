@@ -23,6 +23,13 @@ export default async function handler(req, res) {
       `${SUPABASE_URL}/rest/v1/app_state?key=eq.jarvis:coach_read&select=data`,
       { headers: { apikey: process.env.SUPABASE_SERVICE_ROLE_KEY, Authorization: 'Bearer ' + process.env.SUPABASE_SERVICE_ROLE_KEY } }
     );
+    if (!upstream.ok) {
+      // Code-review fix: without this check, a bad/missing service-role key
+      // or a Supabase outage returned an error body that still looked like
+      // "no narrative yet" to the client -- indistinguishable failure modes.
+      res.status(502).json({ error: 'Supabase request failed: ' + upstream.status });
+      return;
+    }
     const rows = await upstream.json();
     const data = Array.isArray(rows) && rows[0] ? rows[0].data : null;
     res.status(200).json({ coachRead: data });
