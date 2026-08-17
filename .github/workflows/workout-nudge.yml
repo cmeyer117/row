@@ -13,7 +13,7 @@ jobs:
       - name: Send workout nudge
         run: |
           response=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
-            https://row-sage.vercel.app/api/send-workout-nudge \
+            "https://row-sage.vercel.app/api/send-nudge?type=workout" \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}")
           echo "Response code: $response"
           if [ "$response" != "200" ]; then

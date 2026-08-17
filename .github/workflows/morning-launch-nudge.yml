@@ -13,7 +13,7 @@ jobs:
       - name: Send morning launch nudge
         run: |
           response=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
-            https://row-sage.vercel.app/api/send-morning-launch-nudge \
+            "https://row-sage.vercel.app/api/send-nudge?type=morning-launch" \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}")
           echo "Response code: $response"
           if [ "$response" != "200" ]; then

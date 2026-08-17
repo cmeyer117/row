@@ -16,9 +16,9 @@ jobs:
     steps:
       - name: Send coaching inquiry nudge
         run: |
-          url="https://row-sage.vercel.app/api/send-coaching-inquiry-nudge"
+          url="https://row-sage.vercel.app/api/send-nudge?type=coaching-inquiry"
           if [ "${{ inputs.force }}" = "true" ]; then
-            url="${url}?force=true"
+            url="${url}&force=true"
           fi
           response=$(curl -s -w "\n%{http_code}" -X POST "$url" \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}")
