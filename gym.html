@@ -3556,6 +3556,7 @@ img, video, canvas, svg { max-width: 100%; }
       // never touches.
       const sleepEntry = getSleepEntryForDate(dateKey);
       const sleepPoor = window.GymSleepCheckLogic ? window.GymSleepCheckLogic.isPoorSleepEntry(sleepEntry) : false;
+      const macroAdherencePoor = window.__gym.macroAdherencePoor;
       if (recoveryLow || sleepPoor || macroAdherencePoor) {
         const reasons = [];
         if (recoveryLow) reasons.push('recovery was low last time');
@@ -6657,6 +6658,15 @@ document.addEventListener('DOMContentLoaded', function () {
   // gym-weight-photos.js's uploadPhotoToStorage() needs to read pcSupa —
   // expose it live since it's reassigned below once the client connects.
   Object.defineProperty(window.__gym, 'pcSupa', { get: () => pcSupa });
+  // fix: applyCheckinOverride() (earlier <script> block, can't see this
+  // IIFE's `let`) referenced the bare identifier directly -- genuinely
+  // undefined across the script-tag boundary, not just stale. Threw
+  // ReferenceError on every debrief/Rx render once a checkin existed,
+  // silently wedging fireDebrief() (fire-and-forget, no .catch) forever on
+  // "Analyzing your session…". Same fix pattern as pcSupa above: a live
+  // getter, not a one-time value copy, since this gets reassigned once the
+  // async prefetch below resolves.
+  Object.defineProperty(window.__gym, 'macroAdherencePoor', { get: () => macroAdherencePoor });
   // fix (2026-08-12): initVoiceLog() lives in a separate <script> block/IIFE
   // with no access to pcPullRemote -- a voice-logged set had no way to
   // trigger an immediate re-sync, so it only appeared once whatever the
