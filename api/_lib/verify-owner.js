@@ -43,7 +43,14 @@ export async function verifyOwner(authHeader, supabaseUrl, anonKey, fetchImpl = 
     timeoutMs,
     null
   );
-  controller.abort(); // no-op once already settled; cancels the real fetch if we timed out
+  // Best-effort cancellation of the real fetch if we timed out -- NOT
+  // guaranteed side-effect-free like the DOM AbortController: Node's
+  // implementation can throw synchronously here if the underlying request
+  // already settled (confirmed live: crashed this function with an
+  // uncaught DOMException/AbortError, 500ing every request). We don't
+  // actually need this to succeed -- the timeout already made the caller
+  // move on -- so swallow any failure.
+  try { controller.abort(); } catch {}
   if (!r || !r.ok) return false;
   const user = await r.json();
   return !!user && user.email === OWNER_EMAIL && !!user.email_confirmed_at;
