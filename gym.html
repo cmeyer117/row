@@ -2699,8 +2699,9 @@ img, video, canvas, svg { max-width: 100%; }
     <div class="po-filters">
       <div class="po-seg-control" id="gymSeg" style="display:none"></div>
       <div class="po-seg-row">
-        <span class="po-seg-label">Day</span>
+        <span class="po-seg-label" id="daySegLabel">Day</span>
         <div class="po-seg-control" id="daySeg"></div>
+        <button class="po-seg-btn" id="bonusModeToggle" type="button">Bonus</button>
       </div>
       <div class="po-seg-row">
         <span class="po-seg-label">Tag</span>
@@ -3749,25 +3750,48 @@ img, video, canvas, svg { max-width: 100%; }
     $('gymSeg').innerHTML = state.gyms.map(g =>
       '<button class="po-seg-btn ' + (g.id === state.filterGym ? 'active' : '') + '" data-gym="' + g.id + '">' + escape(g.name) + '</button>'
     ).join('');
-    $('daySeg').innerHTML = state.days.map(d =>
-      '<button class="po-seg-btn ' + (d.id === state.filterDay ? 'active' : '') + '" data-day="' + d.id + '">' + escape(d.name) + '</button>'
-    ).join('');
+    $('bonusModeToggle').classList.toggle('active', state.viewMode === 'bonus');
+    if (state.viewMode === 'bonus') {
+      $('daySegLabel').textContent = 'Bonus';
+      $('daySeg').innerHTML = state.bonusTemplates.map(t =>
+        '<button class="po-seg-btn ' + (t.id === state.filterBonusTemplateId ? 'active' : '') + '" data-bonus-template="' + t.id + '">' + escape(t.name) + '</button>'
+      ).join('') + '<button class="po-seg-btn" id="manageBonusBtn" type="button">⚙ Manage</button>';
+      $('daySeg').querySelectorAll('[data-bonus-template]').forEach(b => {
+        b.addEventListener('click', () => {
+          state.filterBonusTemplateId = b.dataset.bonusTemplate;
+          state.currentEx = null;
+          saveState(); renderAll();
+        });
+      });
+      const manageBtn = document.getElementById('manageBonusBtn');
+      if (manageBtn) manageBtn.addEventListener('click', openManageBonusModal);
+    } else {
+      $('daySegLabel').textContent = 'Day';
+      $('daySeg').innerHTML = state.days.map(d =>
+        '<button class="po-seg-btn ' + (d.id === state.filterDay ? 'active' : '') + '" data-day="' + d.id + '">' + escape(d.name) + '</button>'
+      ).join('');
+      $('daySeg').querySelectorAll('.po-seg-btn').forEach(b => {
+        b.addEventListener('click', () => {
+          state.filterDay = b.dataset.day;
+          state.currentEx = null;
+          // User has now manually picked a day — stop auto-overriding to today's split.
+          state._userPickedDay = true;
+          state._userPickedDayKey = getActiveDate();
+          saveState(); renderAll();
+        });
+      });
+    }
     $('gymSeg').querySelectorAll('.po-seg-btn').forEach(b => {
       b.addEventListener('click', () => { state.filterGym = b.dataset.gym; state.currentEx = null; saveState(); renderAll(); });
-    });
-    $('daySeg').querySelectorAll('.po-seg-btn').forEach(b => {
-      b.addEventListener('click', () => {
-        state.filterDay = b.dataset.day;
-        state.currentEx = null;
-        // User has now manually picked a day — stop auto-overriding to today's split.
-        state._userPickedDay = true;
-        state._userPickedDayKey = getActiveDate();
-        saveState(); renderAll();
-      });
     });
     const tag = (state.sessionTags || {})[getActiveDate()];
     $('sessionTagBtn').textContent = tag ? ('🏷 ' + tag) : '+ Tag session';
   }
+  $('bonusModeToggle').addEventListener('click', function() {
+    state.viewMode = state.viewMode === 'bonus' ? 'plan' : 'bonus';
+    state.currentEx = null;
+    saveState(); renderAll();
+  });
   $('sessionTagBtn').addEventListener('click', function() {
     if (!state.sessionTags) state.sessionTags = {};
     const dk = getActiveDate();
