@@ -266,11 +266,26 @@
         startT: start.t,
         midT: mid.t,
         endT: end.t,
+        midValue: mid.value,
         rom: Math.abs(mid.value - start.value),
         durationMs: end.t - start.t
       });
     }
     return reps;
+  }
+
+  // Splits one segmentReps() entry's full duration into eccentric
+  // (start->mid, the first direction of travel) and concentric
+  // (mid->end, the return) phase durations. Pure arithmetic on data
+  // segmentReps already computes -- no new tracking.
+  function phaseDurations(rep) {
+    return { eccentricMs: rep.midT - rep.startT, concentricMs: rep.endT - rep.midT };
+  }
+
+  // Total time-under-tension for a scored set -- sum of every rep's
+  // full durationMs (scoreSet's output already carries this per rep).
+  function totalTutMs(scoredReps) {
+    return scoredReps.reduce(function (sum, r) { return sum + r.durationMs; }, 0);
   }
 
   function round2(n) { return Math.round(n * 100) / 100; }
@@ -333,12 +348,15 @@
     var romTempo = scoreReps(reps);
     var stability = scoreStability(stabilitySamples, reps);
     return romTempo.map(function (r, idx) {
+      var phases = phaseDurations(reps[idx]);
       return {
         index: r.index,
         rom: r.rom,
         romPct: r.romPct,
         romFlag: r.romFlag,
         durationMs: r.durationMs,
+        eccentricMs: phases.eccentricMs,
+        concentricMs: phases.concentricMs,
         tempoRatio: r.tempoRatio,
         tempoFlag: r.tempoFlag,
         avgJitter: stability[idx].avgJitter,
@@ -380,6 +398,8 @@
     createHoldTracker: createHoldTracker,
     updateHoldTracker: updateHoldTracker,
     segmentReps: segmentReps,
+    phaseDurations: phaseDurations,
+    totalTutMs: totalTutMs,
     scoreReps: scoreReps,
     scoreStability: scoreStability,
     scoreSet: scoreSet,

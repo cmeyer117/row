@@ -147,6 +147,16 @@ assertClose(cleanReps[0].rom, 10, 0.01, 'segmentReps: rep 1 ROM matches the 0->1
 assertClose(cleanReps[1].rom, 10, 0.01, 'segmentReps: rep 2 ROM matches the 0->10 swing');
 assertEqual(cleanReps[0].durationMs, 400, 'segmentReps: rep 1 duration spans its full down-up cycle');
 
+// segmentReps — now also reports midValue (the extremum's raw value),
+// needed for depth/lockout scoring against a benchmark's target angle.
+assertClose(cleanReps[0].midValue, 10, 0.01, 'segmentReps: rep 1 midValue is the extremum value (10)');
+
+// phaseDurations — splits a rep's full duration into eccentric (start->mid)
+// and concentric (mid->start) phases.
+var phaseTest = FCL.phaseDurations({ startT: 0, midT: 300, endT: 400 });
+assertEqual(phaseTest.eccentricMs, 300, 'phaseDurations: eccentric phase is start->mid');
+assertEqual(phaseTest.concentricMs, 100, 'phaseDurations: concentric phase is mid->end');
+
 // segmentReps — small jitter below minAmplitude does not create phantom reps.
 var jitterySamples = [
   { t: 0, value: 0 }, { t: 50, value: 0.3 }, { t: 100, value: 0.1 },
@@ -216,6 +226,13 @@ var e2eStability = [{ t: 50, jitter: 1 }, { t: 350, jitter: 1 }];
 var e2eResult = FCL.scoreSet(e2eSamples, e2eStability, 2);
 assertEqual(e2eResult.length, 2, 'scoreSet: end-to-end produces one entry per detected rep');
 assertEqual(e2eResult[1].romFlag, true, 'scoreSet: end-to-end correctly flags the short second rep');
+
+// scoreSet — now includes eccentricMs/concentricMs per rep and totalTutMs
+// for the set (sum of every rep's durationMs).
+var e2eWithTut = FCL.scoreSet(e2eSamples, e2eStability, 2);
+assertEqual(e2eWithTut[0].eccentricMs, 100, 'scoreSet: rep 1 eccentricMs matches its start->mid duration');
+assertEqual(e2eWithTut[0].concentricMs, 100, 'scoreSet: rep 1 concentricMs matches its mid->end duration');
+assertEqual(FCL.totalTutMs(e2eWithTut), e2eWithTut[0].durationMs + e2eWithTut[1].durationMs, 'totalTutMs: sums every rep\'s durationMs');
 
 // buildHistoryRecord — posing shape wraps caller data with a type tag and timestamp.
 var posingRecord = FCL.buildHistoryRecord('posing', { pose: 'front-double-biceps', holdTimeMs: 1620, symmetry: symResult }, '2026-08-07T00:00:00.000Z');
