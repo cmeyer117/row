@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "postinstall": "patch-package"
+    "postinstall": "patch-package",
+    "test": "node scripts/run-tests.mjs"
   },
   "dependencies": {
     "stripe": "^22.3.2",
