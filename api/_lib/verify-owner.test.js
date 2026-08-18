@@ -25,4 +25,14 @@ const timedOut = await verifyOwner('Bearer x', 'https://u', 'anon', neverResolve
 assert.equal(timedOut, false, 'stalled fetch times out to false');
 assert.ok(Date.now() - start < 500, 'timeout bound was actually respected, not a real hang');
 
+// Regression test (2026-08-18): abort() was being called unconditionally
+// after the real fetch already settled, crashing this function on Vercel's
+// runtime (uncaught DOMException/AbortError, 500ing every request) -- even
+// on the normal fast-success path, not just when the timeout won the race.
+// Must never abort a signal whose request has already completed.
+let capturedSignal = null;
+const capturingFetch = async (_url, opts) => { capturedSignal = opts.signal; return { ok: true, json: async () => owner }; };
+await verifyOwner('Bearer x', 'https://u', 'anon', capturingFetch);
+assert.equal(capturedSignal.aborted, false, 'must not abort a request that already settled normally');
+
 console.log('verify-owner: all cases pass');
