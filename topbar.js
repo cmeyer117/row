@@ -3,7 +3,7 @@
 // Drop this on any page with:
 //     <script src="topbar.js" defer></script>
 // It self-injects HTML + CSS and renders the Main/Health/Fitness
-// bottom tabs. Skips chrome on finance.html and inside iframes.
+// bottom tabs. Skips chrome inside iframes.
 // =============================================================
 (function () {
   'use strict';
@@ -52,20 +52,6 @@
 }
 .topbar-home-btn:hover { background: rgba(110, 231, 183, 0.14); border-color: rgba(110, 231, 183, 0.32); }
 .topbar-home-icon { font-size: 17px; line-height: 1; }
-.topbar-finance-btn {
-  display: inline-flex; align-items: center; justify-content: center;
-  width: 44px; height: 42px;
-  border: 1px solid rgba(255, 255, 255, 0.10);
-  background: rgba(255, 255, 255, 0.04);
-  border-radius: 12px; text-decoration: none;
-  -webkit-tap-highlight-color: transparent;
-  transition: background 0.15s;
-}
-.topbar-finance-btn:hover { background: rgba(255, 255, 255, 0.08); }
-.topbar-finance-icon {
-  font-size: 20px; line-height: 1;
-  filter: grayscale(100%) brightness(1.4); opacity: 0.85;
-}
 .topbar-coaching-btn {
   display: inline-flex; align-items: center; justify-content: center;
   width: 44px; height: 42px;
@@ -125,8 +111,6 @@ body.has-bottombar {
 }
 @media (max-width: 480px) {
   .topbar { padding-left: 10px; padding-right: 10px; gap: 6px; }
-  .topbar-finance-btn { width: 40px; height: 38px; }
-  .topbar-finance-icon { font-size: 18px; }
   .topbar-coaching-btn { width: 40px; height: 38px; }
   .topbar-coaching-icon { font-size: 18px; }
   .topbar-review-btn { width: 40px; height: 38px; }
@@ -166,9 +150,6 @@ body.topbar-modal-open { overflow: hidden; touch-action: none; }
   <a href="index.html" class="topbar-home-btn" aria-label="Dashboard hub">
     <span class="topbar-home-icon">⌂</span>
   </a>
-  <a href="finance.html" class="topbar-finance-btn" id="topbarFinance" aria-label="Finance">
-    <span class="topbar-finance-icon">📊</span>
-  </a>
   <a href="coaching.html" class="topbar-coaching-btn" id="topbarCoaching" aria-label="Coaching">
     <span class="topbar-coaching-icon">🏋️</span>
   </a>
@@ -204,7 +185,6 @@ body.topbar-modal-open { overflow: hidden; touch-action: none; }
     if (p.endsWith('health.html') || p.endsWith('/health')) return 'health';
     if (p.endsWith('gym.html') || p.endsWith('/gym') || p.endsWith('mobility.html') || p.endsWith('/mobility')) return 'fitness';
     if (p.endsWith('main.html') || p.endsWith('/main')) return 'main';
-    if (p.endsWith('finance.html')) return '';
     if (p.endsWith('index.html') || p === '/' || p.endsWith('/row/')) return '';
     return 'main';
   }

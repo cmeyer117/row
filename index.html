@@ -190,7 +190,6 @@ body::after {
 .tile-goals    { grid-column: span 2; grid-row: span 2; }
 .tile-fitness  { grid-column: span 2; grid-row: span 1; }
 .tile-health   { grid-column: span 1; grid-row: span 1; }
-.tile-finance  { grid-column: span 1; grid-row: span 1; }
 .tile-vision   { grid-column: span 2; }
 .tile-vessel   { grid-column: span 2; }
 
@@ -333,7 +332,6 @@ body::after {
   .tile-goals   { grid-column: span 2; grid-row: span 1; }
   .tile-fitness { grid-column: span 2; }
   .tile-health  { grid-column: span 1; }
-  .tile-finance { grid-column: span 1; }
   .tile-vision  { grid-column: span 1; }
   .tile-vessel  { grid-column: span 1; }
 }
@@ -342,7 +340,7 @@ body::after {
     grid-template-columns: 1fr;
     grid-template-rows: auto;
   }
-  .tile-goals, .tile-fitness, .tile-health, .tile-finance, .tile-vision, .tile-vessel {
+  .tile-goals, .tile-fitness, .tile-health, .tile-vision, .tile-vessel {
     grid-column: span 1; grid-row: span 1;
   }
   .dash-title { font-size: 24px; }
@@ -445,27 +443,6 @@ body::after {
       </div>
       <div class="tile-footer">
         <span class="tile-badge">STACK</span>
-        <span class="tile-arrow">→</span>
-      </div>
-    </a>
-
-    <!-- Finance -->
-    <a href="finance.html" class="tile tile-finance">
-      <svg class="tile-art" viewBox="0 0 100 60" preserveAspectRatio="none">
-        <g style="opacity:.85">
-          <line class="tile-glow-line" x1="35" y1="26" x2="35" y2="46"/><rect x="31" y="30" width="8" height="12" rx="1.4" fill="rgba(110,231,183,.16)" stroke="rgba(110,231,183,.85)" stroke-width="1.2"/>
-          <line class="tile-glow-line" x1="55" y1="18" x2="55" y2="42"/><rect x="51" y="22" width="8" height="14" rx="1.4" fill="rgba(110,231,183,.16)" stroke="rgba(110,231,183,.85)" stroke-width="1.2"/>
-          <line class="tile-glow-line" x1="75" y1="10" x2="75" y2="36"/><rect x="71" y="14" width="8" height="15" rx="1.4" fill="rgba(110,231,183,.16)" stroke="rgba(110,231,183,.85)" stroke-width="1.2"/>
-        </g>
-      </svg>
-      <div>
-        <div class="tile-num">·04</div>
-        <svg class="tile-icon" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" stroke-width="1.6" stroke-linecap="round"><line x1="5" y1="20" x2="5" y2="12"/><line x1="12" y1="20" x2="12" y2="6"/><line x1="19" y1="20" x2="19" y2="15"/></svg>
-        <div class="tile-name">Finance</div>
-        <div class="tile-sub">Net worth, subscriptions, and cashflow.</div>
-      </div>
-      <div class="tile-footer">
-        <span class="tile-badge">MONEY</span>
         <span class="tile-arrow">→</span>
       </div>
     </a>

@@ -1,6 +1,6 @@
 const CACHE = 'row-v1';
 const OFFLINE = '/offline.html';
-const PRECACHE = [OFFLINE, '/', '/index.html', '/main.html', '/gym.html', '/health.html', '/finance.html', '/sync.js', '/topbar.js'];
+const PRECACHE = [OFFLINE, '/', '/index.html', '/main.html', '/gym.html', '/health.html', '/sync.js', '/topbar.js'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(PRECACHE)).then(() => self.skipWaiting()));
