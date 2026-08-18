@@ -2546,7 +2546,7 @@ img, video, canvas, svg { max-width: 100%; }
   <!-- Debrief Modal -->
   <div id="debriefModal">
     <div class="po-debrief-sheet">
-      <div class="po-debrief-title">⚡ Session Debrief — Jarvis</div>
+      <div class="po-debrief-title">⚡ Session Debrief — Vision</div>
       <div class="po-debrief-body" id="debriefBody">Analyzing your session…</div>
       <button class="po-debrief-close" id="debriefClose" type="button">Close</button>
     </div>
@@ -5894,10 +5894,10 @@ img, video, canvas, svg { max-width: 100%; }
       body.textContent = (await askVisionCoach(message)) || 'No response.';
     } catch (e) {
       body.textContent = e && e.status === 401
-        ? 'Jarvis rejected the request (401 — not signed in, or your session expired). Try signing in again.'
+        ? 'Vision rejected the request (401 — not signed in, or your session expired). Try signing in again.'
         : e && e.status
-        ? 'Jarvis returned an error (' + e.status + (e.message ? ': ' + e.message : '') + ').'
-        : 'Could not reach Jarvis. Signal may be weak — try again.';
+        ? 'Vision returned an error (' + e.status + (e.message ? ': ' + e.message : '') + ').'
+        : 'Could not reach Vision. Signal may be weak — try again.';
     }
   }
 
