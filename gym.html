@@ -6818,6 +6818,7 @@ img, video, canvas, svg { max-width: 100%; }
     $, CONFIG, getChipDate, getActiveDate, fmtDateChipLabel, resetChipToToday, initDateChip,
     hasActiveRestTimer: () => !!restTimerInterval,
     refreshRestTimerDisplay: updateRestTimerDisplay,
+    getAllAdhocExercises,
   };
   // renderAll is called from the BOOT script below, which is now a
   // separate <script> tag (module split) and can't see this IIFE's scope.
@@ -6931,9 +6932,14 @@ document.addEventListener('DOMContentLoaded', function () {
   // Preserves the exercise-vocabulary STT hint the old initVoiceLog mic
   // passed to RowVoice.startCapture -- mini-vision-chat.js is a separate
   // script with no closure access to `state`/getAllAdhocExercises(), so it
-  // reaches them through this hook instead of losing the hint entirely.
+  // reaches them through the window.__gym bridge instead of losing the
+  // hint entirely. Bare `state`/getAllAdhocExercises() references here
+  // threw "state is not defined" (confirmed live, 2026-08-18) -- this
+  // script block is ALSO past the closing </script> of the IIFE those
+  // live in, same cross-script-boundary problem window.__gym.state's own
+  // getter exists to solve; this just wasn't routed through it.
   window.__gym.getSttPrompt = function () {
-    return window.SttPromptLogic ? window.SttPromptLogic.buildSttPrompt(state.exercises, getAllAdhocExercises()) : '';
+    return window.SttPromptLogic ? window.SttPromptLogic.buildSttPrompt(window.__gym.state.exercises, window.__gym.getAllAdhocExercises()) : '';
   };
   // temp diagnostic (2026-08-12): expose pcDebug so sendToVision (separate
   // IIFE) can log a timing marker -- checking the po-coach-sync-debug trail
