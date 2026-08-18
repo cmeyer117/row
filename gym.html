@@ -5696,39 +5696,41 @@ img, video, canvas, svg { max-width: 100%; }
     if (e.target.closest('#gymLightbox')) $('gymLightbox').classList.remove('show');
   });
 
-  // ── Jarvis fetch helper (one retry, 12s timeout — Railway cold starts) ──
-  async function askJarvis(message) {
-    for (let attempt = 0; attempt < 2; attempt++) {
-      const controller = new AbortController();
-      const timer = setTimeout(function() { controller.abort(); }, 12000);
-      try {
-        // 2026-08-12 audit fix: was a client-visible shared secret, now the
-        // real owner session token -- see row-auth.js's getAccessToken().
-        const token = await window.RowAuth.getAccessToken();
-        const res = await fetch('/api/jarvis-chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-          body: JSON.stringify({ message }),
-          signal: controller.signal,
-        });
-        clearTimeout(timer);
-        const data = await res.json();
-        // fetch() doesn't throw on non-2xx — a 401/500/etc. still resolves
-        // here with a parseable JSON body. Without this check, an auth or
-        // server error silently looked identical to "Jarvis had nothing to
-        // say" (both fell through to data.response/data.message being
-        // undefined -> null -> "No response." in the UI), which is exactly
-        // what happened during the 2026-07-24 passphrase-gating rollout.
-        if (!res.ok) {
-          const err = new Error((data && data.error) || ('HTTP ' + res.status));
-          err.status = res.status;
-          throw err;
-        }
-        return data.response || data.message || null;
-      } catch (e) {
-        clearTimeout(timer);
-        if (attempt === 1) throw e;
+  // 2026-08-18: migrated off Jarvis (dormant since 2026-08-15) to Vision's
+  // /api/vision-talk -- the same proxy mini-vision-chat.js already uses
+  // successfully. No retry (unlike the old Jarvis version): Vision's /talk
+  // runs a codex-exec call up to ~60s, so a second attempt after a timeout
+  // just doubles the worst case for no benefit -- mini-vision-chat.js
+  // doesn't retry either.
+  async function askVisionCoach(message) {
+    const controller = new AbortController();
+    const timer = setTimeout(function() { controller.abort(); }, 65000);
+    try {
+      // 2026-08-12 audit fix: was a client-visible shared secret, now the
+      // real owner session token -- see row-auth.js's getAccessToken().
+      const token = await window.RowAuth.getAccessToken();
+      const res = await fetch('/api/vision-talk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify({ transcript: message, coachId: 'gym' }),
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
+      const data = await res.json();
+      // fetch() doesn't throw on non-2xx — a 401/500/etc. still resolves
+      // here with a parseable JSON body. Without this check, an auth or
+      // server error silently looked identical to "Vision had nothing to
+      // say", which is exactly what happened with Jarvis during the
+      // 2026-07-24 passphrase-gating rollout.
+      if (!res.ok) {
+        const err = new Error((data && data.error) || ('HTTP ' + res.status));
+        err.status = res.status;
+        throw err;
       }
+      return data.reply || null;
+    } catch (e) {
+      clearTimeout(timer);
+      throw e;
     }
   }
 
@@ -5889,7 +5891,7 @@ img, video, canvas, svg { max-width: 100%; }
     const message = 'Give me a post-workout debrief for today\'s ' + label + ' session — planned (Rx) vs. actual per exercise below. Weigh recovery context (sleep, macro adherence) from your own data before diagnosing anything as pure training execution — don\'t default to generic "check your sleep" advice if you already have the numbers. Also flag anything notable in today\'s actual numbers themselves, not just deviation from the Rx — the Rx was set before today\'s session and can\'t predict something new. End with exactly ONE specific variable to change next session, not a list: say whether it\'s training (volume/weight/rest) or recovery (sleep/nutrition), and be concrete.\n\n' + sessionLines.join('\n');
 
     try {
-      body.textContent = (await askJarvis(message)) || 'No response.';
+      body.textContent = (await askVisionCoach(message)) || 'No response.';
     } catch (e) {
       body.textContent = e && e.status === 401
         ? 'Jarvis rejected the request (401 — not signed in, or your session expired). Try signing in again.'
