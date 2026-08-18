@@ -234,6 +234,27 @@ assertEqual(e2eWithTut[0].eccentricMs, 100, 'scoreSet: rep 1 eccentricMs matches
 assertEqual(e2eWithTut[0].concentricMs, 100, 'scoreSet: rep 1 concentricMs matches its mid->end duration');
 assertEqual(FCL.totalTutMs(e2eWithTut), e2eWithTut[0].durationMs + e2eWithTut[1].durationMs, 'totalTutMs: sums every rep\'s durationMs');
 
+// scoreDepth — 'min' direction: a rep whose midValue angle is AT OR BELOW
+// target is a met depth (e.g. squat knee angle 95deg vs target <=100deg).
+var squatBenchmark = { jointAngle: 'knee', depthDirection: 'min', targetAngleDeg: 100, cueLabel: 'knee flexion depth' };
+var deepRep = { midValue: 95 };
+var shallowRep = { midValue: 115 };
+assertEqual(FCL.scoreDepth(deepRep, squatBenchmark).depthMet, true, 'scoreDepth: min-direction rep at or below target angle is depthMet true');
+assertEqual(FCL.scoreDepth(shallowRep, squatBenchmark).depthMet, false, 'scoreDepth: min-direction rep above target angle is depthMet false (shallow)');
+assertEqual(FCL.scoreDepth(deepRep, squatBenchmark).depthDeg, 95, 'scoreDepth: depthDeg reports the rep\'s own angle');
+assertEqual(FCL.scoreDepth(deepRep, squatBenchmark).targetDeg, 100, 'scoreDepth: targetDeg reports the benchmark target');
+
+// scoreDepth — 'max' direction: a rep whose midValue is AT OR ABOVE target is met.
+var benchBenchmark = { jointAngle: 'elbow', depthDirection: 'max', targetAngleDeg: 165, cueLabel: 'elbow lockout' };
+assertEqual(FCL.scoreDepth({ midValue: 170 }, benchBenchmark).depthMet, true, 'scoreDepth: max-direction rep at or above target is depthMet true');
+assertEqual(FCL.scoreDepth({ midValue: 150 }, benchBenchmark).depthMet, false, 'scoreDepth: max-direction rep below target is depthMet false (short of lockout)');
+
+// scoreDepth — no matched benchmark (null) returns null, not a crash.
+assertEqual(FCL.scoreDepth(deepRep, null), null, 'scoreDepth: no benchmark returns null');
+
+// scoreDepth — a rep with no midValue (angle undetectable that frame) returns null.
+assertEqual(FCL.scoreDepth({ midValue: null }, squatBenchmark), null, 'scoreDepth: an undetectable midValue returns null rather than a wrong flag');
+
 // buildHistoryRecord — posing shape wraps caller data with a type tag and timestamp.
 var posingRecord = FCL.buildHistoryRecord('posing', { pose: 'front-double-biceps', holdTimeMs: 1620, symmetry: symResult }, '2026-08-07T00:00:00.000Z');
 assertEqual(posingRecord.type, 'posing', 'buildHistoryRecord: posing record has type "posing"');

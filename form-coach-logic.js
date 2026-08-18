@@ -288,6 +288,18 @@
     return scoredReps.reduce(function (sum, r) { return sum + r.durationMs; }, 0);
   }
 
+  // Compares one rep's extremum angle (midValue, from segmentReps) against
+  // a matched benchmark's target. Returns null when there's no benchmark
+  // (matchBenchmark found nothing) or the angle wasn't detectable that
+  // frame -- both are "no data," never guessed at.
+  function scoreDepth(rep, benchmark) {
+    if (!benchmark || rep.midValue == null) return null;
+    var met = benchmark.depthDirection === 'min'
+      ? rep.midValue <= benchmark.targetAngleDeg
+      : rep.midValue >= benchmark.targetAngleDeg;
+    return { depthDeg: round1(rep.midValue), targetDeg: benchmark.targetAngleDeg, depthMet: met };
+  }
+
   function round2(n) { return Math.round(n * 100) / 100; }
 
   // Scores each rep's ROM and tempo against the set's own average.
@@ -343,13 +355,14 @@
   // Combines segmentReps + scoreReps + scoreStability into one
   // rep-by-rep result array: [{ index, rom, romPct, romFlag,
   // durationMs, tempoRatio, tempoFlag, avgJitter, stabilityFlag }, ...]
-  function scoreSet(samples, stabilitySamples, minAmplitude) {
+  function scoreSet(samples, stabilitySamples, minAmplitude, benchmark) {
     var reps = segmentReps(samples, minAmplitude);
     var romTempo = scoreReps(reps);
     var stability = scoreStability(stabilitySamples, reps);
     return romTempo.map(function (r, idx) {
       var phases = phaseDurations(reps[idx]);
-      return {
+      var depth = scoreDepth(reps[idx], benchmark || null);
+      var result = {
         index: r.index,
         rom: r.rom,
         romPct: r.romPct,
@@ -362,6 +375,12 @@
         avgJitter: stability[idx].avgJitter,
         stabilityFlag: stability[idx].stabilityFlag
       };
+      if (depth) {
+        result.depthDeg = depth.depthDeg;
+        result.targetDeg = depth.targetDeg;
+        result.depthMet = depth.depthMet;
+      }
+      return result;
     });
   }
 
@@ -403,6 +422,7 @@
     scoreReps: scoreReps,
     scoreStability: scoreStability,
     scoreSet: scoreSet,
+    scoreDepth: scoreDepth,
     buildHistoryRecord: buildHistoryRecord
   };
   if (typeof window !== 'undefined') window.FormCoachLogic = api;
