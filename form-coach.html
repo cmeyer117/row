@@ -176,6 +176,7 @@ html, body {
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="form-coach-logic.js"></script>
+<script src="benchmarks.js"></script>
 <script>
 // History logging — fire-and-forget capture of each completed session so
 // Carl can judge scoring accuracy across real sessions later. No read path,
@@ -520,10 +521,25 @@ window.FormCoachActiveMode = 'posing';
   function midpoint(a, b) { return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }; }
 
   // Picks the tracked point with the greatest y-range across the
-  // buffered recording as the primary rep-segmentation axis — a
-  // wrist for a press pattern, a hip for a squat pattern, etc.,
-  // without needing to know the exercise in advance.
-  function buildPrimarySignal(frames) {
+  // buffered recording as the primary rep-segmentation axis when there's
+  // no matched benchmark -- a wrist for a press pattern, a hip for a
+  // squat pattern, etc. When a benchmark DID match, uses the real
+  // bilateral joint angle for that exercise instead (FormCoachLogic.
+  // bilateralAngle + ANGLE_TRIPLES) -- more accurate for depth-specific
+  // coaching, and the same angle scoreDepth() will check against.
+  function buildPrimarySignal(frames, benchmark) {
+    if (benchmark) {
+      var angleSamples = frames.map(function (f) {
+        return { t: f.t, value: window.FormCoachLogic.bilateralAngle(f.landmarks, benchmark.jointAngle) };
+      }).filter(function (s) { return s.value !== null; });
+      if (angleSamples.length >= 10) {
+        var angleValues = angleSamples.map(function (s) { return s.value; });
+        return { samples: angleSamples, range: Math.max.apply(null, angleValues) - Math.min.apply(null, angleValues) };
+      }
+      // Fewer than 10 valid angle frames (person partly out of frame too
+      // often) -- fall through to the Y-position fallback below rather
+      // than scoring a set from a mostly-missing signal.
+    }
     var candidates = {
       wristAvgY: function (lm) { return (lm[LIFT_LANDMARK.L_WRIST].y + lm[LIFT_LANDMARK.R_WRIST].y) / 2; },
       hipAvgY: function (lm) { return (lm[LIFT_LANDMARK.L_HIP].y + lm[LIFT_LANDMARK.R_HIP].y) / 2; },
@@ -550,6 +566,8 @@ window.FormCoachActiveMode = 'posing';
     return out;
   }
 
+  function formatSeconds(ms) { return (ms / 1000).toFixed(1) + 's'; }
+
   function renderResult(scored, exerciseName) {
     if (!scored.length) {
       resultEl.innerHTML = '<div class="mob-card"><div class="mob-card-body">No clear reps detected — make sure your full body stays in frame through the whole set.</div></div>';
@@ -560,9 +578,12 @@ window.FormCoachActiveMode = 'posing';
       if (r.romFlag) flags.push('<span class="fc-rep-flag">Short ROM</span>');
       if (r.tempoFlag) flags.push('<span class="fc-rep-flag">Rushed/bounced</span>');
       if (r.stabilityFlag) flags.push('<span class="fc-rep-flag">Unstable</span>');
-      return '<div class="fc-rep-row"><span>Rep ' + r.index + ' — ' + Math.round(r.romPct * 100) + '% ROM</span><span>' + (flags.join(' ') || 'Good') + '</span></div>';
+      var tempoStr = formatSeconds(r.eccentricMs) + ' down / ' + formatSeconds(r.concentricMs) + ' up';
+      var depthStr = ('depthMet' in r) ? (' — ' + r.depthDeg + '°/target ' + r.targetDeg + '° ' + (r.depthMet ? '✓' : '✗')) : '';
+      return '<div class="fc-rep-row"><span>Rep ' + r.index + ' — ' + tempoStr + depthStr + '</span><span>' + (flags.join(' ') || 'Good') + '</span></div>';
     }).join('');
-    resultEl.innerHTML = '<div class="mob-card"><div class="mob-card-body"><strong>' + escape(exerciseName || 'Set') + '</strong> — ' + scored.length + ' reps</div></div><div class="mob-card">' + rows + '</div>';
+    var totalTut = window.FormCoachLogic.totalTutMs(scored);
+    resultEl.innerHTML = '<div class="mob-card"><div class="mob-card-body"><strong>' + escape(exerciseName || 'Set') + '</strong> — ' + scored.length + ' reps, ' + formatSeconds(totalTut) + ' total TUT</div></div><div class="mob-card">' + rows + '</div>';
   }
 
   window.addEventListener('form-coach-camera-ready', function () {
@@ -596,11 +617,12 @@ window.FormCoachActiveMode = 'posing';
         resultEl.innerHTML = '<div class="mob-card"><div class="mob-card-body">Recording too short — try a longer set.</div></div>';
         return;
       }
-      var primary = buildPrimarySignal(buffer);
+      var exerciseName = document.getElementById('liftExerciseName').value.trim();
+      var matchedBenchmark = window.FormCoachLogic.matchBenchmark(exerciseName, window.EXERCISE_BENCHMARKS);
+      var primary = buildPrimarySignal(buffer, matchedBenchmark);
       var stabilitySamples = buildStabilitySamples(buffer);
       var minAmplitude = primary.range * 0.15; // 15% of the set's own observed range filters jitter without hiding a real short rep
-      var scored = window.FormCoachLogic.scoreSet(primary.samples, stabilitySamples, minAmplitude);
-      var exerciseName = document.getElementById('liftExerciseName').value.trim();
+      var scored = window.FormCoachLogic.scoreSet(primary.samples, stabilitySamples, minAmplitude, matchedBenchmark);
       renderResult(scored, exerciseName);
       if (scored.length) {
         resultEl.insertAdjacentHTML('beforeend', '<div class="mob-card" id="liftCritiqueCard"><div class="mob-card-body">Getting AI critique&hellip;</div></div>');
