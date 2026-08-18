@@ -32,6 +32,53 @@
     L_ANKLE: 27, R_ANKLE: 28
   };
 
+  // Real joint-angle triples for the Lift-Form Coach's depth/lockout
+  // benchmarks (distinct from POSE_CONFIGS' trackedJoints below, which
+  // are posing-mode specific). Each side traces shoulder->elbow->wrist,
+  // hip->knee->ankle, or shoulder->hip->knee -- reuses LANDMARK indices.
+  var ANGLE_TRIPLES = {
+    knee: { l: [LANDMARK.L_HIP, LANDMARK.L_KNEE, LANDMARK.L_ANKLE], r: [LANDMARK.R_HIP, LANDMARK.R_KNEE, LANDMARK.R_ANKLE] },
+    elbow: { l: [LANDMARK.L_SHOULDER, LANDMARK.L_ELBOW, LANDMARK.L_WRIST], r: [LANDMARK.R_SHOULDER, LANDMARK.R_ELBOW, LANDMARK.R_WRIST] },
+    hip: { l: [LANDMARK.L_SHOULDER, LANDMARK.L_HIP, LANDMARK.L_KNEE], r: [LANDMARK.R_SHOULDER, LANDMARK.R_HIP, LANDMARK.R_KNEE] }
+  };
+
+  // Bilateral angle for the named ANGLE_TRIPLES entry -- average of the
+  // left and right real angles (not an average of Y-position first).
+  // Returns null if either side is undetectable this frame.
+  function bilateralAngle(landmarks, jointAngle) {
+    var triple = ANGLE_TRIPLES[jointAngle];
+    if (!triple) return null;
+    var l = angleDeg(landmarks[triple.l[0]], landmarks[triple.l[1]], landmarks[triple.l[2]]);
+    var r = angleDeg(landmarks[triple.r[0]], landmarks[triple.r[1]], landmarks[triple.r[2]]);
+    if (l === null || r === null) return null;
+    return (l + r) / 2;
+  }
+
+  // Bidirectional token-F1 fuzzy match against a benchmark table's
+  // `names` arrays -- same algorithm as gym.html's fuzzyMatchExercise(),
+  // reimplemented here since the data shape differs (a names[] array per
+  // entry vs. a single exercise.name). Returns null below threshold 0.35,
+  // same as the reference implementation, so an unmatched exercise
+  // degrades to "no benchmark" rather than a wrong guess.
+  function matchBenchmark(exerciseName, benchmarks) {
+    var q = (exerciseName || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').trim();
+    if (!q) return null;
+    var qTokens = q.split(/\s+/).filter(Boolean);
+    var best = null, bestScore = -1;
+    benchmarks.forEach(function (entry) {
+      entry.names.forEach(function (name) {
+        var nTokens = name.toLowerCase().split(/\s+/).filter(Boolean);
+        var hits = 0;
+        qTokens.forEach(function (qt) {
+          if (nTokens.some(function (nt) { return nt.startsWith(qt) || qt.startsWith(nt); })) hits++;
+        });
+        var score = (hits * hits) / (Math.max(qTokens.length, 1) * Math.max(nTokens.length, 1));
+        if (score > bestScore) { bestScore = score; best = entry; }
+      });
+    });
+    return bestScore >= 0.35 ? best : null;
+  }
+
   // One entry per posing.html Competition-gallery slug. trackedJoints
   // are the angles this pose cares about (used for hold-stability
   // detection); symmetryPairs names two trackedJoints entries to
@@ -324,6 +371,9 @@
   var api = {
     angleDeg: angleDeg,
     LANDMARK: LANDMARK,
+    ANGLE_TRIPLES: ANGLE_TRIPLES,
+    bilateralAngle: bilateralAngle,
+    matchBenchmark: matchBenchmark,
     POSE_CONFIGS: POSE_CONFIGS,
     trackedAngles: trackedAngles,
     computeSymmetry: computeSymmetry,

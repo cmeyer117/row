@@ -60,6 +60,26 @@ assertClose(trackedSymmetric.byName['R elbow'], 90, 0.01, 'trackedAngles: R elbo
 // trackedAngles — an unknown pose slug returns an empty result, not a crash.
 assertEqual(FCL.trackedAngles(lmSymmetric, 'not-a-real-pose').values.length, 0, 'trackedAngles: unknown pose slug returns empty values');
 
+// ANGLE_TRIPLES — a fixed map of real joint-angle triples, reusing LANDMARK indices.
+assertEqual(FCL.ANGLE_TRIPLES.knee.l[1], FCL.LANDMARK.L_KNEE, 'ANGLE_TRIPLES: knee triple vertex is the knee landmark');
+assertEqual(FCL.ANGLE_TRIPLES.elbow.l[1], FCL.LANDMARK.L_ELBOW, 'ANGLE_TRIPLES: elbow triple vertex is the elbow landmark');
+
+// matchBenchmark — an exact name match wins.
+var benchmarks = [
+  { names: ['squat', 'back squat'], jointAngle: 'knee', depthDirection: 'min', targetAngleDeg: 100, cueLabel: 'knee flexion' },
+  { names: ['bench', 'bench press'], jointAngle: 'elbow', depthDirection: 'max', targetAngleDeg: 165, cueLabel: 'elbow lockout' }
+];
+assertEqual(FCL.matchBenchmark('squat', benchmarks).cueLabel, 'knee flexion', 'matchBenchmark: exact match returns the right entry');
+
+// matchBenchmark — a fuzzy match above threshold still resolves (e.g. "back squat" typed as "squats").
+assertEqual(FCL.matchBenchmark('back squats', benchmarks).cueLabel, 'knee flexion', 'matchBenchmark: a close fuzzy match resolves to the right entry');
+
+// matchBenchmark — an unrelated exercise name returns null, not a wrong guess.
+assertEqual(FCL.matchBenchmark('cable crossover', benchmarks), null, 'matchBenchmark: no meaningful match returns null');
+
+// matchBenchmark — empty/whitespace input returns null without throwing.
+assertEqual(FCL.matchBenchmark('', benchmarks), null, 'matchBenchmark: empty input returns null');
+
 // computeSymmetry — perfectly mirrored arms report diffDeg 0.
 var symResult = FCL.computeSymmetry(lmSymmetric, 'front-double-biceps');
 assertEqual(symResult.length, 1, 'computeSymmetry: front-double-biceps has exactly one symmetry pair (elbow)');
