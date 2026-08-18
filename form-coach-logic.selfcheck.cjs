@@ -80,6 +80,16 @@ assertEqual(FCL.matchBenchmark('cable crossover', benchmarks), null, 'matchBench
 // matchBenchmark — empty/whitespace input returns null without throwing.
 assertEqual(FCL.matchBenchmark('', benchmarks), null, 'matchBenchmark: empty input returns null');
 
+// EXERCISE_BENCHMARKS — loaded from benchmarks.js, matchBenchmark resolves real entries.
+var fs2 = require('fs');
+vm.runInContext(fs2.readFileSync(path.join(__dirname, 'benchmarks.js'), 'utf8'), sandbox);
+var realBenchmarks = sandbox.window.EXERCISE_BENCHMARKS;
+assertEqual(Array.isArray(realBenchmarks) && realBenchmarks.length >= 10, true, 'EXERCISE_BENCHMARKS: at least 10 curated entries exist');
+var squatMatch = FCL.matchBenchmark('squat', realBenchmarks);
+assertEqual(squatMatch.jointAngle, 'knee', 'EXERCISE_BENCHMARKS: squat entry tracks the knee joint');
+var benchMatch = FCL.matchBenchmark('bench press', realBenchmarks);
+assertEqual(benchMatch.jointAngle, 'elbow', 'EXERCISE_BENCHMARKS: bench press entry tracks the elbow joint');
+
 // computeSymmetry — perfectly mirrored arms report diffDeg 0.
 var symResult = FCL.computeSymmetry(lmSymmetric, 'front-double-biceps');
 assertEqual(symResult.length, 1, 'computeSymmetry: front-double-biceps has exactly one symmetry pair (elbow)');
