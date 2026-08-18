@@ -6935,9 +6935,9 @@ document.addEventListener('DOMContentLoaded', function () {
   // reaches them through the window.__gym bridge instead of losing the
   // hint entirely. Bare `state`/getAllAdhocExercises() references here
   // threw "state is not defined" (confirmed live, 2026-08-18) -- this
-  // script block is ALSO past the closing </script> of the IIFE those
-  // live in, same cross-script-boundary problem window.__gym.state's own
-  // getter exists to solve; this just wasn't routed through it.
+  // script block is a separate tag from the IIFE those live in, same
+  // cross-script-boundary problem window.__gym.state's own getter exists
+  // to solve; this just wasn't routed through it.
   window.__gym.getSttPrompt = function () {
     return window.SttPromptLogic ? window.SttPromptLogic.buildSttPrompt(window.__gym.state.exercises, window.__gym.getAllAdhocExercises()) : '';
   };
