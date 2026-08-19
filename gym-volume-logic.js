@@ -194,19 +194,19 @@
   function volumeAdvisory(band, stalled, phase) {
     if (!band) return null;
     if (band.label === 'under') {
-      return { suggestion: 'add_set', reason: 'Under MEV (' + band.mev + ' sets/wk) for this muscle -- there\'s real room to add volume here before load progression is even the limiting factor.' };
+      return { suggestion: 'add_set', priority: 2, reason: 'Under MEV (' + band.mev + ' sets/wk) for this muscle -- there\'s real room to add volume here before load progression is even the limiting factor.' };
     }
     if (band.label === 'mrv') {
-      return { suggestion: 'pull_back', reason: 'At or above MRV (' + band.mrv + ' sets/wk) for this muscle -- more volume here is more likely to add fatigue than drive further growth.' };
+      return { suggestion: 'pull_back', priority: 3, reason: 'At or above MRV (' + band.mrv + ' sets/wk) for this muscle -- more volume here is more likely to add fatigue than drive further growth.' };
     }
     if (band.belowTarget) {
       if (phase === 'growth') {
-        return { suggestion: 'add_set', reason: 'Growth phase target is ' + band.target + ' sets/wk for this muscle -- still room to push toward MAV, and this phase is where added volume is a real lever.' };
+        return { suggestion: 'add_set', priority: 1, reason: 'Growth phase target is ' + band.target + ' sets/wk for this muscle -- still room to push toward MAV, and this phase is where added volume is a real lever.' };
       }
-      return { suggestion: 'add_set', reason: 'This phase\'s minimum-effective target is ' + band.target + ' sets/wk for this muscle -- worth adding a set to hold there while other levers do the heavy lifting.' };
+      return { suggestion: 'add_set', priority: 1, reason: 'This phase\'s minimum-effective target is ' + band.target + ' sets/wk for this muscle -- worth adding a set to hold there while other levers do the heavy lifting.' };
     }
     if (stalled) {
-      return { suggestion: 'add_set', reason: 'Stalled on load, but still under MRV (' + band.mrv + ' sets/wk) for this muscle -- a plateau here is often a volume problem, not purely a load problem. Consider adding a set before assuming a deload is the only fix.' };
+      return { suggestion: 'add_set', priority: 0, reason: 'Stalled on load, but still under MRV (' + band.mrv + ' sets/wk) for this muscle -- a plateau here is often a volume problem, not purely a load problem. Consider adding a set before assuming a deload is the only fix.' };
     }
     return null;
   }

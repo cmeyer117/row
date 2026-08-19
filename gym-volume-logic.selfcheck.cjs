@@ -216,6 +216,13 @@ assertEqual(volumeAdvisory(classifyMuscleVolume('Chest', 25), true).suggestion, 
 // volumeAdvisory — unknown muscle (null band) returns null, doesn't crash.
 assertEqual(volumeAdvisory(null, true), null, 'volumeAdvisory: null band (unknown muscle) returns null');
 
+// volumeAdvisory — priority field ranks the 4 cases: pull_back (MRV) highest,
+// then under-MEV add, then phase-target add, then stall-based add lowest.
+assertEqual(volumeAdvisory(classifyMuscleVolume('Chest', 25), false).priority, 3, 'volumeAdvisory: MRV pull_back has priority 3');
+assertEqual(volumeAdvisory(classifyMuscleVolume('Chest', 3), false).priority, 2, 'volumeAdvisory: under-MEV add_set has priority 2');
+assertEqual(volumeAdvisory(classifyMuscleVolume('Chest', 9, 'cut'), false, 'cut').priority, 1, 'volumeAdvisory: phase-target add_set has priority 1');
+assertEqual(volumeAdvisory(classifyMuscleVolume('Chest', 15), true).priority, 0, 'volumeAdvisory: stall-based add_set has priority 0');
+
 // matchesVolumeDecision — add_set is followed only if actual exceeds baseline.
 assertEqual(matchesVolumeDecision('add_set', 10, 12), true, 'matchesVolumeDecision: add_set followed when actual > baseline');
 assertEqual(matchesVolumeDecision('add_set', 10, 10), false, 'matchesVolumeDecision: add_set not followed when actual === baseline');
