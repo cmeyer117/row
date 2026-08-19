@@ -5101,6 +5101,39 @@ img, video, canvas, svg { max-width: 100%; }
     });
   });
 
+  // Builds the autopsy payload for today's logged exercises: per-exercise
+  // getRx() (same priorLogs-excludes-today convention fireDebrief() already
+  // established) feeds GymAutopsyLogic's outcome classifier and suggested-
+  // change ranker. Returns null if nothing was logged today (nothing to
+  // autopsy -- the checkin modal still opens for a manual pain/recovery/
+  // pump entry, just with no Rx summary).
+  function buildAutopsyPayload() {
+    if (!window.GymAutopsyLogic) return null;
+    const today = getActiveDate();
+    const allLogs = state.logs || {};
+    const exercises = (state.exercises || []).concat(getAdhocExercises());
+    const rxList = [];
+    const names = [];
+    exercises.forEach(function(ex) {
+      const allExLogs = allLogs[ex.id] || [];
+      const loggedToday = allExLogs.some(function(l) { return l.date.slice(0, 10) === today; });
+      if (!loggedToday) return;
+      const priorLogs = allExLogs.filter(function(l) { return l.date.slice(0, 10) < today; });
+      rxList.push(getRx(ex, priorLogs));
+      names.push(ex.name);
+    });
+    if (!rxList.length) return null;
+    const outcomes = rxList.map(window.GymAutopsyLogic.classifyRxOutcome);
+    const overall = outcomes.indexOf('missed') !== -1 ? 'missed' : (outcomes.indexOf('beat') !== -1 ? 'beat' : (outcomes.indexOf('met') !== -1 ? 'met' : null));
+    const missedNames = outcomes.map(function(o, i) { return o === 'missed' ? names[i] : null; }).filter(Boolean);
+    return {
+      rxSummary: overall,
+      needsReason: window.GymAutopsyLogic.sessionNeedsReason(outcomes),
+      missedNames: missedNames,
+      suggestedChange: window.GymAutopsyLogic.pickSuggestedChange(rxList)
+    };
+  }
+
   $('poTwDoneBtn').addEventListener('click', () => {
     const todayKey = wtDateKey(new Date());
     const wasUndone = !doneDays[todayKey];
@@ -5116,9 +5149,8 @@ img, video, canvas, svg { max-width: 100%; }
     saveDoneDays(doneDays);
     renderTodaysWorkout();
     renderPastWorkouts();
-    if (wasUndone) {
-      fireDebrief();
-      if (typeof window.__gym_openCheckinModal === 'function') window.__gym_openCheckinModal();
+    if (wasUndone && typeof window.__gym_openCheckinModal === 'function') {
+      window.__gym_openCheckinModal(buildAutopsyPayload());
     }
   });
 
