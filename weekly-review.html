@@ -16,6 +16,8 @@
 <script src="row-auth.js" defer></script>
 <script src="topbar.js" defer></script>
 <script src="gym-volume-logic.js"></script>
+<script src="gym-season-logic.js"></script>
+<script src="gym-readiness-logic.js"></script>
 <script src="decisions.js"></script>
 <style>
 :root {
@@ -59,6 +61,7 @@ button {
 <div id="app" style="max-width:640px;margin:0 auto;padding:24px 16px 100px;">
   <h1 style="font-family:var(--font);font-size:22px;color:var(--text-1);">Weekly Coach Decision Loop</h1>
   <div id="loading" style="color:var(--text-3);">Loading...</div>
+  <div id="readinessSection" style="display:none;"></div>
   <div id="closeoutSection" style="display:none;"></div>
   <div id="newDecisionSection" style="display:none;"></div>
 </div>
@@ -344,9 +347,85 @@ async function renderNewDecisionForm() {
   };
 }
 
+// Prep Readiness Panel -- phase-aware guardrail view, not a peak-week
+// engine. See docs/superpowers/specs/2026-08-19-prep-readiness-panel-design.md.
+const RECOVERY_SCORE = { low: 1, med: 2, high: 3 };
+const TREND_ARROW = { up: '↑', down: '↓', flat: '→' };
+
+async function renderReadinessPanel() {
+  const el = document.getElementById('readinessSection');
+  const [gymState, existingDecision] = await Promise.all([
+    fetchGymState(),
+    window.getOpenDueDecision('weekly-coach-loop'),
+  ]);
+
+  const phase = gymState.season && gymState.season.phase;
+  const phaseLabel = phase ? window.GymSeasonLogic.PHASES[phase] : null;
+  const day = phase && gymState.season.startDate ? window.GymSeasonLogic.daysSince(gymState.season.startDate) : null;
+
+  const counts = window.GymVolumeLogic.weeklySetsByMuscle(gymState.exercises || [], gymState.logs || {});
+  const volumeHtml = MUSCLES.map(m => {
+    const band = window.GymVolumeLogic.classifyMuscleVolume(m, counts[m] || 0, phase);
+    if (!band || !band.belowTarget) return '';
+    return `<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:12px;">
+      <span style="color:var(--text-2);">${m}</span>
+      <span style="color:var(--warn);">${counts[m] || 0} / ${band.target} target</span>
+    </div>`;
+  }).join('');
+
+  const { monday, sunday } = weekWindow(easternCalendarDate(new Date()));
+  const trend = window.GymReadinessLogic.recoveryTrend(gymState.checkins || {}, sunday, RECOVERY_SCORE);
+  const trendHtml = trend.direction
+    ? `<span style="color:var(--text-1);">${trend.avgLast7.toFixed(1)}/3 ${TREND_ARROW[trend.direction]}</span>`
+    : `<span style="color:var(--text-3);">No recovery data logged this week</span>`;
+
+  const [health, posing] = await Promise.all([fetchAppStateKey('health'), fetchAppStateKey('posing')]);
+  const cardioCount = countEntriesInWeek((health && health['health:cardio']) || [], monday, sunday);
+  const posingCount = countEntriesInWeek((posing && posing['posing:log']) || [], monday, sunday);
+
+  const exceptions = window.GymReadinessLogic.mobilityExceptionsInWeek(gymState.jointPain || [], monday, sunday);
+  const exceptionsHtml = exceptions.length
+    ? exceptions.map(e => `<div style="font-size:12px;color:var(--warn);padding:2px 0;">${e.joint} — ${e.severity} (${e.date})</div>`).join('')
+    : `<div style="font-size:12px;color:var(--text-3);">None logged this week</div>`;
+
+  const peakBanner = phase === 'peak'
+    ? `<div style="background:rgba(251,191,36,0.1);border:1px solid rgba(251,191,36,0.3);border-radius:8px;padding:8px 12px;margin:8px 0;font-size:13px;color:var(--warn);">Holding — no autonomous changes.</div>`
+    : '';
+
+  const decisionFlagHtml = existingDecision
+    ? `<div style="font-size:13px;color:var(--warn);padding:6px 0;">Needs coach decision — last week's is open and due.</div>`
+    : '';
+
+  el.style.display = 'block';
+  el.innerHTML = `
+    <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px;">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;">
+        <span style="font-size:15px;color:var(--text-1);font-weight:600;">${phaseLabel || 'No season set'}</span>
+        ${day != null ? `<span style="font-size:12px;color:var(--text-3);">Day ${day}</span>` : ''}
+      </div>
+      ${peakBanner}
+      ${volumeHtml ? `<p style="color:var(--text-3);font-size:11px;text-transform:uppercase;letter-spacing:0.05em;margin:12px 0 4px;">Below phase target</p>${volumeHtml}` : ''}
+      <p style="color:var(--text-3);font-size:11px;text-transform:uppercase;letter-spacing:0.05em;margin:12px 0 4px;">Recovery trend (7-day)</p>
+      ${trendHtml}
+      <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:13px;margin-top:8px;">
+        <span style="color:var(--text-1);">Cardio / posing this week</span>
+        <span style="color:var(--text-2);">${cardioCount} / ${posingCount}</span>
+      </div>
+      ${existingDecision && existingDecision.details && (existingDecision.details.cardio_rx || existingDecision.details.posing_rx) ? `
+      <div style="font-size:12px;color:var(--text-3);padding:2px 0;">
+        ${existingDecision.details.cardio_rx ? `Cardio Rx: ${existingDecision.details.cardio_rx}` : ''}
+        ${existingDecision.details.posing_rx ? `<br>Posing Rx: ${existingDecision.details.posing_rx}` : ''}
+      </div>` : ''}
+      <p style="color:var(--text-3);font-size:11px;text-transform:uppercase;letter-spacing:0.05em;margin:12px 0 4px;">Mobility exceptions</p>
+      ${exceptionsHtml}
+      ${decisionFlagHtml}
+    </div>`;
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
   const existing = await window.getOpenDueDecision('weekly-coach-loop');
   document.getElementById('loading').style.display = 'none';
+  renderReadinessPanel();
   if (existing) {
     renderCloseout(existing);
   } else {
