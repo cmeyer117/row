@@ -1,0 +1,66 @@
+name: Meal Log Nudge
+
+on:
+  schedule:
+    # Breakfast ~10:30am, lunch ~1pm, pre-gym ~3pm, post-gym ~7:30pm Eastern
+    # (EDT, UTC-4; DST drift accepted un-corrected, same as the other nudges).
+    - cron: '30 14 * * *'
+    - cron: '0 17 * * *'
+    - cron: '0 19 * * *'
+    - cron: '30 23 * * *'
+  workflow_dispatch:
+    inputs:
+      meal:
+        description: 'Meal slot to force (1-4)'
+        type: choice
+        options: ['1', '2', '3', '4']
+        default: '1'
+      force:
+        description: 'Force a real test push regardless of logged count'
+        type: boolean
+        default: false
+
+jobs:
+  nudge:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Determine meal slot from current UTC hour
+        id: meal
+        run: |
+          if [ -n "${{ inputs.meal }}" ]; then
+            echo "index=${{ inputs.meal }}" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          hour=$(date -u +%H)
+          case "$hour" in
+            14) echo "index=1" >> "$GITHUB_OUTPUT" ;;
+            17) echo "index=2" >> "$GITHUB_OUTPUT" ;;
+            19) echo "index=3" >> "$GITHUB_OUTPUT" ;;
+            23) echo "index=4" >> "$GITHUB_OUTPUT" ;;
+            *) echo "index=1" >> "$GITHUB_OUTPUT" ;;
+          esac
+      - name: Send meal-log nudge
+        run: |
+          url="https://row-sage.vercel.app/api/send-nudge?type=meal-log&meal=${{ steps.meal.outputs.index }}"
+          if [ "${{ inputs.force }}" = "true" ]; then
+            url="${url}&force=true"
+          fi
+          response=$(curl -s -w "\n%{http_code}" -X POST "$url" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}")
+          code=$(echo "$response" | tail -n1)
+          body=$(echo "$response" | sed '$d')
+          echo "Response code: $code"
+          echo "Response body: $body"
+          if [ "$code" != "200" ]; then
+            echo "Error: unexpected response $code"
+            exit 1
+          fi
+          message=$(echo "$body" | jq -r '.message')
+          if [ "$message" = "Pushed" ]; then
+            sent=$(echo "$body" | jq -r '.sent')
+            total=$(echo "$body" | jq -r '.total')
+            if [ "$sent" != "$total" ]; then
+              echo "Error: only $sent/$total pushes actually succeeded"
+              exit 1
+            fi
+          fi
