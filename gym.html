@@ -7055,6 +7055,19 @@ img, video, canvas, svg { max-width: 100%; }
 document.addEventListener('DOMContentLoaded', function () {
   if (window.initCloudSync) {
     window.initCloudSync({ appKey: 'hype-audio', syncedKeys: ['hype_audio'] });
+    // Mirrors health.html's own initCloudSync call (health.html:1799-1807)
+    // EXACTLY -- syncedKeys must match, not just include health:sleep. Each
+    // initCloudSync instance replaces the WHOLE app_state row on push using
+    // only the keys it's told to watch; a narrower list here would silently
+    // drop health.html's other fields (vitals/labs/measurements/cardio/
+    // stack) on this device's next push. See
+    // docs/superpowers/specs/2026-08-19-morning-readiness-card-design.md.
+    window.initCloudSync({
+      appKey: 'health',
+      syncedKeys: ['stack:items', 'stack:version', 'stack:low', 'macro_targets', 'health:vitals', 'health:labs', 'health:measurements', 'health:sleep', 'health:cardio'],
+      syncedPrefixes: ['stack:taken:'],
+      onApplied: window.renderReadinessCard,
+    });
   }
   const hypeBtn = document.getElementById('hypeMeUpBtn');
   if (hypeBtn) {
