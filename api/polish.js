@@ -12,6 +12,14 @@ export default async function handler(req, res) {
       res.status(405).json({ error: 'Method not allowed' });
       return;
     }
+    // Quarantined 2026-08-18 -- unapproved real Anthropic API spend found via
+    // Codex code review, not previously recorded as approved. Off by default;
+    // set POLISH_ENABLED=true in Vercel to re-enable. See
+    // project-row-polish-endpoint-approved.md memory before flipping this.
+    if (process.env.POLISH_ENABLED !== 'true') {
+      res.status(503).json({ error: 'Polish is currently disabled' });
+      return;
+    }
     // 2026-08-12 audit fix: was a client-visible shared secret guarding a
     // paid Anthropic call, now the real owner session token.
     if (!(await verifyOwner(req.headers['authorization'], SUPABASE_URL, SUPABASE_ANON_KEY))) {
