@@ -5343,10 +5343,12 @@ img, video, canvas, svg { max-width: 100%; }
     }
     $('autopsyAskVision').addEventListener('click', function() {
       persistCheckin();
+      renderReadinessCard();
       fireDebrief();
     });
     $('checkinSave').addEventListener('click', function() {
       persistCheckin();
+      renderReadinessCard();
       bg.classList.remove('show');
       reset();
     });
