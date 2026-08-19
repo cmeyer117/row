@@ -3626,14 +3626,14 @@ img, video, canvas, svg { max-width: 100%; }
   // Looks up the health:sleep entry (a separate page's localStorage key --
   // health.html, not gym.html's own state) submitted for the same day as
   // `last`. Same date-matching convention as state.checkins.
-  function getSleepEntryForDate(dateKey) {
+  function getSleepList() {
     try {
       const list = JSON.parse(localStorage.getItem('health:sleep') || '[]');
-      return (Array.isArray(list) ? list : []).find(function (e) { return e && e.date === dateKey; }) || null;
-    } catch (e) { return null; }
+      return Array.isArray(list) ? list : [];
+    } catch (e) { return []; }
   }
-  function getSleepList() {
-    try { return JSON.parse(localStorage.getItem('health:sleep') || '[]'); } catch (e) { return []; }
+  function getSleepEntryForDate(dateKey) {
+    return getSleepList().find(function (e) { return e && e.date === dateKey; }) || null;
   }
   function setSleepList(list) {
     localStorage.setItem('health:sleep', JSON.stringify(list));
