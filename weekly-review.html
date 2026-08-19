@@ -167,6 +167,45 @@ function easternCalendarDate(date) {
 // fully manual (2026-08-17: no reliable structured target exists for
 // either — deliberately not attempting free-text matching against lift
 // names for a v1).
+// 3-state auto verdict for a numeric weekly target (cardio/posing session
+// counts) -- same idea as matchesVolumeDecision but for a plain "actual vs
+// target" comparison instead of a directional action. null target means no
+// structured Rx was set (legacy free-text decision), so no verdict to give.
+function matchesCountTarget(target, actual) {
+  if (target == null) return null;
+  if (actual >= target) return 'matched';
+  if (actual === 0) return 'not_matched';
+  return 'partly_matched';
+}
+
+// Pre-fix decisions stored cardio_rx/posing_rx as a bare prescription string
+// -- degrade gracefully instead of crashing on old rows.
+function rxInfo(entry, actual) {
+  if (!entry || typeof entry !== 'object') return { legacyText: entry || null, target: null, guardrail: null, actual, verdict: null };
+  const target = typeof entry.target === 'number' ? entry.target : null;
+  return { legacyText: null, target, guardrail: entry.guardrail || null, actual, verdict: matchesCountTarget(target, actual) };
+}
+
+// One-line display for the readiness panel's Rx summary -- handles both the
+// legacy bare string and the new {target, guardrail} shape.
+function rxSummaryText(entry) {
+  if (!entry || typeof entry !== 'object') return entry;
+  const parts = [];
+  if (entry.target != null) parts.push(entry.target + 'x/wk');
+  if (entry.guardrail) parts.push(entry.guardrail);
+  return parts.length ? parts.join(' — ') : '(no target set)';
+}
+
+// The new {target, guardrail} shape is always a truthy object even when
+// both fields are blank, unlike the legacy bare string (empty = falsy) --
+// so callers deciding whether to show a Rx line need this instead of a
+// plain truthiness check on the raw value.
+function hasRx(entry) {
+  if (!entry) return false;
+  if (typeof entry !== 'object') return true;
+  return entry.target != null || !!entry.guardrail;
+}
+
 async function computeScorecard(decision) {
   const scoreWeekRef = easternCalendarDate(new Date(decision.created_at));
   scoreWeekRef.setUTCDate(scoreWeekRef.getUTCDate() + 7);
@@ -193,8 +232,25 @@ async function computeScorecard(decision) {
 
   const cardioCount = countEntriesInWeek((health && health['health:cardio']) || [], monday, sunday);
   const posingCount = countEntriesInWeek((posing && posing['posing:log']) || [], monday, sunday);
+  const cardioRx = rxInfo(decision.details && decision.details.cardio_rx, cardioCount);
+  const posingRx = rxInfo(decision.details && decision.details.posing_rx, posingCount);
 
-  return { volumeRows, cardioCount, posingCount, weekLabel: monday + ' to ' + sunday };
+  return { volumeRows, cardioCount, posingCount, cardioRx, posingRx, weekLabel: monday + ' to ' + sunday };
+}
+
+const VERDICT_BADGE = {
+  matched: `<span style="color:var(--good);">✓ matched</span>`,
+  partly_matched: `<span style="color:var(--warn);">~ partly matched</span>`,
+  not_matched: `<span style="color:var(--bad);">✗ not matched</span>`,
+};
+
+function rxRowHtml(label, count, rx) {
+  const targetLabel = rx.target != null ? ` / ${rx.target} target` : (rx.legacyText ? ` (legacy: "${rx.legacyText}")` : '');
+  const badge = rx.verdict ? VERDICT_BADGE[rx.verdict] : '';
+  return `<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px;">
+    <span style="color:var(--text-1);">${label} sessions logged</span>
+    <span style="color:var(--text-2);">${count}${targetLabel} ${badge}</span>
+  </div>`;
 }
 
 function renderScorecard(scorecard) {
@@ -217,16 +273,49 @@ function renderScorecard(scorecard) {
     <div style="background:rgba(110,231,183,0.05);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:12px;">
       <p style="color:var(--text-3);font-size:11px;text-transform:uppercase;letter-spacing:0.05em;margin:0 0 8px;">Follow-through — week of ${scorecard.weekLabel}</p>
       ${volumeHtml}
-      <div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px;">
-        <span style="color:var(--text-1);">Cardio sessions logged</span>
-        <span style="color:var(--text-2);">${scorecard.cardioCount}</span>
-      </div>
-      <div style="display:flex;justify-content:space-between;padding:4px 0;font-size:13px;">
-        <span style="color:var(--text-1);">Posing sessions logged</span>
-        <span style="color:var(--text-2);">${scorecard.posingCount}</span>
-      </div>
-      <p style="color:var(--text-3);font-size:11px;margin:8px 0 0;">Anchor-lift and pain calls aren't auto-checked — no reliable structured target to compare against. Use the numbers above plus your own read to pick a verdict below.</p>
+      ${rxRowHtml('Cardio', scorecard.cardioCount, scorecard.cardioRx)}
+      ${rxRowHtml('Posing', scorecard.posingCount, scorecard.posingRx)}
+      <p style="color:var(--text-3);font-size:11px;margin:8px 0 0;">Anchor-lift and pain calls still need your own read — pick a verdict for each below.</p>
     </div>`;
+}
+
+// Normalizes anchor_lifts/pain_flags into a uniform {key, label, legacy}
+// shape for the manual-verdict UI below. `key` is `field.index`, used to
+// route a select's value back into decision.details on save. Legacy rows
+// (recorded before this structured payload existed -- a bare string for
+// anchor_lifts, or an array of bare strings for pain_flags) render as
+// plain text with no verdict picker, since there's nothing to score.
+function normalizeAnchorLifts(raw) {
+  if (Array.isArray(raw)) return raw.map((e, i) => ({
+    key: 'anchor_lifts.' + i,
+    label: `${e.lift} — ${e.call}${e.guardrail ? ' (guardrail: ' + e.guardrail + ')' : ''}`,
+  }));
+  if (raw) return [{ key: null, label: raw }];
+  return [];
+}
+
+function normalizePainFlags(raw) {
+  if (!Array.isArray(raw)) return [];
+  return raw.map((e, i) => e && typeof e === 'object'
+    ? { key: 'pain_flags.' + i, label: `${e.note}${e.guardrail ? ' (guardrail: ' + e.guardrail + ')' : ''}` }
+    : { key: null, label: e });
+}
+
+function manualVerdictRowsHtml(title, items) {
+  if (!items.length) return '';
+  const rows = items.map(it => it.key
+    ? `<div style="padding:4px 0;">
+        <div style="font-size:13px;color:var(--text-1);margin-bottom:4px;">${it.label}</div>
+        <select class="manualVerdict" data-key="${it.key}" style="width:100%;padding:6px;">
+          <option value="">Verdict...</option>
+          <option value="matched">Matched</option>
+          <option value="partly_matched">Partly matched</option>
+          <option value="not_matched">Not matched</option>
+        </select>
+      </div>`
+    : `<div style="padding:4px 0;font-size:13px;color:var(--text-2);">${it.label} <span style="color:var(--text-3);">(legacy — no verdict needed)</span></div>`
+  ).join('');
+  return `<div style="margin:8px 0;"><p style="color:var(--text-3);font-size:11px;text-transform:uppercase;letter-spacing:0.05em;margin:0 0 4px;">${title}</p>${rows}</div>`;
 }
 
 async function renderCloseout(decision) {
@@ -239,18 +328,25 @@ async function renderCloseout(decision) {
   // open decision (found in code review 2026-08-17). The verdict picker is
   // the invariant that must always render; the scorecard is a bonus on top.
   let scorecardHtml = '';
+  let scorecard = null;
   try {
-    scorecardHtml = renderScorecard(await computeScorecard(decision));
+    scorecard = await computeScorecard(decision);
+    scorecardHtml = renderScorecard(scorecard);
   } catch (err) {
     console.error('computeScorecard failed:', err);
     scorecardHtml = `<p style="color:var(--warn);font-size:13px;margin-bottom:12px;">Couldn't load follow-through data (connection issue) — pick a verdict from memory.</p>`;
   }
+
+  const anchorItems = normalizeAnchorLifts(decision.details && decision.details.anchor_lifts);
+  const painItems = normalizePainFlags(decision.details && decision.details.pain_flags);
 
   el.innerHTML = `
     <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:16px;">
       <p style="color:var(--text-2);font-size:13px;">Close out last week's decision before starting a new one:</p>
       <p style="color:var(--text-1);font-size:14px;margin:8px 0;">${decision.decision_text}</p>
       ${scorecardHtml}
+      ${manualVerdictRowsHtml('Anchor lifts', anchorItems)}
+      ${manualVerdictRowsHtml('Pain / recovery', painItems)}
       <select id="verdictSelect" style="width:100%;padding:8px;margin-bottom:8px;">
         <option value="">Verdict...</option>
         <option value="worked">Worked</option>
@@ -264,8 +360,19 @@ async function renderCloseout(decision) {
   document.getElementById('closeoutSave').onclick = async () => {
     const verdict = document.getElementById('verdictSelect').value;
     if (!verdict) { alert('Pick a verdict first.'); return; }
+    const manualSelects = Array.from(document.querySelectorAll('.manualVerdict'));
+    if (manualSelects.some(sel => !sel.value)) { alert('Pick a verdict for every anchor-lift/pain entry.'); return; }
     const note = document.getElementById('outcomeNote').value;
-    await window.closeDecision(decision.id, verdict, note);
+
+    const details = JSON.parse(JSON.stringify(decision.details || {}));
+    manualSelects.forEach(sel => {
+      const [field, idx] = sel.dataset.key.split('.');
+      if (details[field] && details[field][idx]) details[field][idx].verdict = sel.value;
+    });
+    if (scorecard && scorecard.cardioRx.verdict && details.cardio_rx) details.cardio_rx.verdict = scorecard.cardioRx.verdict;
+    if (scorecard && scorecard.posingRx.verdict && details.posing_rx) details.posing_rx.verdict = scorecard.posingRx.verdict;
+
+    await window.closeDecision(decision.id, verdict, note, details);
     el.style.display = 'none';
     await renderNewDecisionForm();
   };
@@ -281,6 +388,18 @@ function volumeActionOptions(suggested) {
     const text = label.charAt(0).toUpperCase() + label.slice(1);
     return `<option value="${action}" ${suggested === action ? 'selected' : ''}>${text}</option>`;
   }).join('');
+}
+
+function anchorLiftRowHtml() {
+  return `<div class="anchorLiftRow" style="display:flex;gap:6px;margin-top:6px;">
+    <input type="text" class="anchorLiftName" placeholder="Lift" style="flex:2;padding:6px;">
+    <select class="anchorLiftCall" style="flex:1;padding:6px;">
+      <option value="progress">Progress</option>
+      <option value="hold">Hold</option>
+      <option value="regress">Regress</option>
+    </select>
+    <input type="text" class="anchorLiftGuardrail" placeholder="Guardrail (optional)" style="flex:2;padding:6px;">
+  </div>`;
 }
 
 async function renderNewDecisionForm() {
@@ -305,16 +424,34 @@ async function renderNewDecisionForm() {
       ${coachRead ? `<p style="color:var(--text-2);font-size:13px;">${coachRead.narrative}</p>` : `<p style="color:var(--text-3);font-size:13px;">Signal narrative unavailable this week.</p>`}
       <h3 style="color:var(--text-1);font-size:14px;margin-top:12px;">Volume by muscle</h3>
       ${muscleRows}
-      <textarea id="anchorLifts" placeholder="Anchor lift progress/hold/regress calls" style="width:100%;padding:8px;margin-top:12px;min-height:50px;"></textarea>
-      <textarea id="cardioRx" placeholder="Cardio prescription" style="width:100%;padding:8px;margin-top:8px;min-height:50px;"></textarea>
-      <textarea id="posingRx" placeholder="Posing prescription" style="width:100%;padding:8px;margin-top:8px;min-height:50px;"></textarea>
-      <label style="display:block;color:var(--text-2);font-size:13px;margin-top:8px;">
+      <h3 style="color:var(--text-1);font-size:14px;margin-top:12px;">Anchor lifts</h3>
+      <div id="anchorLiftRows">${anchorLiftRowHtml()}</div>
+      <button type="button" id="addAnchorLift" style="padding:6px 12px;font-size:12px;margin-top:6px;">+ Add lift</button>
+
+      <h3 style="color:var(--text-1);font-size:14px;margin-top:12px;">Cardio</h3>
+      <div style="display:flex;gap:8px;margin-top:4px;">
+        <input type="number" id="cardioTarget" placeholder="Target sessions/wk" style="flex:1;padding:8px;">
+        <input type="text" id="cardioGuardrail" placeholder="Guardrail (optional)" style="flex:2;padding:8px;">
+      </div>
+
+      <h3 style="color:var(--text-1);font-size:14px;margin-top:12px;">Posing</h3>
+      <div style="display:flex;gap:8px;margin-top:4px;">
+        <input type="number" id="posingTarget" placeholder="Target sessions/wk" style="flex:1;padding:8px;">
+        <input type="text" id="posingGuardrail" placeholder="Guardrail (optional)" style="flex:2;padding:8px;">
+      </div>
+
+      <label style="display:block;color:var(--text-2);font-size:13px;margin-top:12px;">
         <input type="checkbox" id="painFlag" /> Recovery/pain flag
       </label>
       <textarea id="painNote" placeholder="Pain/recovery note" style="width:100%;padding:8px;margin-top:4px;min-height:40px;"></textarea>
+      <input type="text" id="painGuardrail" placeholder="Guardrail (optional)" style="width:100%;padding:8px;margin-top:4px;">
       <textarea id="rationale" placeholder="Rationale" style="width:100%;padding:8px;margin-top:8px;min-height:50px;"></textarea>
       <button id="saveDecision" style="padding:10px 16px;margin-top:8px;">Save This Week's Decision</button>
     </div>`;
+
+  document.getElementById('addAnchorLift').onclick = () => {
+    document.getElementById('anchorLiftRows').insertAdjacentHTML('beforeend', anchorLiftRowHtml());
+  };
 
   document.getElementById('saveDecision').onclick = async () => {
     // Store the baseline count alongside each muscle's chosen action, not
@@ -326,6 +463,17 @@ async function renderNewDecisionForm() {
     document.querySelectorAll('.muscleSelect').forEach(sel => {
       muscleGroups[sel.dataset.muscle] = { action: sel.value, baseline: counts[sel.dataset.muscle] || 0 };
     });
+    const anchorLifts = Array.from(document.querySelectorAll('.anchorLiftRow'))
+      .map(row => ({
+        lift: row.querySelector('.anchorLiftName').value.trim(),
+        call: row.querySelector('.anchorLiftCall').value,
+        guardrail: row.querySelector('.anchorLiftGuardrail').value.trim() || null,
+      }))
+      .filter(e => e.lift);
+    const cardioTarget = document.getElementById('cardioTarget').value;
+    const posingTarget = document.getElementById('posingTarget').value;
+    const painNote = document.getElementById('painNote').value;
+
     const reviewDate = new Date();
     reviewDate.setDate(reviewDate.getDate() + 7);
     const summary = 'Week of ' + new Date().toISOString().slice(0, 10) + ' coach decision recorded.';
@@ -336,10 +484,10 @@ async function renderNewDecisionForm() {
       review_date: reviewDate.toISOString().slice(0, 10),
       details: {
         muscle_groups: muscleGroups,
-        anchor_lifts: document.getElementById('anchorLifts').value,
-        cardio_rx: document.getElementById('cardioRx').value,
-        posing_rx: document.getElementById('posingRx').value,
-        pain_flags: document.getElementById('painFlag').checked ? [document.getElementById('painNote').value] : [],
+        anchor_lifts: anchorLifts,
+        cardio_rx: { target: cardioTarget ? Number(cardioTarget) : null, guardrail: document.getElementById('cardioGuardrail').value.trim() || null },
+        posing_rx: { target: posingTarget ? Number(posingTarget) : null, guardrail: document.getElementById('posingGuardrail').value.trim() || null },
+        pain_flags: document.getElementById('painFlag').checked ? [{ note: painNote, guardrail: document.getElementById('painGuardrail').value.trim() || null }] : [],
       },
     });
     alert('Saved.');
@@ -425,10 +573,10 @@ async function renderReadinessPanel() {
         <span style="color:var(--text-1);">Cardio / posing this week</span>
         <span style="color:var(--text-2);">${cardioCount} / ${posingCount}</span>
       </div>
-      ${existingDecision && existingDecision.details && (existingDecision.details.cardio_rx || existingDecision.details.posing_rx) ? `
+      ${existingDecision && existingDecision.details && (hasRx(existingDecision.details.cardio_rx) || hasRx(existingDecision.details.posing_rx)) ? `
       <div style="font-size:12px;color:var(--text-3);padding:2px 0;">
-        ${existingDecision.details.cardio_rx ? `Cardio Rx: ${existingDecision.details.cardio_rx}` : ''}
-        ${existingDecision.details.posing_rx ? `<br>Posing Rx: ${existingDecision.details.posing_rx}` : ''}
+        ${hasRx(existingDecision.details.cardio_rx) ? `Cardio Rx: ${rxSummaryText(existingDecision.details.cardio_rx)}` : ''}
+        ${hasRx(existingDecision.details.posing_rx) ? `<br>Posing Rx: ${rxSummaryText(existingDecision.details.posing_rx)}` : ''}
       </div>` : ''}
       <p style="color:var(--text-3);font-size:11px;text-transform:uppercase;letter-spacing:0.05em;margin:12px 0 4px;">Mobility exceptions</p>
       ${exceptionsHtml}

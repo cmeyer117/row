@@ -52,16 +52,22 @@
       });
   };
 
-  window.closeDecision = function (id, verdict, outcomeNote) {
+  // `details` is optional -- pass the caller's already-merged details object
+  // (item verdicts folded in) to persist it alongside the whole-decision
+  // verdict in the same update. Omit it to leave details untouched, same as
+  // before this param existed.
+  window.closeDecision = function (id, verdict, outcomeNote, details) {
     if (!window.supabase) return Promise.reject(new Error('supabase-js not loaded'));
     if (!id || !verdict) return Promise.reject(new Error('id and verdict are required'));
     const supa = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-    return supa.from('decisions').update({
+    const update = {
       verdict: verdict,
       outcome_note: outcomeNote || null,
       status: 'reviewed',
       reviewed_at: new Date().toISOString(),
-    }).eq('id', id).then(function (res) {
+    };
+    if (details) update.details = details;
+    return supa.from('decisions').update(update).eq('id', id).then(function (res) {
       if (res.error) throw new Error('closeDecision failed: ' + res.error.message);
       return res;
     });
