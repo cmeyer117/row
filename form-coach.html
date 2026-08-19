@@ -527,6 +527,13 @@ window.FormCoachActiveMode = 'posing';
   // bilateral joint angle for that exercise instead (FormCoachLogic.
   // bilateralAngle + ANGLE_TRIPLES) -- more accurate for depth-specific
   // coaching, and the same angle scoreDepth() will check against.
+  // Returns { samples, range, usedBenchmark } -- usedBenchmark tells the
+  // caller whether `samples` are real angle degrees (safe to depth-score
+  // against `benchmark`) or the Y-position fallback (NOT comparable to a
+  // degree target). Without this flag, a caller that always forwards
+  // `benchmark` into scoreSet() would depth-score a raw 0-1 Y-position
+  // against a degree threshold like 100 whenever the angle fallback below
+  // fires -- caught in review before it shipped.
   function buildPrimarySignal(frames, benchmark) {
     if (benchmark) {
       var angleSamples = frames.map(function (f) {
@@ -534,7 +541,7 @@ window.FormCoachActiveMode = 'posing';
       }).filter(function (s) { return s.value !== null; });
       if (angleSamples.length >= 10) {
         var angleValues = angleSamples.map(function (s) { return s.value; });
-        return { samples: angleSamples, range: Math.max.apply(null, angleValues) - Math.min.apply(null, angleValues) };
+        return { samples: angleSamples, range: Math.max.apply(null, angleValues) - Math.min.apply(null, angleValues), usedBenchmark: true };
       }
       // Fewer than 10 valid angle frames (person partly out of frame too
       // often) -- fall through to the Y-position fallback below rather
@@ -552,7 +559,7 @@ window.FormCoachActiveMode = 'posing';
       if (range > bestRange) { bestRange = range; best = name; }
     });
     var samples = frames.map(function (f) { return { t: f.t, value: candidates[best](f.landmarks) }; });
-    return { samples: samples, range: bestRange };
+    return { samples: samples, range: bestRange, usedBenchmark: false };
   }
 
   function buildStabilitySamples(frames) {
@@ -622,7 +629,11 @@ window.FormCoachActiveMode = 'posing';
       var primary = buildPrimarySignal(buffer, matchedBenchmark);
       var stabilitySamples = buildStabilitySamples(buffer);
       var minAmplitude = primary.range * 0.15; // 15% of the set's own observed range filters jitter without hiding a real short rep
-      var scored = window.FormCoachLogic.scoreSet(primary.samples, stabilitySamples, minAmplitude, matchedBenchmark);
+      // Only depth-score against the benchmark when buildPrimarySignal
+      // actually used angle tracking -- if it fell back to Y-position
+      // (too few valid angle frames), primary.samples aren't real degrees
+      // and must never be compared against a degree target.
+      var scored = window.FormCoachLogic.scoreSet(primary.samples, stabilitySamples, minAmplitude, primary.usedBenchmark ? matchedBenchmark : null);
       renderResult(scored, exerciseName);
       if (scored.length) {
         resultEl.insertAdjacentHTML('beforeend', '<div class="mob-card" id="liftCritiqueCard"><div class="mob-card-body">Getting AI critique&hellip;</div></div>');
