@@ -3632,6 +3632,28 @@ img, video, canvas, svg { max-width: 100%; }
       return (Array.isArray(list) ? list : []).find(function (e) { return e && e.date === dateKey; }) || null;
     } catch (e) { return null; }
   }
+  function getSleepList() {
+    try { return JSON.parse(localStorage.getItem('health:sleep') || '[]'); } catch (e) { return []; }
+  }
+  function setSleepList(list) {
+    localStorage.setItem('health:sleep', JSON.stringify(list));
+  }
+  // Mirrors health.html's own upsertByDate exactly (health.html:1001-1010) --
+  // duplicated rather than shared since it's 8 lines and the two pages don't
+  // otherwise share a module.
+  function upsertSleepByDate(list, date, fields) {
+    const cleanFields = {};
+    Object.keys(fields).forEach(function (k) {
+      if (fields[k] !== null && fields[k] !== undefined && fields[k] !== '') cleanFields[k] = fields[k];
+    });
+    if (Object.keys(cleanFields).length === 0) return list;
+    const existing = list.find(function (e) { return e.date === date; });
+    if (existing) {
+      Object.assign(existing, cleanFields);
+      return list;
+    }
+    return list.concat([Object.assign({ date: date }, cleanFields)]);
+  }
 
   // Looks up the check-in submitted on the same day as `last` (the log this
   // prescription is based on) and, if present, applies the pain/recovery
@@ -4294,9 +4316,40 @@ img, video, canvas, svg { max-width: 100%; }
     wireSleepQuickAdd();
   }
   function renderSleepQuickAdd() {
-    return '<div class="po-checkin-row-label">Sleep not logged yet today.</div>';
+    return (
+      '<div class="po-checkin-row-label">Log last night\'s sleep</div>' +
+      '<div class="po-checkin-row">' +
+      '<input class="po-quick-input" id="readinessSleepHours" type="number" inputmode="decimal" step="0.5" min="0" max="14" placeholder="hrs" style="max-width:70px">' +
+      '<button type="button" class="po-checkin-btn" data-quality="1">1</button>' +
+      '<button type="button" class="po-checkin-btn" data-quality="2">2</button>' +
+      '<button type="button" class="po-checkin-btn" data-quality="3">3</button>' +
+      '<button type="button" class="po-checkin-btn" data-quality="4">4</button>' +
+      '<button type="button" class="po-checkin-btn" data-quality="5">5</button>' +
+      '<button type="button" class="po-btn-primary" id="readinessSleepSave" style="padding:6px 14px;">Save</button>' +
+      '</div>'
+    );
   }
-  function wireSleepQuickAdd() {}
+  function wireSleepQuickAdd() {
+    const wrap = $('readinessCard');
+    let selectedQuality = null;
+    wrap.querySelectorAll('.po-checkin-btn[data-quality]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        selectedQuality = Number(btn.dataset.quality);
+        wrap.querySelectorAll('.po-checkin-btn[data-quality]').forEach(function (b) { b.classList.remove('selected'); });
+        btn.classList.add('selected');
+      });
+    });
+    const saveBtn = $('readinessSleepSave');
+    if (!saveBtn) return;
+    saveBtn.addEventListener('click', function () {
+      const hoursInput = $('readinessSleepHours');
+      const hours = hoursInput.value ? Number(hoursInput.value) : null;
+      if (hours == null && selectedQuality == null) return;
+      const dateKey = wtDateKey(new Date());
+      setSleepList(upsertSleepByDate(getSleepList(), dateKey, { hours: hours, quality: selectedQuality }));
+      renderReadinessCard();
+    });
+  }
   function renderRx() {
     const wrap = $('rxWrap');
     const ex = getCurrentEx();
