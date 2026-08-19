@@ -9,9 +9,10 @@
 // wiring is shared. The decision logic stays in its own unit-tested module
 // (workout-nudge-logic.js, macro-drift-logic.js, morning-launch-nudge-logic.js).
 import webpush from 'web-push';
-import { isRestDay, hasLoggedToday } from './workout-nudge-logic.js';
+import { isRestDay, hasLoggedToday, todayEasternKey } from './workout-nudge-logic.js';
 import { last3EasternDates, isDrifting } from './macro-drift-logic.js';
 import { hasStartedToday } from './morning-launch-nudge-logic.js';
+import { shouldSendMealNudge } from './meal-log-nudge-logic.js';
 
 const SUPABASE_URL = 'https://vikpcejlyxieguorwysf.supabase.co';
 // Service-role key: every caller is authenticated by the CRON_SECRET check in
@@ -126,6 +127,28 @@ async function fetchFoodLog(dates) {
   return r.json();
 }
 
+// Row count only (not full rows) via PostgREST's exact-count header —
+// cheaper than fetchFoodLog when the nudge only needs "how many so far".
+async function fetchFoodLogCount(dateKey) {
+  const r = await fetch(
+    `${SUPABASE_URL}/rest/v1/food_log?log_date=eq.${dateKey}&select=id`,
+    { headers: { ...authHeaders(), Prefer: 'count=exact' } }
+  );
+  const contentRange = r.headers.get('content-range'); // "0-4/5" or "*/0"
+  return contentRange ? Number(contentRange.split('/')[1]) : 0;
+}
+
+export async function mealLog(mealIndex, force) {
+  if (!force) {
+    const today = todayEasternKey();
+    const rowCount = await fetchFoodLogCount(today);
+    if (!shouldSendMealNudge(rowCount, mealIndex)) {
+      return { status: 200, body: { message: 'Already logged enough today, no push sent' } };
+    }
+  }
+  return push({ body: 'Log a meal — quick add', url: '/macros.html' });
+}
+
 async function coachingInquiry(force) {
   const since = new Date(Date.now() - 20 * 60 * 1000).toISOString();
   const inquiries = force ? [{ name: 'Diagnostic Test' }] : await fetchRecentNewInquiries(since);
@@ -155,4 +178,5 @@ export const NUDGES = {
   'morning-launch': morningLaunch,
   'macro-drift': macroDrift,
   'coaching-inquiry': coachingInquiry,
+  'meal-log': mealLog,
 };
