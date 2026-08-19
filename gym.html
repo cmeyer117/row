@@ -2748,6 +2748,8 @@ img, video, canvas, svg { max-width: 100%; }
     </button>
   </div>
 
+  <div class="card" id="readinessCard"></div>
+
   <div class="card">
     <!-- Filters -->
     <div class="po-filters">
@@ -4247,6 +4249,54 @@ img, video, canvas, svg { max-width: 100%; }
     m.textContent = ago;
     wrap.classList.add('show');
   }
+  // Reads two signals that already exist (health:sleep, state.checkins) and
+  // shows them together before training -- no new data system, no change to
+  // getRx()/applyCheckinOverride()'s mechanism (they keep reacting to the
+  // last post-workout checkin exactly as before). See
+  // docs/superpowers/specs/2026-08-19-morning-readiness-card-design.md.
+  function lastCheckinEntry() {
+    const dates = Object.keys(state.checkins);
+    if (!dates.length) return null;
+    return state.checkins[dates.sort().pop()];
+  }
+  function renderReadinessCard() {
+    const wrap = $('readinessCard');
+    if (!wrap) return;
+    const todaySleep = getSleepEntryForDate(wtDateKey(new Date()));
+    const checkin = lastCheckinEntry();
+
+    let sleepLine;
+    if (todaySleep) {
+      const parts = [];
+      if (typeof todaySleep.hours === 'number') parts.push(todaySleep.hours + 'h');
+      if (typeof todaySleep.quality === 'number') parts.push('quality ' + todaySleep.quality + '/5');
+      sleepLine = '<div class="po-checkin-row-label">Last night: ' + (parts.join(' · ') || '—') + '</div>';
+    } else {
+      sleepLine = renderSleepQuickAdd();
+    }
+
+    let checkinLine;
+    if (checkin) {
+      const parts = [];
+      if (checkin.recovery) parts.push('recovery ' + checkin.recovery);
+      if (checkin.pain) parts.push('pain ' + checkin.pain);
+      if (checkin.pump) parts.push('pump ' + checkin.pump);
+      checkinLine = '<div class="po-checkin-row-label">Last session: ' + (parts.join(' · ') || '—') + '</div>';
+    } else {
+      checkinLine = '<div class="po-checkin-row-label">No checkin yet</div>';
+    }
+
+    const sleepPoor = window.GymSleepCheckLogic ? window.GymSleepCheckLogic.isPoorSleepEntry(todaySleep) : false;
+    const checkinPoor = !!checkin && (checkin.recovery === 'low' || checkin.pain === 'high');
+    const tag = (sleepPoor || checkinPoor) ? 'Watch it' : 'Good';
+
+    wrap.innerHTML = '<div class="po-checkin-row-label" style="font-weight:600;margin-bottom:6px;">Readiness — ' + tag + '</div>' + sleepLine + checkinLine;
+    wireSleepQuickAdd();
+  }
+  function renderSleepQuickAdd() {
+    return '<div class="po-checkin-row-label">Sleep not logged yet today.</div>';
+  }
+  function wireSleepQuickAdd() {}
   function renderRx() {
     const wrap = $('rxWrap');
     const ex = getCurrentEx();
@@ -4521,6 +4571,7 @@ img, video, canvas, svg { max-width: 100%; }
     renderWeekStrip();
     renderFilters(); renderSelect(); renderForm(); renderLastSet();
     renderRepsRow();
+    renderReadinessCard();
     renderRx(); renderStats(); renderSparkline(); renderHistory();
     renderTodaysWorkout();
     renderPastWorkouts();
@@ -6918,7 +6969,10 @@ img, video, canvas, svg { max-width: 100%; }
   };
   // renderAll is called from the BOOT script below, which is now a
   // separate <script> tag (module split) and can't see this IIFE's scope.
+  // renderReadinessCard needs the same bridge -- Task 3's initCloudSync
+  // onApplied callback lives in yet another later <script> tag.
   window.renderAll = renderAll;
+  window.renderReadinessCard = renderReadinessCard;
 })();
 </script>
 <script src="gym-weight-photos.js"></script>
