@@ -4316,17 +4316,28 @@ img, video, canvas, svg { max-width: 100%; }
     wireSleepQuickAdd();
   }
   function renderSleepQuickAdd() {
+    // Three separate rows, not one crammed together -- .po-checkin-btn's
+    // flex:1 (built for a label + a few toggle buttons, see the checkin
+    // modal's pain/recovery/pump rows) and .po-btn-primary's width:100%
+    // (built to be the sole child of its own container, see "Log set")
+    // fight each other for space when mixed into one flex row: found live
+    // 2026-08-19 -- the 5 quality buttons rendered at 1px wide and Save
+    // overflowed to 559px in a 647px row. Matching each class's own
+    // existing usage pattern instead of inventing a new combined layout.
     return (
-      '<div class="po-checkin-row-label">Log last night\'s sleep</div>' +
       '<div class="po-checkin-row">' +
-      '<input class="po-quick-input" id="readinessSleepHours" type="number" inputmode="decimal" step="0.5" min="0" max="14" placeholder="hrs" style="max-width:70px">' +
+      '<div class="po-checkin-row-label">Hours</div>' +
+      '<input class="po-quick-input" id="readinessSleepHours" type="number" inputmode="decimal" step="0.5" min="0" max="14" placeholder="7.5">' +
+      '</div>' +
+      '<div class="po-checkin-row">' +
+      '<div class="po-checkin-row-label">Quality</div>' +
       '<button type="button" class="po-checkin-btn" data-quality="1">1</button>' +
       '<button type="button" class="po-checkin-btn" data-quality="2">2</button>' +
       '<button type="button" class="po-checkin-btn" data-quality="3">3</button>' +
       '<button type="button" class="po-checkin-btn" data-quality="4">4</button>' +
       '<button type="button" class="po-checkin-btn" data-quality="5">5</button>' +
-      '<button type="button" class="po-btn-primary" id="readinessSleepSave" style="padding:6px 14px;">Save</button>' +
-      '</div>'
+      '</div>' +
+      '<button type="button" class="po-btn-primary" id="readinessSleepSave">Save sleep</button>'
     );
   }
   function wireSleepQuickAdd() {
