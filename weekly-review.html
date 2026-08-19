@@ -80,7 +80,13 @@ async function fetchGymState() {
       },
     });
     const rows = await res.json();
-    return (rows[0] && rows[0].data && rows[0].data.po_coach_v1) || { exercises: [], logs: {} };
+    const data = rows[0] && rows[0].data;
+    const base = (data && data.po_coach_v1) || { exercises: [], logs: {} };
+    // po_coach_season is a sibling key to po_coach_v1 within the same
+    // app_state row (see gym.html's PC_SYNCED_KEYS), not nested inside
+    // it -- merge it in under `season` so callers get everything from one
+    // fetch. checkins/jointPain are already inside po_coach_v1 itself.
+    return Object.assign({}, base, { season: (data && data.po_coach_season) || null });
   })();
   return _gymStatePromise;
 }
