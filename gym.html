@@ -5116,9 +5116,9 @@ img, video, canvas, svg { max-width: 100%; }
     const names = [];
     exercises.forEach(function(ex) {
       const allExLogs = allLogs[ex.id] || [];
-      const loggedToday = allExLogs.some(function(l) { return l.date.slice(0, 10) === today; });
+      const loggedToday = allExLogs.some(function(l) { return l && l.date && l.date.slice(0, 10) === today; });
       if (!loggedToday) return;
-      const priorLogs = allExLogs.filter(function(l) { return l.date.slice(0, 10) < today; });
+      const priorLogs = allExLogs.filter(function(l) { return l && l.date && l.date.slice(0, 10) < today; });
       rxList.push(getRx(ex, priorLogs));
       names.push(ex.name);
     });
@@ -5209,34 +5209,40 @@ img, video, canvas, svg { max-width: 100%; }
       bg.classList.remove('show');
       reset();
     });
-    $('autopsyAskVision').addEventListener('click', function() {
-      fireDebrief();
-    });
-    $('checkinSave').addEventListener('click', function() {
-      // Only record fields the user actually tapped/filled this time — merge
-      // into any existing same-day entry so reopening the modal later (e.g.
-      // just to add steps) doesn't clobber an already-saved pain/recovery/pump
-      // rating back to null.
+    // Shared by both the Save button and "Ask Vision" -- extracted so
+    // tapping "Ask Vision" without also tapping Save no longer silently
+    // discards whatever pain/recovery/pump/reason/note was already entered
+    // (code review finding, 2026-08-19). Only records fields the user
+    // actually tapped/filled this time — merges into any existing same-day
+    // entry so a later reopen (e.g. just to add steps) doesn't clobber an
+    // already-saved rating back to null.
+    function persistCheckin() {
       const stepsVal = $('checkinSteps').value;
       const steps = stepsVal ? parseInt(stepsVal, 10) : null;
       const deviationNote = $('autopsyDeviationNote').value || null;
       const hasAutopsyData = autopsyPayload.rxSummary != null || autopsyPayload.suggestedChange != null;
-      if (selections.pain != null || selections.recovery != null || selections.pump != null || steps != null
-          || selections.reason != null || deviationNote != null || hasAutopsyData) {
-        const dateKey = getActiveDate();
-        const existing = state.checkins[dateKey] || {};
-        state.checkins[dateKey] = {
-          pain: selections.pain != null ? selections.pain : (existing.pain != null ? existing.pain : null),
-          recovery: selections.recovery != null ? selections.recovery : (existing.recovery != null ? existing.recovery : null),
-          pump: selections.pump != null ? selections.pump : (existing.pump != null ? existing.pump : null),
-          steps: steps != null ? steps : (existing.steps != null ? existing.steps : null),
-          rxSummary: autopsyPayload.rxSummary != null ? autopsyPayload.rxSummary : (existing.rxSummary != null ? existing.rxSummary : null),
-          deviationReason: selections.reason != null ? selections.reason : (existing.deviationReason != null ? existing.deviationReason : null),
-          deviationNote: deviationNote != null ? deviationNote : (existing.deviationNote != null ? existing.deviationNote : null),
-          suggestedChange: autopsyPayload.suggestedChange != null ? autopsyPayload.suggestedChange : (existing.suggestedChange != null ? existing.suggestedChange : null)
-        };
-        saveState();
-      }
+      if (selections.pain == null && selections.recovery == null && selections.pump == null && steps == null
+          && selections.reason == null && deviationNote == null && !hasAutopsyData) return;
+      const dateKey = getActiveDate();
+      const existing = state.checkins[dateKey] || {};
+      state.checkins[dateKey] = {
+        pain: selections.pain != null ? selections.pain : (existing.pain != null ? existing.pain : null),
+        recovery: selections.recovery != null ? selections.recovery : (existing.recovery != null ? existing.recovery : null),
+        pump: selections.pump != null ? selections.pump : (existing.pump != null ? existing.pump : null),
+        steps: steps != null ? steps : (existing.steps != null ? existing.steps : null),
+        rxSummary: autopsyPayload.rxSummary != null ? autopsyPayload.rxSummary : (existing.rxSummary != null ? existing.rxSummary : null),
+        deviationReason: selections.reason != null ? selections.reason : (existing.deviationReason != null ? existing.deviationReason : null),
+        deviationNote: deviationNote != null ? deviationNote : (existing.deviationNote != null ? existing.deviationNote : null),
+        suggestedChange: autopsyPayload.suggestedChange != null ? autopsyPayload.suggestedChange : (existing.suggestedChange != null ? existing.suggestedChange : null)
+      };
+      saveState();
+    }
+    $('autopsyAskVision').addEventListener('click', function() {
+      persistCheckin();
+      fireDebrief();
+    });
+    $('checkinSave').addEventListener('click', function() {
+      persistCheckin();
       bg.classList.remove('show');
       reset();
     });

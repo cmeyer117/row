@@ -9,15 +9,18 @@
   // prescribe from). Returns 'beat' | 'met' | 'missed' | null.
   //
   // type 'up' always means the prior session's target was cleared (beat).
-  // type 'down' (Deload) and the 'Reassess'/'Repeat' tags both mean the
-  // session came in under what was asked (missed). Everything else --
-  // 'Add a rep', 'Push for more' (bodyweight), 'Peak — hold' -- landed
-  // exactly where the Rx expected (met).
+  // type 'down' (Deload, Pain — deload) and the 'Reassess'/'Repeat'/
+  // 'Pain — repeat' tags all mean the session came in under what was asked
+  // (missed) -- the pain-driven checkin override (applyCheckinOverride())
+  // produces 'Pain — repeat' as a type:'hold' result, so it needs its own
+  // tag check same as 'Repeat'. Everything else -- 'Add a rep', 'Push for
+  // more' (bodyweight), 'Peak — hold' -- landed exactly where the Rx
+  // expected (met).
   function classifyRxOutcome(rx) {
     if (!rx) return null;
     if (rx.type === 'up') return 'beat';
     if (rx.type === 'down') return 'missed';
-    if (rx.tag === 'Reassess' || rx.tag === 'Repeat') return 'missed';
+    if (rx.tag === 'Reassess' || rx.tag === 'Repeat' || rx.tag === 'Pain — repeat') return 'missed';
     return 'met';
   }
 

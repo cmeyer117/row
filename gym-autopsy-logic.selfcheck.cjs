@@ -26,6 +26,8 @@ assertEqual(A.classifyRxOutcome({ type: 'hold', tag: 'Peak — hold' }), 'met', 
 assertEqual(A.classifyRxOutcome({ type: 'hold', tag: 'Repeat' }), 'missed', 'hold + Repeat (fell short of repMin) classifies as missed');
 assertEqual(A.classifyRxOutcome({ type: 'down', tag: 'Deload' }), 'missed', 'type down (deload) classifies as missed');
 assertEqual(A.classifyRxOutcome({ type: 'hold', tag: 'Reassess' }), 'missed', 'Reassess (stall) classifies as missed');
+assertEqual(A.classifyRxOutcome({ type: 'hold', tag: 'Pain — repeat' }), 'missed', 'pain-driven checkin override (bw, hold) classifies as missed, not met');
+assertEqual(A.classifyRxOutcome({ type: 'down', tag: 'Pain — deload' }), 'missed', 'pain-driven checkin override (weighted, down) classifies as missed');
 
 // --- sessionNeedsReason ---
 assertEqual(A.sessionNeedsReason(['beat', 'met']), false, 'all beat/met: no reason needed');

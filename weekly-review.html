@@ -366,7 +366,21 @@ async function renderReadinessPanel() {
   const counts = window.GymVolumeLogic.weeklySetsByMuscle(gymState.exercises || [], gymState.logs || {});
   const volumeHtml = MUSCLES.map(m => {
     const band = window.GymVolumeLogic.classifyMuscleVolume(m, counts[m] || 0, phase);
-    if (!band || !band.belowTarget) return '';
+    if (!band) return '';
+    // Flags both directions volumeAdvisory() would -- below the phase
+    // target (belowTarget) AND at/above MRV (band.label === 'mrv'), not
+    // just the under-volume case. An over-volume muscle is the
+    // highest-priority flag in the whole autopsy/advisory system
+    // (gym-volume-logic.js's priority:3); the guardrail panel silently
+    // missing it defeated the panel's own purpose (code review finding,
+    // 2026-08-19).
+    if (band.label === 'mrv') {
+      return `<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:12px;">
+        <span style="color:var(--text-2);">${m}</span>
+        <span style="color:var(--bad);">${counts[m] || 0} — at/above MRV (${band.mrv})</span>
+      </div>`;
+    }
+    if (!band.belowTarget) return '';
     return `<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:12px;">
       <span style="color:var(--text-2);">${m}</span>
       <span style="color:var(--warn);">${counts[m] || 0} / ${band.target} target</span>
