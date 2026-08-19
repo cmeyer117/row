@@ -5144,8 +5144,9 @@ img, video, canvas, svg { max-width: 100%; }
 
   (function initCheckinModal() {
     const bg = $('checkinModalBg');
-    const selections = { pain: null, recovery: null, pump: null };
-    bg.querySelectorAll('.po-checkin-row').forEach(function(row) {
+    const selections = { pain: null, recovery: null, pump: null, reason: null };
+    let autopsyPayload = { rxSummary: null, suggestedChange: null };
+    bg.querySelectorAll('.po-checkin-row[data-checkin-field]').forEach(function(row) {
       const field = row.getAttribute('data-checkin-field');
       row.querySelectorAll('.po-checkin-btn').forEach(function(btn) {
         btn.addEventListener('click', function() {
@@ -5155,14 +5156,29 @@ img, video, canvas, svg { max-width: 100%; }
         });
       });
     });
+    $('autopsyReasonRow').querySelectorAll('.po-checkin-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        selections.reason = btn.getAttribute('data-reason');
+        $('autopsyReasonRow').querySelectorAll('.po-checkin-btn').forEach(function(b) { b.classList.remove('selected'); });
+        btn.classList.add('selected');
+      });
+    });
     function reset() {
-      selections.pain = null; selections.recovery = null; selections.pump = null;
+      selections.pain = null; selections.recovery = null; selections.pump = null; selections.reason = null;
       $('checkinSteps').value = '';
+      $('autopsyDeviationNote').value = '';
       bg.querySelectorAll('.po-checkin-btn').forEach(function(b) { b.classList.remove('selected'); });
+      $('autopsyReasonSection').style.display = 'none';
+      $('autopsySuggestedChange').style.display = 'none';
+      $('autopsyRxSummary').textContent = '';
+      autopsyPayload = { rxSummary: null, suggestedChange: null };
     }
     $('checkinSkip').addEventListener('click', function() {
       bg.classList.remove('show');
       reset();
+    });
+    $('autopsyAskVision').addEventListener('click', function() {
+      fireDebrief();
     });
     $('checkinSave').addEventListener('click', function() {
       // Only record fields the user actually tapped/filled this time — merge
@@ -5171,21 +5187,33 @@ img, video, canvas, svg { max-width: 100%; }
       // rating back to null.
       const stepsVal = $('checkinSteps').value;
       const steps = stepsVal ? parseInt(stepsVal, 10) : null;
-      if (selections.pain != null || selections.recovery != null || selections.pump != null || steps != null) {
+      const deviationNote = $('autopsyDeviationNote').value || null;
+      const hasAutopsyData = autopsyPayload.rxSummary != null || autopsyPayload.suggestedChange != null;
+      if (selections.pain != null || selections.recovery != null || selections.pump != null || steps != null
+          || selections.reason != null || deviationNote != null || hasAutopsyData) {
         const dateKey = getActiveDate();
         const existing = state.checkins[dateKey] || {};
         state.checkins[dateKey] = {
           pain: selections.pain != null ? selections.pain : (existing.pain != null ? existing.pain : null),
           recovery: selections.recovery != null ? selections.recovery : (existing.recovery != null ? existing.recovery : null),
           pump: selections.pump != null ? selections.pump : (existing.pump != null ? existing.pump : null),
-          steps: steps != null ? steps : (existing.steps != null ? existing.steps : null)
+          steps: steps != null ? steps : (existing.steps != null ? existing.steps : null),
+          rxSummary: autopsyPayload.rxSummary != null ? autopsyPayload.rxSummary : (existing.rxSummary != null ? existing.rxSummary : null),
+          deviationReason: selections.reason != null ? selections.reason : (existing.deviationReason != null ? existing.deviationReason : null),
+          deviationNote: deviationNote != null ? deviationNote : (existing.deviationNote != null ? existing.deviationNote : null),
+          suggestedChange: autopsyPayload.suggestedChange != null ? autopsyPayload.suggestedChange : (existing.suggestedChange != null ? existing.suggestedChange : null)
         };
         saveState();
       }
       bg.classList.remove('show');
       reset();
     });
-    window.__gym_openCheckinModal = function() {
+    // autopsy: { rxSummary: 'beat'|'met'|'missed'|null, needsReason: bool,
+    // missedNames: string[], suggestedChange: string|null } -- computed by
+    // the Mark Done handler from today's logged exercises via
+    // GymAutopsyLogic. Omit/pass nothing to open with no autopsy data
+    // (matches the old no-arg call shape).
+    window.__gym_openCheckinModal = function(autopsy) {
       // Pre-populate from any existing same-day entry so reopening shows
       // what's already saved instead of a blank form.
       const existing = state.checkins[getActiveDate()];
@@ -5198,6 +5226,21 @@ img, video, canvas, svg { max-width: 100%; }
           if (btn) btn.classList.add('selected');
         });
         if (existing.steps != null) $('checkinSteps').value = existing.steps;
+      }
+      if (autopsy) {
+        autopsyPayload = { rxSummary: autopsy.rxSummary || null, suggestedChange: autopsy.suggestedChange || null };
+        const RX_LABEL = { beat: 'Beat the Rx today.', met: 'Met the Rx today.', missed: 'Came up short of the Rx today.' };
+        $('autopsyRxSummary').textContent = autopsy.rxSummary ? RX_LABEL[autopsy.rxSummary] : '';
+        if (autopsy.needsReason) {
+          $('autopsyReasonLabel').textContent = (autopsy.missedNames && autopsy.missedNames.length)
+            ? 'Why\'d ' + autopsy.missedNames.join(', ') + ' come up short?'
+            : 'Why\'d it come up short?';
+          $('autopsyReasonSection').style.display = 'block';
+        }
+        if (autopsy.suggestedChange) {
+          $('autopsySuggestedChange').textContent = 'Suggested change: ' + autopsy.suggestedChange;
+          $('autopsySuggestedChange').style.display = 'block';
+        }
       }
       bg.classList.add('show');
     };
