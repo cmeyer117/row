@@ -80,6 +80,18 @@ assertEqual(FCL.matchBenchmark('cable crossover', benchmarks), null, 'matchBench
 // matchBenchmark — empty/whitespace input returns null without throwing.
 assertEqual(FCL.matchBenchmark('', benchmarks), null, 'matchBenchmark: empty input returns null');
 
+// matchBenchmark — Codex review catch: a generic word shared by two
+// DIFFERENT entries' names ("press" matches "bench press" and "overhead
+// press" equally) must return null (ambiguous), not silently pick
+// whichever entry happens to appear first in the array.
+var pressBenchmarks = [
+  { names: ['bench press', 'bench'], jointAngle: 'elbow', depthDirection: 'max', targetAngleDeg: 165, cueLabel: 'bench lockout' },
+  { names: ['overhead press', 'shoulder press'], jointAngle: 'elbow', depthDirection: 'max', targetAngleDeg: 165, cueLabel: 'ohp lockout' }
+];
+assertEqual(FCL.matchBenchmark('press', pressBenchmarks), null, 'matchBenchmark: a generic term tied across two different entries returns null rather than guessing');
+// A specific enough name still resolves cleanly despite the shared token.
+assertEqual(FCL.matchBenchmark('bench press', pressBenchmarks).cueLabel, 'bench lockout', 'matchBenchmark: a specific full name still resolves even when a generic sub-token is shared');
+
 // EXERCISE_BENCHMARKS — loaded from benchmarks.js, matchBenchmark resolves real entries.
 var fs2 = require('fs');
 vm.runInContext(fs2.readFileSync(path.join(__dirname, 'benchmarks.js'), 'utf8'), sandbox);
@@ -254,6 +266,22 @@ assertEqual(FCL.scoreDepth(deepRep, null), null, 'scoreDepth: no benchmark retur
 
 // scoreDepth — a rep with no midValue (angle undetectable that frame) returns null.
 assertEqual(FCL.scoreDepth({ midValue: null }, squatBenchmark), null, 'scoreDepth: an undetectable midValue returns null rather than a wrong flag');
+
+// scoreDepth — Codex review catch: for a 'max' benchmark, the real lockout
+// can be at start/end rather than mid, depending on where recording began
+// (e.g. bench press recorded starting from a locked-out rack position --
+// the bottom of the rep is the mid extremum, lockout is start/end). A rep
+// that DOES lock out (startValue/endValue near target) must not be scored
+// depthMet:false just because midValue (the bottom) is far from target.
+var lockoutAtEndsRep = { startValue: 172, midValue: 70, endValue: 172 };
+assertEqual(FCL.scoreDepth(lockoutAtEndsRep, benchBenchmark).depthMet, true, 'scoreDepth: max-direction benchmark checks start/end too, not just midValue -- a real lockout at the rep boundaries is still detected');
+assertEqual(FCL.scoreDepth(lockoutAtEndsRep, benchBenchmark).depthDeg, 172, 'scoreDepth: max-direction depthDeg reports the best (highest) of start/mid/end, not just mid');
+
+// scoreDepth — same principle for 'min' direction: the real squat depth
+// could land at start/end if recording began from the bottom position.
+var deepAtEndsRep = { startValue: 92, midValue: 165, endValue: 92 };
+assertEqual(FCL.scoreDepth(deepAtEndsRep, squatBenchmark).depthMet, true, 'scoreDepth: min-direction benchmark checks start/end too -- real depth at the rep boundaries is still detected');
+assertEqual(FCL.scoreDepth(deepAtEndsRep, squatBenchmark).depthDeg, 92, 'scoreDepth: min-direction depthDeg reports the best (lowest) of start/mid/end');
 
 // buildHistoryRecord — posing shape wraps caller data with a type tag and timestamp.
 var posingRecord = FCL.buildHistoryRecord('posing', { pose: 'front-double-biceps', holdTimeMs: 1620, symmetry: symResult }, '2026-08-07T00:00:00.000Z');

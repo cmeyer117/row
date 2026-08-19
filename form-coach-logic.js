@@ -60,12 +60,23 @@
   // entry vs. a single exercise.name). Returns null below threshold 0.35,
   // same as the reference implementation, so an unmatched exercise
   // degrades to "no benchmark" rather than a wrong guess.
+  //
+  // Codex review catch (2026-08-18): a generic single-word query like
+  // "press" scores identically against "bench press" and "overhead
+  // press" (or "extension" against tricep/leg extension) -- the original
+  // version silently picked whichever entry happened to appear first in
+  // the array, confidently applying the WRONG joint/depth target. Now
+  // tracks every entry that ties the top score; if more than one
+  // distinct entry ties, that's a genuine ambiguity and this returns
+  // null (no benchmark) rather than guessing.
   function matchBenchmark(exerciseName, benchmarks) {
     var q = (exerciseName || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').trim();
     if (!q) return null;
     var qTokens = q.split(/\s+/).filter(Boolean);
-    var best = null, bestScore = -1;
+    var bestScore = -1;
+    var bestEntries = []; // distinct entries tied at bestScore
     benchmarks.forEach(function (entry) {
+      var entryBestScore = -1;
       entry.names.forEach(function (name) {
         var nTokens = name.toLowerCase().split(/\s+/).filter(Boolean);
         var hits = 0;
@@ -73,10 +84,17 @@
           if (nTokens.some(function (nt) { return nt.startsWith(qt) || qt.startsWith(nt); })) hits++;
         });
         var score = (hits * hits) / (Math.max(qTokens.length, 1) * Math.max(nTokens.length, 1));
-        if (score > bestScore) { bestScore = score; best = entry; }
+        if (score > entryBestScore) entryBestScore = score;
       });
+      if (entryBestScore > bestScore) {
+        bestScore = entryBestScore;
+        bestEntries = [entry];
+      } else if (entryBestScore === bestScore && bestEntries.indexOf(entry) === -1) {
+        bestEntries.push(entry);
+      }
     });
-    return bestScore >= 0.35 ? best : null;
+    if (bestScore < 0.35) return null;
+    return bestEntries.length === 1 ? bestEntries[0] : null;
   }
 
   // One entry per posing.html Competition-gallery slug. trackedJoints
@@ -266,7 +284,9 @@
         startT: start.t,
         midT: mid.t,
         endT: end.t,
+        startValue: start.value,
         midValue: mid.value,
+        endValue: end.value,
         rom: Math.abs(mid.value - start.value),
         durationMs: end.t - start.t
       });
@@ -288,16 +308,27 @@
     return scoredReps.reduce(function (sum, r) { return sum + r.durationMs; }, 0);
   }
 
-  // Compares one rep's extremum angle (midValue, from segmentReps) against
-  // a matched benchmark's target. Returns null when there's no benchmark
-  // (matchBenchmark found nothing) or the angle wasn't detectable that
-  // frame -- both are "no data," never guessed at.
+  // Compares one rep against a matched benchmark's target angle. Codex
+  // review catch (2026-08-18): midValue alone is NOT always the relevant
+  // extremum -- segmentReps' mid point is just "wherever the signal
+  // reversed direction," which is the bottom of a squat (correct for a
+  // 'min' benchmark) but can be the WRONG end for a 'max' benchmark like
+  // bench lockout, depending on whether recording started at lockout
+  // (making lockout the start/end, not the mid) or at the bottom. Using
+  // min()/max() across all three of a rep's tracked points (start, mid,
+  // end) finds the true depth/lockout extremum regardless of which
+  // position recording happened to start from. Returns null when there's
+  // no benchmark or none of the three angles were detectable that frame
+  // -- "no data," never guessed at.
   function scoreDepth(rep, benchmark) {
-    if (!benchmark || rep.midValue == null) return null;
+    if (!benchmark) return null;
+    var candidates = [rep.startValue, rep.midValue, rep.endValue].filter(function (v) { return v != null; });
+    if (!candidates.length) return null;
+    var extreme = benchmark.depthDirection === 'min' ? Math.min.apply(null, candidates) : Math.max.apply(null, candidates);
     var met = benchmark.depthDirection === 'min'
-      ? rep.midValue <= benchmark.targetAngleDeg
-      : rep.midValue >= benchmark.targetAngleDeg;
-    return { depthDeg: round1(rep.midValue), targetDeg: benchmark.targetAngleDeg, depthMet: met };
+      ? extreme <= benchmark.targetAngleDeg
+      : extreme >= benchmark.targetAngleDeg;
+    return { depthDeg: round1(extreme), targetDeg: benchmark.targetAngleDeg, depthMet: met };
   }
 
   function round2(n) { return Math.round(n * 100) / 100; }
