@@ -16,7 +16,7 @@ const source = fs.readFileSync(require('path').join(__dirname, 'gym-season-logic
 const sandbox = { window: {} };
 vm.createContext(sandbox);
 vm.runInContext(source, sandbox);
-const { daysSince, todayKey } = sandbox.window.GymSeasonLogic;
+const { daysSince, todayKey, PHASES } = sandbox.window.GymSeasonLogic;
 
 function assertEqual(actual, expected, label) {
   if (actual !== expected) {
@@ -40,5 +40,13 @@ assertEqual(daysSince('2026-07-30', new Date('2026-08-02T15:00:00')), 4, 'month-
 // todayKey formats as YYYY-MM-DD with zero-padded month/day.
 assertEqual(todayKey(new Date(2026, 0, 5)), '2026-01-05', 'todayKey zero-pads single-digit month and day');
 assertEqual(todayKey(new Date(2026, 10, 23)), '2026-11-23', 'todayKey formats double-digit month correctly');
+
+// PHASES -- shared label map, single source of truth (previously
+// duplicated inline in gym.html's Season Engine IIFE).
+assertEqual(PHASES.cut, 'Cut', 'PHASES: cut label');
+assertEqual(PHASES.reverse_diet, 'Reverse Diet', 'PHASES: reverse_diet label');
+assertEqual(PHASES.growth, 'Growth', 'PHASES: growth label');
+assertEqual(PHASES.peak, 'Peak Week', 'PHASES: peak label');
+assertEqual(PHASES.show_prep, 'Show Prep', 'PHASES: show_prep label');
 
 console.log('gym-season-logic.selfcheck.cjs: all assertions passed');

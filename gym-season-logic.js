@@ -18,10 +18,12 @@
     return now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
   }
 
+  var PHASES = { cut: 'Cut', reverse_diet: 'Reverse Diet', growth: 'Growth', peak: 'Peak Week', show_prep: 'Show Prep' };
+
   if (typeof window !== 'undefined') {
-    window.GymSeasonLogic = { daysSince: daysSince, todayKey: todayKey };
+    window.GymSeasonLogic = { daysSince: daysSince, todayKey: todayKey, PHASES: PHASES };
   }
   if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { daysSince: daysSince, todayKey: todayKey };
+    module.exports = { daysSince: daysSince, todayKey: todayKey, PHASES: PHASES };
   }
 })();

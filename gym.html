@@ -7559,7 +7559,7 @@ document.addEventListener('DOMContentLoaded', function () {
 // Storage key po_coach_season is in PC_SYNCED_KEYS above, so writes here
 // auto-push through the same legacy sync every other gym.html key uses.
 (function () {
-  var PHASES = { cut: 'Cut', reverse_diet: 'Reverse Diet', growth: 'Growth', peak: 'Peak Week', show_prep: 'Show Prep' };
+  var PHASES = window.GymSeasonLogic.PHASES;
 
   function loadSeason() {
     try { return JSON.parse(localStorage.getItem('po_coach_season') || 'null'); } catch (e) { return null; }
