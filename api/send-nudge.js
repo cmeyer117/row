@@ -3,7 +3,7 @@
 // four separate serverless functions after Row hit Vercel's Hobby-plan cap of
 // 12 Serverless Functions per deployment; the nudges themselves live in
 // _lib/nudges.js, which Vercel doesn't count toward that limit.
-import { NUDGES, mealLog } from './_lib/nudges.js';
+import { NUDGES } from './_lib/nudges.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -27,7 +27,7 @@ export default async function handler(req, res) {
       res.status(400).json({ error: 'meal-log requires ?meal=1-4' });
       return;
     }
-    const { status, body } = await mealLog(mealIndex, force);
+    const { status, body } = await nudge(mealIndex, force);
     res.status(status).json(body);
     return;
   }

@@ -138,7 +138,7 @@ async function fetchFoodLogCount(dateKey) {
   return contentRange ? Number(contentRange.split('/')[1]) : 0;
 }
 
-export async function mealLog(mealIndex, force) {
+async function mealLog(mealIndex, force) {
   if (!force) {
     const today = todayEasternKey();
     const rowCount = await fetchFoodLogCount(today);
