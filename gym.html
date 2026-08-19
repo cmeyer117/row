@@ -2982,12 +2982,15 @@ img, video, canvas, svg { max-width: 100%; }
     </div>
   </div>
 
-  <!-- POST-WORKOUT CHECK-IN MODAL. z-index above #debriefModal (9000) since
-       both can open from the same "Mark Done" tap and .sub-modal-bg's base
-       z-index (200) would otherwise leave this one hidden behind it. -->
+  <!-- POST-WORKOUT AUTOPSY MODAL (formerly the checkin modal -- now also
+       carries the Rx-vs-actual summary, why-it-changed reason, and
+       suggested change that used to be a separate LLM-driven debrief
+       modal. z-index above #debriefModal (9000), which is now reached
+       only via the "Ask Vision" button below, not fired automatically. -->
   <div class="sub-modal-bg" id="checkinModalBg" style="z-index:9500;">
     <div class="sub-modal">
-      <div class="sub-modal-title">How'd that session feel?</div>
+      <div class="sub-modal-title">Session Autopsy</div>
+      <div id="autopsyRxSummary" class="po-checkin-row-label" style="margin-bottom:8px;"></div>
       <div class="po-checkin-row" data-checkin-field="pain">
         <div class="po-checkin-row-label">Pain</div>
         <button type="button" class="po-checkin-btn" data-val="low">Low</button>
@@ -3010,10 +3013,22 @@ img, video, canvas, svg { max-width: 100%; }
         <div class="po-checkin-row-label">Steps today</div>
         <input class="po-quick-input" id="checkinSteps" type="number" inputmode="numeric" placeholder="8000" style="max-width:100px">
       </div>
+      <div id="autopsyReasonSection" style="display:none;">
+        <div class="po-checkin-row-label" id="autopsyReasonLabel" style="margin-top:10px;">Why'd it come up short?</div>
+        <div class="po-checkin-row" id="autopsyReasonRow">
+          <button type="button" class="po-checkin-btn" data-reason="fatigue">Low energy</button>
+          <button type="button" class="po-checkin-btn" data-reason="time">Time crunch</button>
+          <button type="button" class="po-checkin-btn" data-reason="pain">Pain/injury</button>
+          <button type="button" class="po-checkin-btn" data-reason="stress">Life stress</button>
+        </div>
+        <textarea id="autopsyDeviationNote" class="po-quick-input" placeholder="Optional note" style="width:100%;margin-top:6px;min-height:40px;"></textarea>
+      </div>
+      <div id="autopsySuggestedChange" class="po-checkin-row-label" style="display:none;margin-top:10px;"></div>
       <div class="sub-modal-actions">
         <button type="button" class="po-btn-secondary" id="checkinSkip">Skip</button>
         <button type="button" class="po-btn-primary" id="checkinSave">Save</button>
       </div>
+      <button type="button" class="po-btn-secondary" id="autopsyAskVision" style="width:100%;margin-top:8px;">Ask Vision for deeper analysis</button>
     </div>
   </div>
 
