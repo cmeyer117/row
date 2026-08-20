@@ -242,7 +242,21 @@
         const state = collect();
         if (isTrivial(state)) return;
         const json = JSON.stringify(state);
-        if (json === lastSyncedJson) return;
+        if (json === lastSyncedJson) {
+          // Already in sync -- must still confirm 'synced' status, not
+          // silently return. applyRemote() now schedules a push whenever
+          // ANY key changed (not just a genuine merge divergence), so this
+          // path is common: most ordinary remote applies land here with
+          // nothing left to push. Without this, status stays stuck at
+          // whatever schedulePush() set it to ('pending') since nothing
+          // downstream would ever correct it (self-review catch, 2026-08-20).
+          if (status !== 'synced') {
+            status = 'synced';
+            if (!lastSyncedAt) lastSyncedAt = new Date().toISOString();
+            broadcastStatus();
+          }
+          return;
+        }
         status = 'pending';
         broadcastStatus();
         try {
@@ -327,10 +341,20 @@
           syncReady = true;
           if (data && data.data && Object.keys(data.data).length > 0) {
             lastSyncedJson = JSON.stringify(data.data);
-            applyRemote(data.data);
-            lastSyncedAt = new Date().toISOString();
-            status = 'synced';
-            broadcastStatus();
+            // applyRemote() may itself call schedulePush() (a merged
+            // result that differs from the pure-remote copy needs to
+            // round-trip back) -- in that case status is already correctly
+            // 'pending', and unconditionally overwriting it to 'synced'
+            // here would flash a false-green badge for the 250ms until the
+            // scheduled push's own status update corrects it (self-review
+            // catch, 2026-08-20). Only claim 'synced' when nothing needed
+            // pushing back.
+            const applied = applyRemote(data.data);
+            if (!applied) {
+              lastSyncedAt = new Date().toISOString();
+              status = 'synced';
+              broadcastStatus();
+            }
           } else if (Object.keys(collect()).length > 0) {
             schedulePush();
           } else {

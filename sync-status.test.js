@@ -12,7 +12,7 @@ const source = readFileSync(new URL('./sync.js', import.meta.url), 'utf8');
 // Minimal in-memory localStorage + window/CustomEvent/fetch mock. supaImpl
 // controls what supa.from('app_state').upsert(...) resolves/rejects to;
 // fetchImpl controls the flushOnUnload() keepalive fetch's outcome.
-function makeSync({ supaImpl, fetchImpl } = {}) {
+function makeSync({ supaImpl, fetchImpl, initialRemoteData } = {}) {
   const store = {};
   // listAllKeys() iterates via localStorage.key(i) over localStorage.length --
   // real localStorage guarantees stable key-order iteration; this mock backs
@@ -39,7 +39,7 @@ function makeSync({ supaImpl, fetchImpl } = {}) {
           onAuthStateChange: () => {},
         },
         from: () => ({
-          select: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve({ data: null, error: null }) }) }),
+          select: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve({ data: initialRemoteData ? { data: initialRemoteData } : null, error: null }) }) }),
           upsert: () => (supaImpl ? supaImpl() : Promise.resolve({ error: null })),
         }),
         channel: () => ({ on: () => ({ subscribe: () => {} }) }),
@@ -85,6 +85,24 @@ async function run() {
     await new Promise((r) => setTimeout(r, 400)); // past the 250ms push debounce
     const afterPush = env.statusEvents();
     assertEqual(afterPush[afterPush.length - 1].detail.status, 'synced', 'a successful push broadcasts synced');
+  }
+
+  // --- applyRemote()'s new unconditional schedulePush() (added so a
+  // genuine merge round-trips back to Supabase) must not leave the badge
+  // stuck on 'pending' for the common case where nothing actually needed
+  // pushing (a plain remote pull with no local divergence). Self-review
+  // catch, 2026-08-20: schedulePush() sets 'pending', but pushNow() used
+  // to return silently (no status update) whenever it found nothing new
+  // to send, so the badge never recovered to 'synced'. ---
+  {
+    const env = makeSync({
+      initialRemoteData: { foo: [{ id: 1, updated_at: 5 }] }, // local starts empty, so applying this IS a "change"
+      supaImpl: () => Promise.resolve({ error: null }),
+    });
+    env.window.initCloudSync({ appKey: 'test5', syncedKeys: ['foo'] });
+    await new Promise((r) => setTimeout(r, 500)); // past init's applyRemote + the resulting schedulePush's 250ms debounce
+    const events = env.statusEvents();
+    assertEqual(events[events.length - 1].detail.status, 'synced', 'a plain remote pull with nothing left to push settles back to synced, not stuck on pending');
   }
 
   // --- pushNow failure -> 'error' status, then automatic retry succeeds ---
