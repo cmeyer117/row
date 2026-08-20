@@ -108,6 +108,34 @@ async function run() {
     cases.push(['ensure(): getSession was called twice -- once timed out, once via retry', callCount === 2]);
   }
 
+  // ensure() -- a retry that itself fails must reject, not leave the
+  // promise (and _ensurePromise) permanently pending (Codex layered
+  // review catch, 2026-08-20). Reuses the one 10s hang from the case
+  // above's timeout instead of waiting through a second one: call 1 hangs
+  // (forces the offline-retry overlay), call 2 (the retry) rejects, call 3
+  // (a fresh ensure() after the rejection) succeeds immediately.
+  {
+    let callCount = 0;
+    const { RowAuth, triggerRetry } = makeAuthWithDom(() => {
+      callCount++;
+      if (callCount === 1) return new Promise(() => {});
+      if (callCount === 2) return Promise.reject(new Error('retry failed too'));
+      return Promise.resolve(OWNER_SESSION);
+    });
+    const ensurePromise = RowAuth.ensure();
+    await new Promise((resolve) => setTimeout(resolve, 10200));
+    triggerRetry();
+    let rejected = false;
+    try { await ensurePromise; } catch (e) { rejected = true; }
+    cases.push(['ensure(): a retry that itself fails rejects instead of hanging forever', rejected]);
+
+    // _ensurePromise must have cleared -- a fresh ensure() call after the
+    // rejection should try again (call 3), not return the same stuck promise.
+    const session = await RowAuth.ensure();
+    cases.push(['ensure(): a new call after a rejected retry tries again and can still succeed', session.user.email === 'carl.meyer.business@gmail.com']);
+    cases.push(['ensure(): getSession called exactly 3 times -- hang, failed retry, fresh success', callCount === 3]);
+  }
+
   let failed = 0;
   for (const [label, ok] of cases) {
     if (!ok) { console.error('FAIL:', label); failed++; }

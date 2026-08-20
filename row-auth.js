@@ -53,7 +53,7 @@
   // timeout at all, unlike getAccessToken() below which already had this
   // exact bound for the exact same reason).
   function showOfflineRetry(retry) {
-    return new Promise(function (resolve) {
+    return new Promise(function (resolve, reject) {
       var overlay = document.createElement('div');
       overlay.id = 'row-auth-offline';
       overlay.style.cssText = 'position:fixed;inset:0;z-index:100000;display:flex;align-items:center;justify-content:center;background:#080808;font-family:-apple-system,BlinkMacSystemFont,"Inter",sans-serif;visibility:visible;';
@@ -66,7 +66,17 @@
       appendWhenReady(overlay);
       overlay.querySelector('#ra-offline-retry').addEventListener('click', async function () {
         overlay.remove();
-        resolve(await retry());
+        // If retry() itself rejects (e.g. a non-owner session's signOut()
+        // call fails), this promise -- and therefore ensure()'s whole
+        // chain via _ensurePromise -- must reject too, not sit forever
+        // unresolved. Left unhandled, every future ensure() caller would
+        // share that same permanently-pending promise (Codex layered
+        // review catch, 2026-08-20).
+        try {
+          resolve(await retry());
+        } catch (err) {
+          reject(err);
+        }
       });
     });
   }
