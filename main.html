@@ -327,6 +327,12 @@ body::after {
   font-size: 18px;
   color: var(--text-tertiary);
 }
+.gm-perfect-day-line {
+  font-size: 11px; font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--text-tertiary);
+  margin-top: 4px;
+}
 .gm-progress-label {
   font-size: 11px; font-weight: 600;
   letter-spacing: 0.10em; text-transform: uppercase;
@@ -342,6 +348,49 @@ body::after {
   color: var(--text-tertiary);
 }
 .gm-card-tomorrow .gm-progress-row { display: none; }
+
+.gm-pd-header {
+  display: flex; align-items: center; justify-content: space-between;
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.gm-pd-header-actions { display: flex; align-items: center; gap: 10px; }
+.gm-pd-planner-link {
+  font-size: 11px; font-weight: 600; letter-spacing: 0.04em;
+  color: var(--text-secondary); text-decoration: none;
+  padding: 4px 10px; border-radius: 999px;
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+}
+.gm-pd-planner-link:hover { color: var(--text-primary); }
+.gm-pd-chevron { color: var(--text-tertiary); flex-shrink: 0; transition: transform 0.15s; }
+.gm-pd-card.expanded .gm-pd-chevron { transform: rotate(180deg); }
+.gm-pd-panel { display: none; margin-top: 12px; }
+.gm-pd-card.expanded .gm-pd-panel { display: block; }
+.gm-pd-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+.gm-pd-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 10px; border-radius: 10px;
+  background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06);
+}
+.gm-pd-row-label { flex: 1; font-size: 13px; color: var(--text-secondary); }
+.gm-pd-row-del { color: var(--text-tertiary); cursor: pointer; padding: 0 4px; background: none; border: none; font-size: 14px; }
+.gm-pd-row-del:hover { color: var(--text-primary); }
+.gm-pd-add-row { display: flex; gap: 8px; }
+.gm-pd-time-input { flex-shrink: 0; width: 100px; }
+.gm-pd-label-input { flex: 1; }
+.gm-pd-time-input, .gm-pd-label-input {
+  padding: 8px 10px; border-radius: 8px;
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+  color: var(--text-primary); font-family: inherit; font-size: 13px;
+}
+.gm-pd-add-btn {
+  padding: 8px 14px; border-radius: 8px;
+  background: rgba(110,231,183,0.12); border: 1px solid rgba(110,231,183,0.3);
+  color: var(--accent); font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit;
+}
+.gm-row-time {
+  font-family: var(--font-mono); font-size: 10px; color: var(--accent);
+  flex-shrink: 0; margin-right: 2px;
+}
 
 .gm-streak {
   display: inline-flex; align-items: center; gap: 6px;
@@ -881,6 +930,9 @@ body::after {
             <span class="gm-progress-total" id="gmProgressTotal">/ 0</span>
             <span class="gm-progress-label" id="gmProgressLabel">no goals yet</span>
           </div>
+          <div class="gm-perfect-day-line" id="gmPerfectDay" style="display:none;">
+            Perfect Day: <span id="gmPerfectDayNum"></span>
+          </div>
         </div>
         <div class="gm-streak" id="gmStreak">
           <span class="gm-streak-icon">⚡</span>
@@ -897,6 +949,25 @@ body::after {
         <button type="button" id="goalAddBtn"    class="gm-add">+ Add</button>
         <button type="button" id="goalPolishBtn" class="gm-polish">✨ Polish</button>
         <div class="gm-status" id="polishStatus"></div>
+      </div>
+    </div>
+
+    <!-- PERFECT DAY TEMPLATE -->
+    <div class="gm-card gm-pd-card" id="gmPdCard">
+      <div class="gm-pd-header" id="gmPdHeader">
+        <span class="gm-eyebrow" style="margin-bottom:0">Perfect Day Template</span>
+        <div class="gm-pd-header-actions">
+          <a href="planner.html" class="gm-pd-planner-link" id="gmPdPlannerLink" title="Planner">🗓 Planner</a>
+          <svg class="gm-pd-chevron" id="gmPdChevron" viewBox="0 0 16 16" width="12" height="12"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+      </div>
+      <div class="gm-pd-panel" id="gmPdPanel">
+        <div class="gm-pd-list" id="gmPdList"></div>
+        <div class="gm-pd-add-row">
+          <input type="time" id="gmPdTimeInput" class="gm-pd-time-input">
+          <input type="text" id="gmPdLabelInput" class="gm-pd-label-input" placeholder="e.g. Morning reading" autocomplete="off">
+          <button type="button" id="gmPdAddBtn" class="gm-pd-add-btn">+ Add</button>
+        </div>
       </div>
     </div>
 
@@ -1032,7 +1103,9 @@ body::after {
       // same ID instead of colliding under sync's merge-by-ID.
       const old = (window.MorningLaunchLogic ? window.MorningLaunchLogic.upgradeGoalsWithIds(getGoals(k), k) : getGoals(k));
       old.forEach(g => {
-        if (!g.done && g.text && !texts.has(g.text)) {
+        // Template items reset fresh each day (seedTemplateIfNeeded reseeds
+        // them) rather than chasing an incomplete day forward.
+        if (!g.done && g.text && !texts.has(g.text) && g.source !== 'template') {
           today.push({ text: g.text, done: false, id: g.id });
           texts.add(g.text);
         }
@@ -1040,6 +1113,56 @@ body::after {
       storeDelete(k);
     });
     setGoals(todayK, today);
+  }
+
+  // ---------- Perfect Day template ----------
+  function seedTemplateIfNeeded() {
+    const todayK = todayKey();
+    const todayDateStr = getActiveDateString();
+    const today = getGoals(todayK);
+    if (today.some(g => g.source === 'template')) return; // already seeded today
+    const template = getGoals('perfectDay:template');
+    if (!template.length) return;
+    template.forEach(t => {
+      // Deterministic ID (date + template item's own id, not newId()) so two
+      // devices that both seed today's template before syncing converge on
+      // the same entry instead of duplicating -- same fix rollover() already
+      // applies to carried-forward goals, for the same reason.
+      today.push({ text: t.label, done: false, id: 'pd-' + todayDateStr + '-' + t.id, source: 'template', time: t.time });
+    });
+    setGoals(todayK, today);
+  }
+
+  function perfectDayScore(goals) {
+    const items = goals.filter(g => g.source === 'template');
+    if (!items.length) return null;
+    return { done: items.filter(g => g.done).length, total: items.length };
+  }
+
+  // ---------- Planner ----------
+  function mergeDuePlannerItems() {
+    const todayDateStr = getActiveDateString();
+    const items = storeGet('planner:items') || [];
+    // <= not === : an item due on a day the app was never opened must still
+    // land the next time it boots, not silently vanish (Codex review caught
+    // this -- the spec promised catch-up behavior this line didn't deliver).
+    const due = items.filter(p => p.date <= todayDateStr && !p.mergedAt);
+    if (!due.length) return;
+    const today = getGoals(todayKey());
+    due.forEach(p => {
+      // Deterministic ID (the planner item's own id) -- same reasoning as
+      // seedTemplateIfNeeded above, so two devices merging the same due
+      // item before syncing land on one goal entry, not two. Also guards a
+      // stale remote sync reviving a cleared mergedAt on this same device
+      // from re-appending a duplicate goal row (Codex review finding).
+      const goalId = 'pl-' + p.id;
+      if (!today.some(g => g.id === goalId)) {
+        today.push({ text: p.title, done: false, id: goalId, source: 'planned' });
+      }
+      p.mergedAt = new Date().toISOString();
+    });
+    setGoals(todayKey(), today);
+    storeSet('planner:items', items);
   }
 
   // ---------- streak ----------
@@ -1322,6 +1445,13 @@ body::after {
     });
     li.appendChild(cb);
 
+    if (goal.source === 'template' && goal.time) {
+      const timeChip = document.createElement('span');
+      timeChip.className = 'gm-row-time';
+      timeChip.textContent = goal.time;
+      li.appendChild(timeChip);
+    }
+
     const text = document.createElement('span');
     text.className = 'gm-text';
     text.textContent = goal.text;
@@ -1376,6 +1506,15 @@ body::after {
     document.getElementById('todayLabel').textContent =
       'Today — ' + formatDate(getActiveDateString());
 
+    const pdScore = perfectDayScore(goals);
+    const pdLine = document.getElementById('gmPerfectDay');
+    if (pdScore) {
+      pdLine.style.display = '';
+      document.getElementById('gmPerfectDayNum').textContent = pdScore.done + '/' + pdScore.total;
+    } else {
+      pdLine.style.display = 'none';
+    }
+
     const bar = document.getElementById('gmBar');
     bar.innerHTML = '';
     goals.forEach(g => {
@@ -1403,6 +1542,87 @@ body::after {
     document.getElementById('gmTomorrowCount').textContent =
       list.length === 0 ? '0 items' : (done + '/' + list.length + ' done');
   }
+
+  // ---------- Perfect Day template editor ----------
+  function getPdTemplate() { return getGoals('perfectDay:template'); }
+  function setPdTemplate(list) { setGoals('perfectDay:template', list); }
+
+  function renderPdTemplate() {
+    const list = getPdTemplate().slice().sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+    const wrap = document.getElementById('gmPdList');
+    wrap.innerHTML = '';
+    list.forEach(item => {
+      const row = document.createElement('div');
+      row.className = 'gm-pd-row';
+
+      const timeInput = document.createElement('input');
+      timeInput.type = 'time';
+      timeInput.className = 'gm-pd-time-input';
+      timeInput.value = item.time || '';
+      timeInput.addEventListener('change', () => {
+        const raw = getPdTemplate();
+        const t = raw.find(x => x.id === item.id);
+        if (t) { t.time = timeInput.value; setPdTemplate(raw); renderPdTemplate(); }
+      });
+      row.appendChild(timeInput);
+
+      const label = document.createElement('span');
+      label.className = 'gm-pd-row-label';
+      label.textContent = item.label;
+      label.addEventListener('click', () => {
+        if (label.getAttribute('contenteditable') === 'true') return;
+        const original = label.textContent;
+        label.setAttribute('contenteditable', 'true');
+        label.focus();
+        function commit() {
+          const next = label.textContent.trim();
+          label.removeAttribute('contenteditable');
+          if (next && next !== original) {
+            const raw = getPdTemplate();
+            const t = raw.find(x => x.id === item.id);
+            if (t) { t.label = next; setPdTemplate(raw); }
+          } else {
+            label.textContent = original;
+          }
+        }
+        label.addEventListener('blur', commit, { once: true });
+        label.addEventListener('keydown', function onKey(e) {
+          if (e.key === 'Enter') { e.preventDefault(); label.removeEventListener('keydown', onKey); label.blur(); }
+          else if (e.key === 'Escape') { e.preventDefault(); label.removeEventListener('keydown', onKey); label.textContent = original; }
+        });
+      });
+      row.appendChild(label);
+
+      const del = document.createElement('button');
+      del.type = 'button';
+      del.className = 'gm-pd-row-del';
+      del.setAttribute('aria-label', 'Delete template item');
+      del.textContent = '×';
+      del.addEventListener('click', () => {
+        setPdTemplate(getPdTemplate().filter(x => x.id !== item.id));
+        renderPdTemplate();
+      });
+      row.appendChild(del);
+
+      wrap.appendChild(row);
+    });
+  }
+
+  document.getElementById('gmPdHeader').addEventListener('click', () => {
+    document.getElementById('gmPdCard').classList.toggle('expanded');
+  });
+  document.getElementById('gmPdPlannerLink').addEventListener('click', e => e.stopPropagation());
+  document.getElementById('gmPdAddBtn').addEventListener('click', () => {
+    const timeEl = document.getElementById('gmPdTimeInput');
+    const labelEl = document.getElementById('gmPdLabelInput');
+    const label = labelEl.value.trim();
+    if (!label) return;
+    const list = getPdTemplate();
+    list.push({ id: newId('pdt'), time: timeEl.value || '', label: label });
+    setPdTemplate(list);
+    labelEl.value = '';
+    renderPdTemplate();
+  });
 
   function renderListInto(goals, listEl, emptyEl, key, readOnly) {
     listEl.innerHTML = '';
@@ -2505,10 +2725,13 @@ body::after {
 
   // ---------- Boot ----------
   rollover();
+  seedTemplateIfNeeded();
+  mergeDuePlannerItems();
   processStreak();
   loadToday();
   loadTomorrow();
   renderStreak();
+  renderPdTemplate();
   updateDayRing();
   setInterval(updateDayRing, 60 * 1000);
   startTicker();
@@ -2516,7 +2739,7 @@ body::after {
 
   // Re-render when storage changes from another tab (or our bridged parent).
   window.addEventListener('storage', () => {
-    loadToday(); loadTomorrow(); renderStreak(); mlRender();
+    loadToday(); loadTomorrow(); renderStreak(); renderPdTemplate(); mlRender();
   });
 })();
 </script>
@@ -2525,7 +2748,7 @@ document.addEventListener('DOMContentLoaded', function () {
   if (typeof initCloudSync !== 'function') return;
   initCloudSync({
     appKey: 'goals',
-    syncedKeys: ['morning_outcomes_v1'],
+    syncedKeys: ['morning_outcomes_v1', 'perfectDay:template', 'planner:items'],
     syncedPrefixes: ['goals:', 'morning_launch:', 'routine_checklist:'],
     onApplied: function () {
       window.dispatchEvent(new CustomEvent('goals-changed'));

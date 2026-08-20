@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#050506">
+<link rel="manifest" href="/manifest.json" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Row" />
+<title>Planner — Row</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="sync.js" defer></script>
+<script src="row-auth.js" defer></script>
+<script src="topbar.js" defer></script>
+<style>
+:root {
+  --text-primary: #F4F1EA;
+  --text-secondary: #B8B6B0;
+  --text-tertiary: #76746E;
+  --accent: #6EE7B7;
+  --success: #6EE7B7;
+  --warning: #F2C063;
+  --danger: #FF6B6B;
+  --font: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; padding: 0;
+  background: #000;
+  color: var(--text-secondary);
+  font-family: var(--font);
+  -webkit-font-smoothing: antialiased;
+  -webkit-text-size-adjust: 100%;
+  overflow-x: hidden;
+}
+.pl-shell {
+  width: 100%; max-width: 720px; margin: 0 auto;
+  padding: 20px 16px calc(110px + env(safe-area-inset-bottom));
+}
+.pl-eyebrow {
+  font-size: 10.5px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--text-tertiary); margin-bottom: 4px;
+}
+.pl-title { font-size: 22px; font-weight: 700; color: var(--text-primary); margin: 0 0 18px; }
+
+.pl-week-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.pl-week-nav-btn {
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+  color: var(--text-secondary); border-radius: 8px; padding: 6px 12px;
+  font-size: 13px; cursor: pointer; font-family: inherit;
+}
+.pl-week-nav-btn:hover { color: var(--text-primary); }
+.pl-week-label { font-size: 12px; color: var(--text-tertiary); }
+
+.pl-strip { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin-bottom: 18px; }
+.pl-day-card {
+  position: relative; padding: 10px 4px; border-radius: 12px; text-align: center; cursor: pointer;
+  background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06);
+  transition: border-color 0.2s, background 0.2s;
+}
+.pl-day-card:hover { border-color: rgba(110,231,183,0.24); }
+.pl-day-card.is-today { border-color: rgba(110,231,183,0.35); }
+.pl-day-card.is-selected { background: rgba(110,231,183,0.08); border-color: rgba(110,231,183,0.4); }
+.pl-day-name { font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-tertiary); margin-bottom: 3px; }
+.pl-day-num { font-family: var(--font-mono); font-size: 14px; font-weight: 700; color: var(--text-primary); }
+.pl-day-dot {
+  width: 5px; height: 5px; border-radius: 50%; background: var(--accent);
+  margin: 5px auto 0; opacity: 0;
+}
+.pl-day-card.has-items .pl-day-dot { opacity: 1; }
+
+.pl-card {
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 16px; padding: 16px; margin-bottom: 14px;
+}
+.pl-selected-label { font-size: 14px; font-weight: 700; color: var(--text-primary); margin-bottom: 12px; }
+.pl-item-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+.pl-item-row {
+  display: flex; align-items: flex-start; gap: 8px;
+  padding: 8px 10px; border-radius: 10px;
+  background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06);
+}
+.pl-item-body { flex: 1; min-width: 0; }
+.pl-item-title { font-size: 13px; color: var(--text-primary); }
+.pl-item-note { font-size: 11px; color: var(--text-tertiary); margin-top: 2px; }
+.pl-item-badge {
+  font-family: var(--font-mono); font-size: 9px; font-weight: 700; letter-spacing: 0.08em;
+  color: var(--success); flex-shrink: 0; padding-top: 2px;
+}
+.pl-item-del { color: var(--text-tertiary); cursor: pointer; padding: 0 4px; background: none; border: none; font-size: 14px; flex-shrink: 0; }
+.pl-item-del:hover { color: var(--text-primary); }
+.pl-empty { font-size: 12px; color: var(--text-tertiary); font-style: italic; margin-bottom: 12px; }
+
+.pl-add-row { display: flex; flex-direction: column; gap: 8px; }
+.pl-add-input {
+  padding: 9px 12px; border-radius: 8px;
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+  color: var(--text-primary); font-family: inherit; font-size: 13px;
+}
+.pl-add-btn {
+  padding: 9px 14px; border-radius: 8px;
+  background: rgba(110,231,183,0.12); border: 1px solid rgba(110,231,183,0.3);
+  color: var(--accent); font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit;
+}
+</style>
+</head>
+<body>
+
+<div class="pl-shell">
+  <div class="pl-eyebrow">Goals</div>
+  <h1 class="pl-title">Planner</h1>
+
+  <div class="pl-week-nav">
+    <button type="button" class="pl-week-nav-btn" id="plPrevWeek">← Prev</button>
+    <span class="pl-week-label" id="plWeekLabel"></span>
+    <button type="button" class="pl-week-nav-btn" id="plNextWeek">Next →</button>
+  </div>
+
+  <div class="pl-strip" id="plStrip"></div>
+
+  <div class="pl-card">
+    <div class="pl-selected-label" id="plSelectedLabel"></div>
+    <div class="pl-item-list" id="plItemList"></div>
+    <div class="pl-empty" id="plEmpty" style="display:none;">Nothing scheduled for this day.</div>
+    <div class="pl-add-row">
+      <input type="text" id="plAddTitle" class="pl-add-input" placeholder="What's scheduled…" autocomplete="off">
+      <input type="text" id="plAddNote" class="pl-add-input" placeholder="Note (optional)" autocomplete="off">
+      <button type="button" id="plAddBtn" class="pl-add-btn">+ Add to this day</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  function storeGet(key) { try { return JSON.parse(localStorage.getItem(key)); } catch (e) { return null; } }
+  function storeSet(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) {} }
+  function newId(prefix) { return (prefix || 'id') + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+  function pad2(n) { return String(n).padStart(2, '0'); }
+  function dateToKey(d) { return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); }
+  function getActiveDateString() {
+    const now = new Date();
+    if (now.getHours() < 6) { const d = new Date(now); d.setDate(d.getDate() - 1); return dateToKey(d); }
+    return dateToKey(now);
+  }
+  function getPlannerItems() { const v = storeGet('planner:items'); return Array.isArray(v) ? v : []; }
+  function setPlannerItems(list) { storeSet('planner:items', list); }
+
+  const DAY_NAMES = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
+  const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+  const todayStr = getActiveDateString();
+  let weekOffset = 0; // 0 = week containing today
+  let selectedDate = todayStr;
+
+  // Sunday-start week containing (today + weekOffset*7 days).
+  function weekStartDate() {
+    const base = new Date(todayStr + 'T12:00:00');
+    base.setDate(base.getDate() + weekOffset * 7 - base.getDay());
+    return base;
+  }
+
+  function renderWeek() {
+    const start = weekStartDate();
+    const items = getPlannerItems();
+    const strip = document.getElementById('plStrip');
+    strip.innerHTML = '';
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(start);
+      d.setDate(d.getDate() + i);
+      const key = dateToKey(d);
+      const card = document.createElement('div');
+      card.className = 'pl-day-card';
+      if (key === todayStr) card.classList.add('is-today');
+      if (key === selectedDate) card.classList.add('is-selected');
+      if (items.some(p => p.date === key)) card.classList.add('has-items');
+      card.innerHTML =
+        '<div class="pl-day-name">' + DAY_NAMES[d.getDay()] + '</div>' +
+        '<div class="pl-day-num">' + d.getDate() + '</div>' +
+        '<div class="pl-day-dot"></div>';
+      card.addEventListener('click', () => { selectedDate = key; renderWeek(); renderSelectedDay(); });
+      strip.appendChild(card);
+    }
+    const end = new Date(start); end.setDate(end.getDate() + 6);
+    document.getElementById('plWeekLabel').textContent =
+      MONTH_NAMES[start.getMonth()] + ' ' + start.getDate() + ' – ' + MONTH_NAMES[end.getMonth()] + ' ' + end.getDate();
+  }
+
+  function formatSelectedLabel(dateStr) {
+    const d = new Date(dateStr + 'T12:00:00');
+    const label = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()] + ', ' + MONTH_NAMES[d.getMonth()] + ' ' + d.getDate();
+    return dateStr === todayStr ? label + ' (today)' : label;
+  }
+
+  function renderSelectedDay() {
+    document.getElementById('plSelectedLabel').textContent = formatSelectedLabel(selectedDate);
+    const items = getPlannerItems().filter(p => p.date === selectedDate);
+    const listEl = document.getElementById('plItemList');
+    listEl.innerHTML = '';
+    document.getElementById('plEmpty').style.display = items.length ? 'none' : 'block';
+    items.forEach(item => {
+      const row = document.createElement('div');
+      row.className = 'pl-item-row';
+      const body = document.createElement('div');
+      body.className = 'pl-item-body';
+      const title = document.createElement('div');
+      title.className = 'pl-item-title';
+      title.textContent = item.title;
+      body.appendChild(title);
+      if (item.note) {
+        const note = document.createElement('div');
+        note.className = 'pl-item-note';
+        note.textContent = item.note;
+        body.appendChild(note);
+      }
+      row.appendChild(body);
+      if (item.mergedAt) {
+        // Landed on Goals already -- read-only here, delete/edit happens on
+        // the actual goal now (see the design doc's Error Handling section).
+        const badge = document.createElement('span');
+        badge.className = 'pl-item-badge';
+        badge.textContent = '✓ ON GOALS';
+        row.appendChild(badge);
+      } else {
+        const del = document.createElement('button');
+        del.type = 'button';
+        del.className = 'pl-item-del';
+        del.setAttribute('aria-label', 'Delete planned item');
+        del.textContent = '×';
+        del.addEventListener('click', () => {
+          setPlannerItems(getPlannerItems().filter(p => p.id !== item.id));
+          renderWeek(); renderSelectedDay();
+        });
+        row.appendChild(del);
+      }
+      listEl.appendChild(row);
+    });
+  }
+
+  document.getElementById('plPrevWeek').addEventListener('click', () => { weekOffset--; renderWeek(); });
+  document.getElementById('plNextWeek').addEventListener('click', () => { weekOffset++; renderWeek(); });
+
+  document.getElementById('plAddBtn').addEventListener('click', () => {
+    const titleEl = document.getElementById('plAddTitle');
+    const noteEl = document.getElementById('plAddNote');
+    const title = titleEl.value.trim();
+    if (!title) return;
+    const items = getPlannerItems();
+    items.push({ id: newId('pl'), date: selectedDate, title: title, note: noteEl.value.trim() || undefined });
+    setPlannerItems(items);
+    titleEl.value = ''; noteEl.value = '';
+    renderWeek(); renderSelectedDay();
+  });
+
+  window.addEventListener('storage', () => { renderWeek(); renderSelectedDay(); });
+
+  renderWeek();
+  renderSelectedDay();
+})();
+</script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  if (typeof initCloudSync !== 'function') return;
+  initCloudSync({
+    appKey: 'goals',
+    syncedKeys: ['planner:items'],
+    onApplied: function () { window.dispatchEvent(new Event('storage')); }
+  });
+});
+</script>
+</body>
+</html>
