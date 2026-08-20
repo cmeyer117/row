@@ -590,7 +590,13 @@ async function renderReadinessPanel() {
   const waistSeries = ((health && health['health:measurements']) || []).filter(e => e && e.waist != null).map(e => ({ date: e.date, value: e.waist }));
   const currentWeight = weightSeries.length ? weightSeries.slice().sort((a, b) => a.date.localeCompare(b.date)).slice(-1)[0].value : null;
   const recompResult = window.RecompSignalLogic.computeRecompDelta(weightSeries, waistSeries, 14, new Date());
-  const weekPainHigh = Object.keys(gymState.checkins || {}).some(dateKey => dateKey >= monday && dateKey <= sunday && gymState.checkins[dateKey] && gymState.checkins[dateKey].pain === 'high');
+  // The MOST RECENT checkin in the week window, not "any high-pain day this
+  // week" -- an early-week high-pain flag that's since resolved shouldn't
+  // keep overriding a verdict that's otherwise back on track (code review
+  // finding, 2026-08-20).
+  const weekCheckinDates = Object.keys(gymState.checkins || {}).filter(dateKey => dateKey >= monday && dateKey <= sunday).sort();
+  const latestWeekCheckinDate = weekCheckinDates[weekCheckinDates.length - 1];
+  const weekPainHigh = !!(latestWeekCheckinDate && gymState.checkins[latestWeekCheckinDate] && gymState.checkins[latestWeekCheckinDate].pain === 'high');
 
   const snapshotSignals = {
     cardio: window.CoachSnapshotLogic.scoreCountSignal(matchesCountTarget(cardioRxTarget, cardioCount)),

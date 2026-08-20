@@ -63,10 +63,19 @@
     var weightDelta = Math.round((w[w.length - 1].value - w[0].value) * 10) / 10;
     var waistDelta = Math.round((waist[waist.length - 1].value - waist[0].value) * 10) / 10;
     var result = classify(weightDelta, waistDelta);
+    // Actual elapsed days between the two weight datapoints the delta was
+    // computed from -- NOT windowDays itself, which is only an upper bound.
+    // Sparse logging (e.g. two weigh-ins a day apart) would otherwise get
+    // silently treated as if it spanned the full window by any caller that
+    // assumes weightDelta always covers windowDays (found in code review,
+    // 2026-08-20 -- a rate-per-week caller was dividing by windowDays/7
+    // unconditionally).
+    var weightSpanDays = Math.max(1, Math.round((new Date(w[w.length - 1].date) - new Date(w[0].date)) / 86400000));
     return {
       ok: true,
       weightDelta: weightDelta,
       waistDelta: waistDelta,
+      weightSpanDays: weightSpanDays,
       label: result.label,
       detail: result.detail
     };

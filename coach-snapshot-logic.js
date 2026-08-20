@@ -38,11 +38,15 @@
     return 0;
   }
 
-  // weightDelta: absolute lbs change over a 14-day window (RecompSignalLogic
-  // .computeRecompDelta's weightDelta field). currentWeight: latest logged
-  // weight, for converting to a %-of-bodyweight rate. Returns null if
-  // recompResult.ok is false (not enough weigh-ins) or currentWeight is
-  // falsy/zero.
+  // recompResult: RecompSignalLogic.computeRecompDelta()'s return value --
+  // uses weightDelta AND weightSpanDays (the ACTUAL elapsed days between
+  // its two weight datapoints, not the caller's windowDays, which is only
+  // an upper bound -- sparse logging, e.g. two weigh-ins a day apart,
+  // would otherwise silently understate the true rate). currentWeight:
+  // latest logged weight, for converting to a %-of-bodyweight rate.
+  // Returns null if recompResult.ok is false (not enough weigh-ins),
+  // currentWeight is falsy/zero, or the span is under 7 days (too little
+  // elapsed time for a reliable weekly-rate extrapolation).
   //
   // Thresholds sourced from a 2026-08-20 Gemini consult on enhanced/PED-
   // assisted bodybuilder off-season guidance (J3University/Revive Stronger
@@ -51,7 +55,8 @@
   // >0.5-1%/week sustained is the commonly-cited "too fast" flag.
   function scoreBodyweightSignal(recompResult, currentWeight, phase) {
     if (!recompResult || !recompResult.ok || !currentWeight) return null;
-    var ratePerWeek = (recompResult.weightDelta / currentWeight) / 2; // 14-day window = 2 weeks
+    if (!recompResult.weightSpanDays || recompResult.weightSpanDays < 7) return null;
+    var ratePerWeek = (recompResult.weightDelta / currentWeight) / (recompResult.weightSpanDays / 7);
     if (phase === 'growth') {
       if (ratePerWeek >= 0 && ratePerWeek <= 0.005) return 2;
       if ((ratePerWeek > -0.005 && ratePerWeek < 0) || (ratePerWeek > 0.005 && ratePerWeek <= 0.01)) return 1;

@@ -37,25 +37,31 @@ assertEqual(C.scoreMacroSignal([true, true]), 0, 'scoreMacroSignal: 2+ poor days
 assertEqual(C.scoreMacroSignal([]), null, 'scoreMacroSignal: no days logged -> null, not 0');
 
 // --- scoreBodyweightSignal ---
-// growth: 200 lb lifter, +1 lb over 14 days = 0.5 lb/week = 0.25%/week -- squarely in the 0-0.5% good band.
-assertEqual(C.scoreBodyweightSignal({ ok: true, weightDelta: 1 }, 200, 'growth'), 2, 'scoreBodyweightSignal: growth, 0.25%/wk (within 0-0.5% target) -> 2 (good)');
+// growth: 200 lb lifter, +1 lb over a real 14-day span = 0.5 lb/week = 0.25%/week -- squarely in the 0-0.5% good band.
+assertEqual(C.scoreBodyweightSignal({ ok: true, weightDelta: 1, weightSpanDays: 14 }, 200, 'growth'), 2, 'scoreBodyweightSignal: growth, 0.25%/wk (within 0-0.5% target) -> 2 (good)');
 // growth: +4 lb over 14 days = 2 lb/week = 1%/week -- right at the "too fast" boundary, still partial not bad.
-assertEqual(C.scoreBodyweightSignal({ ok: true, weightDelta: 4 }, 200, 'growth'), 1, 'scoreBodyweightSignal: growth, 1%/wk -> 1 (partial, at the too-fast boundary)');
+assertEqual(C.scoreBodyweightSignal({ ok: true, weightDelta: 4, weightSpanDays: 14 }, 200, 'growth'), 1, 'scoreBodyweightSignal: growth, 1%/wk -> 1 (partial, at the too-fast boundary)');
 // growth: +8 lb over 14 days = 4 lb/week = 2%/week -- clearly too fast.
-assertEqual(C.scoreBodyweightSignal({ ok: true, weightDelta: 8 }, 200, 'growth'), 0, 'scoreBodyweightSignal: growth, 2%/wk -> 0 (bad, too fast)');
+assertEqual(C.scoreBodyweightSignal({ ok: true, weightDelta: 8, weightSpanDays: 14 }, 200, 'growth'), 0, 'scoreBodyweightSignal: growth, 2%/wk -> 0 (bad, too fast)');
 // growth: losing weight during a growth phase is bad.
-assertEqual(C.scoreBodyweightSignal({ ok: true, weightDelta: -3 }, 200, 'growth'), 0, 'scoreBodyweightSignal: growth, losing weight -> 0 (bad)');
+assertEqual(C.scoreBodyweightSignal({ ok: true, weightDelta: -3, weightSpanDays: 14 }, 200, 'growth'), 0, 'scoreBodyweightSignal: growth, losing weight -> 0 (bad)');
 // cut: trending down is good.
-assertEqual(C.scoreBodyweightSignal({ ok: true, weightDelta: -3 }, 200, 'cut'), 2, 'scoreBodyweightSignal: cut, trending down -> 2 (good)');
+assertEqual(C.scoreBodyweightSignal({ ok: true, weightDelta: -3, weightSpanDays: 14 }, 200, 'cut'), 2, 'scoreBodyweightSignal: cut, trending down -> 2 (good)');
 // cut: gaining during a cut is bad.
-assertEqual(C.scoreBodyweightSignal({ ok: true, weightDelta: 2 }, 200, 'cut'), 0, 'scoreBodyweightSignal: cut, gaining -> 0 (bad)');
+assertEqual(C.scoreBodyweightSignal({ ok: true, weightDelta: 2, weightSpanDays: 14 }, 200, 'cut'), 0, 'scoreBodyweightSignal: cut, gaining -> 0 (bad)');
 // reverse_diet: near-flat is good.
-assertEqual(C.scoreBodyweightSignal({ ok: true, weightDelta: 0.3 }, 200, 'reverse_diet'), 2, 'scoreBodyweightSignal: reverse_diet, near-flat -> 2 (good)');
+assertEqual(C.scoreBodyweightSignal({ ok: true, weightDelta: 0.3, weightSpanDays: 14 }, 200, 'reverse_diet'), 2, 'scoreBodyweightSignal: reverse_diet, near-flat -> 2 (good)');
 // reverse_diet: a big swing is bad.
-assertEqual(C.scoreBodyweightSignal({ ok: true, weightDelta: -5 }, 200, 'reverse_diet'), 0, 'scoreBodyweightSignal: reverse_diet, big swing -> 0 (bad)');
+assertEqual(C.scoreBodyweightSignal({ ok: true, weightDelta: -5, weightSpanDays: 14 }, 200, 'reverse_diet'), 0, 'scoreBodyweightSignal: reverse_diet, big swing -> 0 (bad)');
 // not enough data -> null.
 assertEqual(C.scoreBodyweightSignal({ ok: false }, 200, 'growth'), null, 'scoreBodyweightSignal: not enough weigh-ins -> null');
-assertEqual(C.scoreBodyweightSignal({ ok: true, weightDelta: 1 }, 0, 'growth'), null, 'scoreBodyweightSignal: no current weight -> null, does not divide by zero');
+assertEqual(C.scoreBodyweightSignal({ ok: true, weightDelta: 1, weightSpanDays: 14 }, 0, 'growth'), null, 'scoreBodyweightSignal: no current weight -> null, does not divide by zero');
+// Codex review finding (2026-08-20): sparse logging (e.g. two weigh-ins a
+// day apart) must NOT be treated as if it spans the full 14-day window --
+// a real 1 lb/day swing extrapolated over a real 1-day span is a massive
+// rate, but a naive "always divide by 2 weeks" calculation would have
+// silently shown this as a mild, in-band 0.25 lb/week.
+assertEqual(C.scoreBodyweightSignal({ ok: true, weightDelta: 1, weightSpanDays: 1 }, 200, 'growth'), null, 'scoreBodyweightSignal: span under 7 days -> null, not extrapolated as if it were 14 days');
 
 // --- computeVerdict ---
 // pain override wins regardless of how good everything else looks.
