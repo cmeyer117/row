@@ -93,6 +93,63 @@ assertEqual(E.detectStalledExercise({ exerciseName: 'Bench', exposures: [
   assertEqual(f, null, 'only 3 exposures in the new rep bracket -- suppressed, old bracket history not reused');
 }
 
+// --- Codex bug #1: double-progression (reps climbing at a flat load) must
+// NOT be flagged as a plateau -- load stayed the same but reps are a new
+// high every exposure ---
+{
+  const dates = ['2026-08-01', '2026-08-05', '2026-08-10', '2026-08-15'];
+  const reps = [8, 9, 10, 11];
+  const exposures = dates.map((d, i) => ({ date: d, load: 100, reps: reps[i] }));
+  const f = E.detectStalledExercise({ exerciseName: 'Bench', exposures });
+  assertEqual(f, null, 'load flat but reps climbing every exposure (100x8,100x9,100x10,100x11) is real double-progression, not a plateau');
+}
+
+// --- Codex bug #2: an already-declining historical block must not qualify
+// a further drop as an "intentional deload" ---
+assertEqual(
+  E.looksLikeIntentionalDeload([100, 100, 99, 99, 98, 98], 85),
+  false,
+  'historical block already trending down (100,100,99,99,98,98) + a drop to 85 is a real regression, not a planned deload'
+);
+
+// --- Codex bugs #3/#4: date windows were off-by-one (inclusive of an extra
+// boundary day) -- confirm true 14-day / 7-day windows with no gap or
+// overlap against their adjoining baseline window ---
+{
+  // Session frequency: 4 sparse sessions inside the true trailing-14-day
+  // window (offsets 0,3,7,11), a 1-session marker sitting exactly on the
+  // day-14 boundary (must land in baseline, NOT recent), and a dense
+  // 27-session baseline filling offsets 15-41. If the recent window were
+  // still 15 dates (the old bug), the day-14 marker would leak into it and
+  // recentWeeks would come out at 2.5, not 2.
+  const off = n => { const d = new Date(NOW); d.setUTCDate(d.getUTCDate() - n); return d.toISOString().slice(0, 10); };
+  const recentSparse = [0, 3, 7, 11].map(off);
+  const boundaryMarker = [off(14)];
+  const baselineDense = []; for (let i = 15; i <= 41; i++) baselineDense.push(off(i));
+  const sessionDates = recentSparse.concat(boundaryMarker).concat(baselineDense);
+  const f = E.detectMissedSessionTrend({ sessionDates, now: NOW });
+  assert(f, 'sparse recent + dense baseline should still flag a drop');
+  assertEqual(f.observation, 'Session frequency dropped from ~7/week to ~2/week over the last 2 weeks.',
+    'recent window is a true trailing 14 days (excludes the day-14 boundary marker) and baseline is the contiguous 28 days after it (includes the marker)');
+}
+{
+  // Recovery signal: 7 low-sleep nights at offsets 0-6 (true trailing-7-day
+  // window), a marker night (20h) at the day-7 boundary that must land in
+  // baseline (not recent), 29 baseline nights alternating 7h/8h at offsets
+  // 8-36, and an extreme marker (-20h) at offset 37 that must be excluded
+  // from baseline entirely (old baseline window reached out to day 37).
+  const off = n => { const d = new Date(NOW); d.setUTCDate(d.getUTCDate() - n); return d.toISOString().slice(0, 10); };
+  const entries = [];
+  for (let i = 0; i <= 6; i++) entries.push({ date: off(i), hours: 4 });
+  entries.push({ date: off(7), hours: 20 });
+  for (let i = 8; i <= 36; i++) entries.push({ date: off(i), hours: (i % 2 === 0 ? 7 : 8) });
+  entries.push({ date: off(37), hours: -20 });
+  const f = E.detectRecoverySignal({ sleepEntries: entries, now: NOW, performanceStalled: true });
+  assert(f, 'a real 7-day sleep deviation with a concurrent stall should flag');
+  assertEqual(f.observation, '7-day avg sleep (4h) is below the 30-day baseline (7.9h) by 1.7 SD, alongside a performance stall this week.',
+    'recent window is a true trailing 7 days (excludes the day-7 marker) and baseline is the contiguous 30 days after it (includes day 7, excludes day 37)');
+}
+
 // --- missed-session trend ---
 {
   const baseline = dateSeries(42, 7, 4, NOW).filter(d => d <= new Date(NOW.getTime() - 15 * 86400000).toISOString().slice(0, 10));

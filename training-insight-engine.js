@@ -31,6 +31,18 @@
   function daysBetween(a, b) { return Math.round((new Date(b + 'T00:00:00Z') - new Date(a + 'T00:00:00Z')) / 86400000); }
 
   // ---- rep-range isolation (the e1RM-comparison fallacy fix) ----
+  // A double-progression high: candidate beats best on load, or matches
+  // best's load while beating its reps. Used so a plateau check accounts
+  // for reps climbing at a flat load, not just load alone.
+  function bestOf(exposures) {
+    return exposures.reduce(function (best, e) {
+      return !best || e.load > best.load || (e.load === best.load && e.reps > best.reps) ? e : best;
+    }, null);
+  }
+  function isNewHigh(candidate, best) {
+    return candidate.load > best.load || (candidate.load >= best.load && candidate.reps > best.reps);
+  }
+
   function repBracketOf(reps) {
     if (reps <= 3) return '1-3';
     if (reps <= 7) return '4-7';
@@ -69,7 +81,15 @@
     const mid = Math.ceil(historicalLoads.length / 2);
     const firstHalf = historicalLoads.slice(0, mid);
     const secondHalf = historicalLoads.slice(mid);
-    return mean(secondHalf) >= mean(firstHalf) * 0.98;
+    const droppedFromStableOrRising = mean(secondHalf) >= mean(firstHalf) * 0.98;
+    // The historical block itself must not already be trending down --
+    // otherwise a drop on top of a real decline reads as "intentional"
+    // just because it stays within 2% of a falling average. Compare the
+    // block's own first third to its last third (a coarse trend-sign
+    // check, no tolerance -- any real decline disqualifies it).
+    const third = Math.max(1, Math.floor(historicalLoads.length / 3));
+    const blockNotDeclining = mean(historicalLoads.slice(-third)) >= mean(historicalLoads.slice(0, third));
+    return droppedFromStableOrRising && blockNotDeclining;
   }
 
   // input: { exerciseName, exposures: [{date,load,reps,variantTag?}] }
@@ -98,7 +118,10 @@
     const histStdev = stdev(historicalLoads);
     const maxHistorical = Math.max.apply(null, historicalLoads);
     const isRegression = latest.load < (histMean - histStdev);
-    const isPlateau = !isRegression && latest.load <= maxHistorical;
+    // Plateau = latest exposure is neither a load PR nor a rep PR at the
+    // same-or-better load (double progression) vs everything before it --
+    // reps climbing at a flat load is real progress, not a stall.
+    const isPlateau = !isRegression && !isNewHigh(latest, bestOf(run.slice(0, -1)));
     if (!isRegression && !isPlateau) return null; // still progressing -- nothing to flag
 
     if (isRegression && looksLikeIntentionalDeload(historicalLoads, latest.load)) {
@@ -132,8 +155,8 @@
       const startKey = start.toISOString().slice(0, 10), endKey = end.toISOString().slice(0, 10);
       return dates.filter(function (d) { return d >= startKey && d <= endKey; }).length;
     }
-    const recentWeeks = sessionsInWindow(14, 0) / 2;   // avg/week, last 14 days
-    const baselineWeeks = sessionsInWindow(42, 15) / 4; // avg/week, the 4 weeks before that
+    const recentWeeks = sessionsInWindow(13, 0) / 2;   // avg/week, trailing 14 calendar days (today - 13..today)
+    const baselineWeeks = sessionsInWindow(41, 14) / 4; // avg/week, the 4 weeks (28 days) immediately before that, no gap/overlap
     if (baselineWeeks < 1) return null; // not enough baseline history to compare against
     const dropRatio = (baselineWeeks - recentWeeks) / baselineWeeks;
     if (dropRatio < 0.3) return null; // under 30% drop -- normal week-to-week noise
@@ -189,11 +212,12 @@
       const startKey = start.toISOString().slice(0, 10), endKey = end.toISOString().slice(0, 10);
       return entries.filter(function (e) { return e.date >= startKey && e.date <= endKey; }).map(function (e) { return e.hours; });
     }
-    const recent = hoursInWindow(7, 0);
+    const recent = hoursInWindow(6, 0); // trailing 7 calendar days (today - 6..today)
     // Baseline excludes the recent window itself -- otherwise the very
     // deviation being measured leaks into what it's measured against,
-    // diluting both the mean and the spread.
-    const baseline = hoursInWindow(37, 8);
+    // diluting both the mean and the spread. Starts immediately after the
+    // recent window ends, 30 days (today-36..today-7), no gap/overlap.
+    const baseline = hoursInWindow(36, 7);
     if (recent.length < 4 || baseline.length < 14) return null;
     const recentMa = mean(recent);
     const baselineMean = mean(baseline);
