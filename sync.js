@@ -18,6 +18,26 @@
     if (SUPABASE_URL.indexOf('PASTE-') === 0 || SUPABASE_KEY.indexOf('PASTE-') === 0) return;
 
     let supa = null, pushTimer = null, suppressSync = false, lastSyncedJson = null;
+    // Status broadcast for topbar.js's sync badge -- see
+    // docs/superpowers/specs/2026-08-20-visible-sync-status-design.md.
+    // status/lastSyncedAt/retryDelayMs are this instance's own state;
+    // retryTimer is the pending backoff retry (if any), cleared on success.
+    let status = 'pending', lastSyncedAt = null, retryDelayMs = 0, retryTimer = null;
+    const RETRY_DELAYS = [5000, 15000, 30000];
+    function broadcastStatus() {
+      try {
+        window.dispatchEvent(new CustomEvent('row:sync-status', { detail: { appKey, status, lastSyncedAt } }));
+      } catch (e) {}
+    }
+    // Registered into a small shared per-appKey registry so topbar.js's
+    // "Retry now" action can force an immediate attempt without sync.js
+    // exposing anything broader than this one hook.
+    function registerRetryHook(fn) {
+      try {
+        window.__rowSyncRetry = window.__rowSyncRetry || {};
+        window.__rowSyncRetry[appKey] = fn;
+      } catch (e) {}
+    }
     // Unload handlers (beforeunload/pagehide) can't reliably await an async
     // getSession() call before the page tears down, so the owner's access
     // token is cached here on session init/refresh and read synchronously
@@ -127,21 +147,56 @@
     // an array that's legitimately shrunk to zero items) -- that's a real,
     // valid state a consumer's own delete feature can produce.
     function isTrivial(state) { return Object.keys(state).length === 0; }
+    // Retry-with-backoff on failure -- previously a bare catch(e){} that
+    // silently dropped the write with no durable signal to Carl (Codex
+    // review catch, 2026-08-20). retryDelayMs resets to 0 on any success,
+    // whether from this timer firing or an unrelated new edit's own
+    // schedulePush() landing first -- pushNow() itself is the single
+    // choke point both paths go through.
+    function scheduleRetry() {
+      clearTimeout(retryTimer);
+      const delay = RETRY_DELAYS[Math.min(retryDelayMs, RETRY_DELAYS.length - 1)];
+      retryDelayMs = Math.min(retryDelayMs + 1, RETRY_DELAYS.length - 1);
+      retryTimer = setTimeout(pushNow, delay);
+    }
     async function pushNow() {
       if (!supa || !syncReady) return;
       const state = collect();
       if (isTrivial(state)) return;
       const json = JSON.stringify(state);
       if (json === lastSyncedJson) return;
+      status = 'pending';
+      broadcastStatus();
       try {
         const { error } = await supa.from('app_state').upsert(
           { key: appKey, data: state, updated_at: new Date().toISOString() },
           { onConflict: 'key' }
         );
-        if (!error) lastSyncedJson = json;
-      } catch (e) {}
+        if (!error) {
+          lastSyncedJson = json;
+          lastSyncedAt = new Date().toISOString();
+          status = 'synced';
+          retryDelayMs = 0;
+          clearTimeout(retryTimer);
+          broadcastStatus();
+        } else {
+          status = 'error';
+          broadcastStatus();
+          scheduleRetry();
+        }
+      } catch (e) {
+        status = 'error';
+        broadcastStatus();
+        scheduleRetry();
+      }
     }
-    function schedulePush() { clearTimeout(pushTimer); pushTimer = setTimeout(pushNow, 250); }
+    registerRetryHook(function forceRetry() { clearTimeout(retryTimer); pushNow(); });
+    function schedulePush() {
+      status = 'pending';
+      broadcastStatus();
+      clearTimeout(pushTimer);
+      pushTimer = setTimeout(pushNow, 250);
+    }
     function flushOnUnload() {
       if (!syncReady || !cachedAccessToken) return;
       const state = collect();
@@ -149,6 +204,16 @@
       const json = JSON.stringify(state);
       if (json === lastSyncedJson) return;
       try {
+        // Deliberately NOT setting lastSyncedJson here -- a keepalive
+        // fetch fired during real page teardown has no readable response
+        // in this context, so there was never a real basis for claiming
+        // "synced." The old optimistic update meant beforeunload and
+        // pagehide firing for one navigation (the common case, not an
+        // edge case) would see the second attempt as already-synced and
+        // skip it, even if the first genuinely failed (Codex review catch,
+        // 2026-08-20). Both events now always genuinely attempt the write;
+        // a harmless duplicate upsert is the cost of not silently dropping
+        // a real one.
         fetch(SUPABASE_URL + '/rest/v1/app_state?on_conflict=key', {
           method: 'POST',
           headers: {
@@ -160,7 +225,6 @@
           body: JSON.stringify({ key: appKey, data: state, updated_at: new Date().toISOString() }),
           keepalive: true,
         }).catch(() => {});
-        lastSyncedJson = json;
       } catch (e) {}
     }
     (async function init() {
@@ -182,11 +246,27 @@
           if (data && data.data && Object.keys(data.data).length > 0) {
             lastSyncedJson = JSON.stringify(data.data);
             applyRemote(data.data);
+            lastSyncedAt = new Date().toISOString();
+            status = 'synced';
+            broadcastStatus();
           } else if (Object.keys(collect()).length > 0) {
             schedulePush();
+          } else {
+            // Nothing to pull, nothing local to push -- genuinely synced
+            // (an empty state matching an empty remote), not the default
+            // 'pending' the badge would otherwise show forever.
+            lastSyncedAt = new Date().toISOString();
+            status = 'synced';
+            broadcastStatus();
           }
+        } else {
+          status = 'error';
+          broadcastStatus();
         }
-      } catch (e) {}
+      } catch (e) {
+        status = 'error';
+        broadcastStatus();
+      }
       supa.channel('app_state_' + appKey)
         .on('postgres_changes', {
           event: '*', schema: 'public', table: 'app_state', filter: 'key=eq.' + appKey,

@@ -66,6 +66,37 @@
   font-size: 20px; line-height: 1;
   filter: grayscale(100%) brightness(1.4); opacity: 0.85;
 }
+.topbar-sync-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 38px; height: 38px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 10px; position: relative;
+  -webkit-tap-highlight-color: transparent; cursor: pointer; padding: 0;
+}
+.topbar-sync-dot {
+  width: 9px; height: 9px; border-radius: 50%;
+  background: #6EE7B7; transition: background 0.2s;
+}
+.topbar-sync-dot.pending { background: #F2C063; }
+.topbar-sync-dot.error { background: #FF6B6B; animation: topbar-sync-pulse 1.2s ease-in-out infinite; }
+@keyframes topbar-sync-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+.topbar-sync-popover {
+  display: none; position: absolute; top: 46px; right: 0; z-index: 50;
+  min-width: 220px; max-width: 280px;
+  background: #121214; border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px; padding: 10px; font-size: 12px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+}
+.topbar-sync-popover.show { display: block; }
+.topbar-sync-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 5px 0; color: rgba(255,255,255,0.85); }
+.topbar-sync-row-key { font-weight: 600; text-transform: capitalize; }
+.topbar-sync-row-time { color: rgba(255,255,255,0.5); font-size: 11px; }
+.topbar-sync-retry {
+  background: rgba(255,107,107,0.15); border: 1px solid rgba(255,107,107,0.4);
+  color: #FF6B6B; border-radius: 6px; padding: 2px 8px; font-size: 11px;
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
 .bottombar {
   position: fixed; bottom: 0; left: 0; right: 0; z-index: 40;
   display: flex; justify-content: space-around; align-items: stretch;
@@ -134,6 +165,10 @@ body.topbar-modal-open { overflow: hidden; touch-action: none; }
   <a href="index.html" class="topbar-home-btn" aria-label="Dashboard hub">
     <span class="topbar-home-icon">⌂</span>
   </a>
+  <button type="button" class="topbar-sync-btn" id="topbarSync" aria-label="Sync status">
+    <span class="topbar-sync-dot" id="topbarSyncDot"></span>
+    <div class="topbar-sync-popover" id="topbarSyncPopover"></div>
+  </button>
   <a href="weekly-review.html" class="topbar-review-btn" id="topbarReview" aria-label="Weekly Review">
     <span class="topbar-review-icon">🗓️</span>
   </a>
@@ -219,10 +254,67 @@ body.topbar-modal-open { overflow: hidden; touch-action: none; }
     sync();
   }
 
+  // -------- Sync status badge --------
+  // A page can run multiple initCloudSync() instances (different appKeys,
+  // e.g. gym.html's hype-audio/health pattern) -- tracks each independently
+  // and shows the worst status across all of them. See
+  // docs/superpowers/specs/2026-08-20-visible-sync-status-design.md.
+  function relTime(iso) {
+    if (!iso) return 'never';
+    const secs = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 1000));
+    if (secs < 60) return 'just now';
+    if (secs < 3600) return Math.round(secs / 60) + 'm ago';
+    if (secs < 86400) return Math.round(secs / 3600) + 'h ago';
+    return Math.round(secs / 86400) + 'd ago';
+  }
+  function initSyncBadge() {
+    const btn = document.getElementById('topbarSync');
+    const dot = document.getElementById('topbarSyncDot');
+    const popover = document.getElementById('topbarSyncPopover');
+    if (!btn || !dot || !popover) return;
+    const state = {}; // appKey -> { status, lastSyncedAt }
+
+    function worstStatus() {
+      const statuses = Object.values(state).map((s) => s.status);
+      if (statuses.some((s) => s === 'error')) return 'error';
+      if (statuses.some((s) => s === 'pending')) return 'pending';
+      return 'synced';
+    }
+    function render() {
+      dot.className = 'topbar-sync-dot' + (worstStatus() !== 'synced' ? ' ' + worstStatus() : '');
+      popover.innerHTML = Object.keys(state).length
+        ? Object.keys(state).sort().map((key) => {
+            const s = state[key];
+            const retryBtn = s.status === 'error' ? `<button type="button" class="topbar-sync-retry" data-retry-key="${key}">Retry</button>` : '';
+            return `<div class="topbar-sync-row"><span class="topbar-sync-row-key">${key}</span><span class="topbar-sync-row-time">${s.status === 'error' ? retryBtn : relTime(s.lastSyncedAt)}</span></div>`;
+          }).join('')
+        : '<div class="topbar-sync-row">No sync activity yet</div>';
+    }
+    window.addEventListener('row:sync-status', function (e) {
+      const d = e.detail;
+      if (!d || !d.appKey) return;
+      state[d.appKey] = { status: d.status, lastSyncedAt: d.lastSyncedAt };
+      render();
+    });
+    btn.addEventListener('click', function (e) {
+      const retryKey = e.target && e.target.getAttribute && e.target.getAttribute('data-retry-key');
+      if (retryKey) {
+        e.stopPropagation();
+        try { window.__rowSyncRetry && window.__rowSyncRetry[retryKey] && window.__rowSyncRetry[retryKey](); } catch (err) {}
+        return;
+      }
+      popover.classList.toggle('show');
+    });
+    document.addEventListener('click', function (e) {
+      if (!btn.contains(e.target)) popover.classList.remove('show');
+    });
+  }
+
   function boot() {
     injectStyleAndHTML();
     lockGestures();
     startModalLock();
+    initSyncBadge();
   }
 
   if (document.readyState === 'loading') {
