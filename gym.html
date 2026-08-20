@@ -256,7 +256,7 @@ img, video, canvas, svg { max-width: 100%; }
 }
 .tab-icon svg { width: 100%; height: 100%; display: block; }
 .po-toprow {
-  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap;
 }
 .po-quick-log-wrap { display: none; }
 .po-quick-log-wrap.is-open { display: block; }
@@ -2202,6 +2202,7 @@ img, video, canvas, svg { max-width: 100%; }
   transition: opacity 0.4s;
 }
 .po-quick-feedback.error { color: var(--bad); }
+.po-quick-feedback.warn { color: var(--warn); }
 .po-quick-feedback.ql-hidden { opacity: 0; }
 
 /* ===== Tab Bar ===== */
@@ -2486,6 +2487,7 @@ img, video, canvas, svg { max-width: 100%; }
     </button>
     <button class="po-day-pill" type="button" id="quickLogToggle" title="Quick log a set">+ Log</button>
     <button class="po-day-pill" type="button" id="plateCalcToggle" title="Plate calculator">🍽 Plates</button>
+    <a class="po-day-pill" href="posing.html" title="Posing coach">🏆 Posing</a>
   </div>
 
   <!-- Week strip — read-only status/progress per rotation day, last 5 days
@@ -3095,10 +3097,6 @@ img, video, canvas, svg { max-width: 100%; }
       <a class="gym-tab" href="mobility.html">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="8" cy="3.5" r="1.5" fill="currentColor"/><path d="M5 7c0-1.1.9-2 2-2h2c1.1 0 2 .9 2 2v2.5l1.5 3.5h-1.5L10 11H6l-1 2H3.5L5 9.5V7z" fill="currentColor"/></svg>
         Mobility
-      </a>
-      <a class="gym-tab" href="posing.html">
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="8" cy="2.5" r="1.5" fill="currentColor"/><path d="M8 4v4M8 8l-2-3M6 5l-1.5-.5M8 8l2-3M10 5l1.5-.5M8 8l-1.5 5M8 8l1.5 5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
-        Posing
       </a>
     </div>
   </nav>
@@ -6225,6 +6223,13 @@ img, video, canvas, svg { max-width: 100%; }
     const isoDate = new Date(dateKey + 'T12:00:00').toISOString();
     const arr = state.logs[ex.id] || [];
     const priorLogs = arr.slice();
+    // Only compare like-for-like weight bases -- a plates-per-side count vs a
+    // total-lb figure would false-positive/false-negative against each other.
+    const lastPrior = priorLogs[priorLogs.length - 1];
+    const comparableBasis = entry.weightBasis === 'totalLbs' && (!lastPrior || lastPrior.weightBasis !== 'platesPerSide');
+    const outlier = (comparableBasis && window.GymWeightOutlierLogic)
+      ? window.GymWeightOutlierLogic.checkWeightOutlier(priorLogs, w)
+      : null;
     const activeVariant = getSession(ex.id).activeVariant || null;
     arr.push(Object.assign({ weight: w, reps: reps, date: isoDate, variant: activeVariant }, entry));
     arr.sort((a, b) => a.date.localeCompare(b.date));
@@ -6243,6 +6248,7 @@ img, video, canvas, svg { max-width: 100%; }
     if (typeof wtRender === 'function') wtRender();
     // Show undo button after logging
     $('undoBtn').style.display = 'block';
+    if (outlier) alert('Logged, but ' + w + unit() + ' is ' + outlier.multiplier + '× your last (' + outlier.priorWeight + unit() + '). Typo? Edit it in History if so.');
     // Tiny pulse on the button so the user feels the save
     const btn = $('logBtn');
     btn.style.transition = 'transform 0.15s';
@@ -6388,6 +6394,13 @@ img, video, canvas, svg { max-width: 100%; }
     var isoDate = new Date(dk + 'T12:00:00').toISOString();
     if (!state.logs[ex.id]) state.logs[ex.id] = [];
     var priorLogs = state.logs[ex.id].slice();
+    // Skip the check if the last entry was logged in the log-set form's
+    // plates-per-side mode -- that weight isn't comparable to this parser's
+    // always-total-lb figures (see gym.html's logBtn handler for why).
+    var lastPrior = priorLogs[priorLogs.length - 1];
+    var outlier = (!lastPrior || lastPrior.weightBasis !== 'platesPerSide') && window.GymWeightOutlierLogic
+      ? window.GymWeightOutlierLogic.checkWeightOutlier(priorLogs, w)
+      : null;
     var entry = { weight: w, reps: reps, date: isoDate, variant: getSession(ex.id).activeVariant || null };
     if (parsed.plates != null) { entry.plates = parsed.plates; entry.extraLbs = parsed.extraLbs || 0; }
     if (parsed.rir != null) { entry.rir = parsed.rir; }
@@ -6403,7 +6416,9 @@ img, video, canvas, svg { max-width: 100%; }
       window.__gym.logWorkoutEvent(ex.name, eventType, w, reps, !!ex.bw);
     }
     if (typeof startRestTimer === 'function') startRestTimer(ex, eventType);
-    return { ok: true, msg: '✓  ' + ex.name + '  ·  ' + formatSet(entry, ex) };
+    var msg = '✓  ' + ex.name + '  ·  ' + formatSet(entry, ex);
+    if (outlier) msg = '⚠ Logged, but ' + w + unit() + ' is ' + outlier.multiplier + '× your last (' + outlier.priorWeight + unit() + '). Typo? Edit it in History if so.';
+    return { ok: true, msg: msg, outlier: !!outlier };
   }
 
   (function initQuickLog() {
@@ -6417,9 +6432,10 @@ img, video, canvas, svg { max-width: 100%; }
       const open = wrap.classList.toggle('is-open');
       if (open) input.focus();
     });
-    function showFeedback(msg, isError) {
+    function showFeedback(msg, variant) {
       fb.textContent = msg;
-      fb.classList.toggle('error', isError);
+      fb.classList.toggle('error', variant === 'error');
+      fb.classList.toggle('warn', variant === 'warn');
       fb.classList.remove('ql-hidden');
       clearTimeout(fbTimer);
       fbTimer = setTimeout(function() { fb.classList.add('ql-hidden'); }, 2500);
@@ -6429,7 +6445,7 @@ img, video, canvas, svg { max-width: 100%; }
       if (!raw) return;
       const result = quickLog(raw);
       if (result.ok) { input.value = ''; input.focus(); }
-      showFeedback(result.msg, !result.ok);
+      showFeedback(result.msg, !result.ok ? 'error' : (result.outlier ? 'warn' : ''));
     }
     btn.addEventListener('click', submit);
     input.addEventListener('keydown', function(e) { if (e.key === 'Enter') { e.preventDefault(); submit(); } });
@@ -6447,11 +6463,11 @@ img, video, canvas, svg { max-width: 100%; }
       });
       input.value = '';
       if (ok > 0 && fail === 0) {
-        showFeedback('✓  ' + ok + ' set' + (ok === 1 ? '' : 's') + ' logged', false);
+        showFeedback('✓  ' + ok + ' set' + (ok === 1 ? '' : 's') + ' logged', '');
       } else if (ok > 0) {
-        showFeedback('✓  ' + ok + ' logged · ' + fail + ' skipped', false);
+        showFeedback('✓  ' + ok + ' logged · ' + fail + ' skipped', '');
       } else {
-        showFeedback('Nothing matched — check format (bench 225×8)', true);
+        showFeedback('Nothing matched — check format (bench 225×8)', 'error');
       }
     });
   })();
@@ -7042,6 +7058,7 @@ img, video, canvas, svg { max-width: 100%; }
 })();
 </script>
 <script src="gym-weight-photos.js"></script>
+<script src="gym-weight-outlier-logic.js"></script>
 <script src="gym-workout-events.js"></script>
 <script src="gym-rx-phase-logic.js"></script>
 <script src="gym-rx-deload-logic.js"></script>
