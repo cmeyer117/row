@@ -278,6 +278,9 @@ function loadTargets() {
   } catch (e) { return Object.assign({}, DEFAULT_TARGETS); }
 }
 function saveTargets(targets) {
+  // updated_at drives the conflict-aware merge in sync.js's mergeObjects()
+  // -- see docs/superpowers/specs/2026-08-20-object-key-conflict-merge-design.md.
+  targets.updated_at = new Date().toISOString();
   try { localStorage.setItem(LS_KEY, JSON.stringify(targets)); } catch (e) {}
 }
 

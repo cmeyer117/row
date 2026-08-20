@@ -8,10 +8,48 @@
   const SUPABASE_URL = 'https://vikpcejlyxieguorwysf.supabase.co';
   const SUPABASE_KEY = 'sb_publishable_EvWPtfW1FBW5Vf-H6w0yHw_PcXK4imv';
 
+  // Shallow key-union merge for a plain-object synced value, scoped
+  // deliberately narrow -- see
+  // docs/superpowers/specs/2026-08-20-object-key-conflict-merge-design.md.
+  // Only for object keys with NO delete/removal path anywhere in the app
+  // (verified per-key before use, not assumed): a key present on only one
+  // side is kept as-is (safe -- there's no delete semantics to resurrect),
+  // a key present on both sides with different values is resolved by
+  // whichever side's own updated_at is newer (whole-object granularity,
+  // not per-key -- this is not a general CRDT). Deliberately does NOT
+  // special-case array-typed sub-keys (a from-scratch Codex review caught
+  // that "always union" is wrong for e.g. morning_launch's positional slot
+  // arrays) -- none of the keys this is currently used for contain arrays
+  // at all, so that generalization is left out rather than built unsafely.
+  // A key with a real delete path (stack:taken, po_coach_workout_done,
+  // po_coach_weights, morning_outcomes_v1) must NOT use this until it has
+  // real tombstone semantics -- deferred, not solved here.
+  function mergeObjects(remoteObj, localObj) {
+    remoteObj = (remoteObj && typeof remoteObj === 'object' && !Array.isArray(remoteObj)) ? remoteObj : {};
+    localObj = (localObj && typeof localObj === 'object' && !Array.isArray(localObj)) ? localObj : {};
+    const remoteNewer = (remoteObj.updated_at || '') > (localObj.updated_at || '');
+    const keys = new Set([...Object.keys(remoteObj), ...Object.keys(localObj)]);
+    const merged = {};
+    for (const k of keys) {
+      const rv = remoteObj[k], lv = localObj[k];
+      if (rv === undefined) merged[k] = lv;
+      else if (lv === undefined) merged[k] = rv;
+      else merged[k] = remoteNewer ? rv : lv;
+    }
+    return merged;
+  }
+  window.RowSyncMergeObjects = mergeObjects;
+
   window.initCloudSync = function (config) {
     const appKey = config && config.appKey;
     const syncedKeys = (config && config.syncedKeys) || [];
     const syncedPrefixes = (config && config.syncedPrefixes) || [];
+    // Opt-in list of object-shaped keys that get conflict-aware merge
+    // (mergeObjects()) instead of wholesale replacement -- deliberately
+    // NOT automatic for every object value. Only keys verified to have no
+    // delete/removal path belong here (see mergeObjects()'s own comment).
+    const mergeableObjectKeys = (config && config.mergeableObjectKeys) || [];
+    const mergeableObjectPrefixes = (config && config.mergeableObjectPrefixes) || [];
     const onApplied = config && config.onApplied;
     if (!appKey || !window.supabase) return;
     if (!SUPABASE_URL || !SUPABASE_KEY) return;
@@ -57,6 +95,13 @@
       if (syncedKeys.indexOf(k) !== -1) return true;
       for (let i = 0; i < syncedPrefixes.length; i++) {
         if (k.indexOf(syncedPrefixes[i]) === 0) return true;
+      }
+      return false;
+    }
+    function isMergeableObjectKey(k) {
+      if (mergeableObjectKeys.indexOf(k) !== -1) return true;
+      for (let i = 0; i < mergeableObjectPrefixes.length; i++) {
+        if (k.indexOf(mergeableObjectPrefixes[i]) === 0) return true;
       }
       return false;
     }
@@ -123,13 +168,29 @@
             let localValue = [];
             try { localValue = JSON.parse(localStorage.getItem(k) || '[]'); } catch (e) {}
             if (Array.isArray(localValue)) incomingValue = mergeArrays(incomingValue, localValue);
+          } else if (isMergeableObjectKey(k) && incomingValue && typeof incomingValue === 'object') {
+            let localValue = null;
+            try { localValue = JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) {}
+            incomingValue = window.RowSyncMergeObjects(incomingValue, localValue);
           }
           const incoming = JSON.stringify(incomingValue);
           const local = localStorage.getItem(k);
           if (local !== incoming) { try { origSet(k, incoming); changed = true; } catch (e) {} }
         }
       } finally { suppressSync = false; }
-      if (changed && typeof onApplied === 'function') { try { onApplied(); } catch (e) {} }
+      if (changed) {
+        // A merge (array or object) can produce a result that differs from
+        // BOTH the pure-remote and pure-local starting points -- e.g. it
+        // kept a local-only entry the remote side never had. Using origSet
+        // above deliberately avoids re-triggering a push for a value that's
+        // already just a straight remote copy, but a genuinely-merged
+        // result must round-trip back to Supabase or it can vanish again on
+        // a fresh device pull (Codex layered review catch, 2026-08-20 --
+        // this gap already existed for the array-merge path too, not new
+        // to the object-merge work, just never triggered a push either).
+        schedulePush();
+        if (typeof onApplied === 'function') { try { onApplied(); } catch (e) {} }
+      }
       return changed;
     }
     // Once a synced key has ever existed in localStorage, a push where NONE

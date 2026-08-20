@@ -7102,6 +7102,8 @@ document.addEventListener('DOMContentLoaded', function () {
       appKey: 'health',
       syncedKeys: ['stack:items', 'stack:version', 'stack:low', 'macro_targets', 'health:vitals', 'health:labs', 'health:measurements', 'health:sleep', 'health:cardio'],
       syncedPrefixes: ['stack:taken:'],
+      // See docs/superpowers/specs/2026-08-20-object-key-conflict-merge-design.md
+      mergeableObjectKeys: ['macro_targets'],
       onApplied: window.renderReadinessCard,
     });
   }
@@ -7375,6 +7377,24 @@ document.addEventListener('DOMContentLoaded', function () {
           const mergedJointPain = window.GymStateMergeLogic.mergeJointPain(remote[k].jointPain, localObj.jointPain);
           const mergedCheckins = window.GymStateMergeLogic.mergeCheckins(remote[k].checkins, localObj.checkins);
           const merged = Object.assign({}, remote[k], { logs: mergedLogs, jointPain: mergedJointPain, checkins: mergedCheckins });
+          const incoming = JSON.stringify(merged);
+          if (localStorage.getItem(k) !== incoming) {
+            try { _pcOrigSet(k, incoming); changed = true; } catch {}
+          }
+          continue;
+        }
+        if (k === 'po_coach_season' && k in remote && remote[k] && typeof remote[k] === 'object' && window.RowSyncMergeObjects) {
+          // Conflict-aware merge instead of wholesale replace -- saveSeason()
+          // has no delete path (a flat {phase, startDate, ...} object, always
+          // overwritten wholesale, never a key removed), so the shared
+          // shallow key-union merge is safe here. po_coach_workout_done/
+          // po_coach_weights deliberately NOT given the same treatment --
+          // both have real delete/splice paths with no tombstone semantics
+          // yet. See
+          // docs/superpowers/specs/2026-08-20-object-key-conflict-merge-design.md.
+          let localSeason = null;
+          try { localSeason = JSON.parse(localStorage.getItem(k) || 'null'); } catch {}
+          const merged = window.RowSyncMergeObjects(remote[k], localSeason);
           const incoming = JSON.stringify(merged);
           if (localStorage.getItem(k) !== incoming) {
             try { _pcOrigSet(k, incoming); changed = true; } catch {}
@@ -7727,6 +7747,9 @@ document.addEventListener('DOMContentLoaded', function () {
     try { return JSON.parse(localStorage.getItem('po_coach_season') || 'null'); } catch (e) { return null; }
   }
   function saveSeason(season) {
+    // updated_at drives the conflict-aware merge in sync.js's mergeObjects()
+    // -- see docs/superpowers/specs/2026-08-20-object-key-conflict-merge-design.md.
+    season.updated_at = new Date().toISOString();
     localStorage.setItem('po_coach_season', JSON.stringify(season));
   }
   var todayKey = window.GymSeasonLogic.todayKey;

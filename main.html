@@ -1030,6 +1030,9 @@ body::after {
   function rcSaveChecked(date, itemId, checked) {
     const saved = rcLoadSavedChecks(date);
     saved[itemId] = checked;
+    // updated_at drives the conflict-aware merge in sync.js's mergeObjects()
+    // -- see docs/superpowers/specs/2026-08-20-object-key-conflict-merge-design.md.
+    saved.updated_at = new Date().toISOString();
     storeSet(rcChecklistKey(date), saved);
   }
   // Fetches one app_state row's data, wrapped so a failure never throws --
@@ -2750,6 +2753,14 @@ document.addEventListener('DOMContentLoaded', function () {
     appKey: 'goals',
     syncedKeys: ['morning_outcomes_v1', 'perfectDay:template', 'planner:items'],
     syncedPrefixes: ['goals:', 'morning_launch:', 'routine_checklist:'],
+    // Conflict-aware merge instead of wholesale replace -- routine_checklist:*
+    // has no delete/removal path (rcSaveChecked() only ever flips a
+    // boolean, never removes a key), so a shallow key-union is safe.
+    // morning_outcomes_v1/morning_launch:* deliberately excluded -- both
+    // have real removal paths (splice-based / session resets) with no
+    // tombstone semantics yet. See
+    // docs/superpowers/specs/2026-08-20-object-key-conflict-merge-design.md.
+    mergeableObjectPrefixes: ['routine_checklist:'],
     onApplied: function () {
       window.dispatchEvent(new CustomEvent('goals-changed'));
       window.dispatchEvent(new Event('storage'));
