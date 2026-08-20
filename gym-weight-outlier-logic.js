@@ -12,7 +12,9 @@
   // dropped decimal point (10 -> 100) or a fat-fingered extra digit.
   var OUTLIER_MULTIPLIER = 3;
 
-  // priorLogs: this exercise's existing log entries (any order/emptiness ok).
+  // priorLogs: this exercise's existing log entries, sorted ascending by date
+  // (matches getRx()'s same last-entry-is-most-recent assumption elsewhere
+  // in gym.html — every write path here re-sorts after pushing). Empty ok.
   // newWeight: the weight about to be logged.
   // Returns { priorWeight, multiplier } if newWeight looks like a typo
   // against the most recent prior entry, otherwise null.

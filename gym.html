@@ -6225,8 +6225,11 @@ img, video, canvas, svg { max-width: 100%; }
     const priorLogs = arr.slice();
     // Only compare like-for-like weight bases -- a plates-per-side count vs a
     // total-lb figure would false-positive/false-negative against each other.
+    // Legacy entries predate the weightBasis field, so resolve it the same
+    // way gym-workout-events.js does rather than trusting a literal match.
     const lastPrior = priorLogs[priorLogs.length - 1];
-    const comparableBasis = entry.weightBasis === 'totalLbs' && (!lastPrior || lastPrior.weightBasis !== 'platesPerSide');
+    const lastPriorBasis = lastPrior && window.GymWorkoutEvents ? window.GymWorkoutEvents.weightBasis(lastPrior) : null;
+    const comparableBasis = entry.weightBasis === 'totalLbs' && (!lastPrior || lastPriorBasis !== 'platesPerSide');
     const outlier = (comparableBasis && window.GymWeightOutlierLogic)
       ? window.GymWeightOutlierLogic.checkWeightOutlier(priorLogs, w)
       : null;
@@ -6397,8 +6400,11 @@ img, video, canvas, svg { max-width: 100%; }
     // Skip the check if the last entry was logged in the log-set form's
     // plates-per-side mode -- that weight isn't comparable to this parser's
     // always-total-lb figures (see gym.html's logBtn handler for why).
+    // Legacy entries predate the weightBasis field, so resolve it the same
+    // way gym-workout-events.js does rather than trusting a literal match.
     var lastPrior = priorLogs[priorLogs.length - 1];
-    var outlier = (!lastPrior || lastPrior.weightBasis !== 'platesPerSide') && window.GymWeightOutlierLogic
+    var lastPriorBasis = lastPrior && window.GymWorkoutEvents ? window.GymWorkoutEvents.weightBasis(lastPrior) : null;
+    var outlier = (!lastPrior || lastPriorBasis !== 'platesPerSide') && window.GymWeightOutlierLogic
       ? window.GymWeightOutlierLogic.checkWeightOutlier(priorLogs, w)
       : null;
     var entry = { weight: w, reps: reps, date: isoDate, variant: getSession(ex.id).activeVariant || null };

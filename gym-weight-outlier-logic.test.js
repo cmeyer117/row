@@ -43,6 +43,22 @@ const cases = [];
   const result = checkWeightOutlier([{ weight: 25, reps: 8 }, { weight: 25, reps: 9 }, { weight: 100, reps: 5 }], 105);
   cases.push(['compares against the most recent entry, not an earlier one', result === null]);
 }
+{
+  const result = checkWeightOutlier([{ weight: 135, reps: 8 }], 45);
+  cases.push(['exactly at the 1/3x boundary flagged', result && result.multiplier === 3]);
+}
+{
+  const result = checkWeightOutlier([{ weight: 135, reps: 8 }], 46);
+  cases.push(['just above the 1/3x boundary -> null', result === null]);
+}
+{
+  const result = checkWeightOutlier([{ weight: 25, reps: 8 }], NaN);
+  cases.push(['NaN new weight -> null, not a crash', result === null]);
+}
+{
+  const result = checkWeightOutlier([{ weight: NaN, reps: 8 }], 100);
+  cases.push(['malformed prior weight (NaN) -> null, not a crash', result === null]);
+}
 
 let failed = 0;
 for (const [label, ok] of cases) {
