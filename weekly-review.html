@@ -18,6 +18,7 @@
 <script src="gym-volume-logic.js"></script>
 <script src="gym-season-logic.js"></script>
 <script src="gym-readiness-logic.js"></script>
+<script src="readiness-index-logic.js"></script>
 <script src="decisions.js"></script>
 <style>
 :root {
@@ -545,6 +546,21 @@ async function renderReadinessPanel() {
   const cardioCount = countEntriesInWeek((health && health['health:cardio']) || [], monday, sunday);
   const posingCount = countEntriesInWeek((posing && posing['posing:log']) || [], monday, sunday);
 
+  const readinessList = (posing && posing['posing:readiness']) || [];
+  const latestReadiness = window.ReadinessIndexLogic.latestCheckin(readinessList);
+  let readinessIndexHtml = '';
+  if (latestReadiness) {
+    const sorted = readinessList.slice().sort((a, b) => a.date.localeCompare(b.date));
+    const currentAvg = window.ReadinessIndexLogic.averageScore(latestReadiness);
+    const prevAvg = sorted.length > 1 ? window.ReadinessIndexLogic.averageScore(sorted[sorted.length - 2]) : null;
+    const readinessTrend = window.ReadinessIndexLogic.trend(currentAvg, prevAvg);
+    const age = window.ReadinessIndexLogic.daysSince(latestReadiness.date, new Date().toISOString().slice(0, 10));
+    readinessIndexHtml = `<div style="display:flex;justify-content:space-between;padding:6px 0;font-size:13px;">
+      <span style="color:var(--text-1);">Judge's-eye readiness</span>
+      <span style="color:var(--text-2);">${currentAvg != null ? currentAvg.toFixed(1) + '/5' : '—'}${readinessTrend ? ' ' + TREND_ARROW[readinessTrend] : ''} — checked in ${age}d ago</span>
+    </div>`;
+  }
+
   const exceptions = window.GymReadinessLogic.mobilityExceptionsInWeek(gymState.jointPain || [], monday, sunday);
   const exceptionsHtml = exceptions.length
     ? exceptions.map(e => `<div style="font-size:12px;color:var(--warn);padding:2px 0;">${e.joint} — ${e.severity} (${e.date})</div>`).join('')
@@ -573,6 +589,7 @@ async function renderReadinessPanel() {
         <span style="color:var(--text-1);">Cardio / posing this week</span>
         <span style="color:var(--text-2);">${cardioCount} / ${posingCount}</span>
       </div>
+      ${readinessIndexHtml}
       ${existingDecision && existingDecision.details && (hasRx(existingDecision.details.cardio_rx) || hasRx(existingDecision.details.posing_rx)) ? `
       <div style="font-size:12px;color:var(--text-3);padding:2px 0;">
         ${hasRx(existingDecision.details.cardio_rx) ? `Cardio Rx: ${rxSummaryText(existingDecision.details.cardio_rx)}` : ''}

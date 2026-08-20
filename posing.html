@@ -16,6 +16,7 @@
 <script src="row-auth.js" defer></script>
 <script src="topbar.js" defer></script>
 <script src="sync.js" defer></script>
+<script src="readiness-index-logic.js" defer></script>
 <style>
 :root {
   --bg: #000000;
@@ -235,6 +236,30 @@ html, body {
       <button id="poseLogAddBtn" class="pose-log-add-btn" type="button">+ Log</button>
     </div>
     <div id="poseLogList" class="pose-log-list"></div>
+  </div>
+
+  <div class="pose-log-card">
+    <div class="mob-subtitle" style="margin-bottom:10px;">Judge's-eye readiness check-in (monthly)</div>
+    <div class="pose-log-row">
+      <input id="readinessDate" type="date" class="pose-log-input" />
+    </div>
+    <div class="pose-log-row">
+      <input id="readinessPose1" type="text" placeholder="Pose 1" class="pose-log-input" />
+      <select id="readinessScore1" class="pose-log-input"><option value="">Score</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select>
+    </div>
+    <div class="pose-log-row">
+      <input id="readinessPose2" type="text" placeholder="Pose 2" class="pose-log-input" />
+      <select id="readinessScore2" class="pose-log-input"><option value="">Score</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select>
+    </div>
+    <div class="pose-log-row">
+      <input id="readinessPose3" type="text" placeholder="Pose 3" class="pose-log-input" />
+      <select id="readinessScore3" class="pose-log-input"><option value="">Score</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select>
+    </div>
+    <div class="pose-log-row">
+      <input id="readinessNote" type="text" placeholder="Note (optional)" class="pose-log-input" />
+      <button id="readinessAddBtn" class="pose-log-add-btn" type="button">+ Check in</button>
+    </div>
+    <div id="readinessList" class="pose-log-list"></div>
   </div>
 
   <div class="mob-tabs">
@@ -579,6 +604,10 @@ html, body {
 <!-- Gym tab bar — Posing active -->
 <nav class="gym-tabbar">
   <div class="gym-tabbar-inner">
+    <a class="gym-tab active" href="posing.html">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="8" cy="2.5" r="1.5" fill="currentColor"/><path d="M8 4v4M8 8l-2-3M6 5l-1.5-.5M8 8l2-3M10 5l1.5-.5M8 8l-1.5 5M8 8l1.5 5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
+      Posing
+    </a>
     <a class="gym-tab" href="gym.html">
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="3" width="12" height="2" rx="1" fill="currentColor"/><rect x="2" y="7" width="8" height="2" rx="1" fill="currentColor"/><rect x="2" y="11" width="10" height="2" rx="1" fill="currentColor"/></svg>
       Fitness
@@ -586,10 +615,6 @@ html, body {
     <a class="gym-tab" href="mobility.html">
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="8" cy="3.5" r="1.5" fill="currentColor"/><path d="M5 7c0-1.1.9-2 2-2h2c1.1 0 2 .9 2 2v2.5l1.5 3.5h-1.5L10 11H6l-1 2H3.5L5 9.5V7z" fill="currentColor"/></svg>
       Mobility
-    </a>
-    <a class="gym-tab active" href="posing.html">
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="8" cy="2.5" r="1.5" fill="currentColor"/><path d="M8 4v4M8 8l-2-3M6 5l-1.5-.5M8 8l2-3M10 5l1.5-.5M8 8l-1.5 5M8 8l1.5 5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
-      Posing
     </a>
     <a class="gym-tab" href="form-coach.html">
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="2" width="12" height="9" rx="1.5" stroke="currentColor" stroke-width="1.3" fill="none"/><circle cx="8" cy="6.5" r="1.6" stroke="currentColor" stroke-width="1.2" fill="none"/><path d="M2 13h12" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
@@ -702,12 +727,56 @@ html, body {
 
   renderPosingLog();
 
+  function getReadinessLog() { return _get('posing:readiness') || []; }
+  function setReadinessLog(list) { _set('posing:readiness', list); }
+
+  function renderReadinessLog() {
+    const list = getReadinessLog();
+    const listEl = document.getElementById('readinessList');
+    listEl.innerHTML = list.slice().reverse().map((e) => {
+      const avg = window.ReadinessIndexLogic.averageScore(e);
+      const scoresText = (e.scores || []).map((s) => s.pose + ': ' + s.score).join(', ');
+      return '<div class="pose-log-item"><span>' + e.date +
+        ' — ' + scoresText + (avg != null ? ' (avg ' + avg.toFixed(1) + ')' : '') +
+        (e.note ? ' · ' + e.note : '') +
+        '</span><span class="pose-log-del" data-del-readiness-date="' + e.date + '">✕</span></div>';
+    }).join('');
+  }
+
+  document.getElementById('readinessAddBtn').addEventListener('click', () => {
+    const date = document.getElementById('readinessDate').value || new Date().toISOString().slice(0, 10);
+    const scores = [1, 2, 3].map((n) => ({
+      pose: document.getElementById('readinessPose' + n).value.trim(),
+      score: document.getElementById('readinessScore' + n).value ? Number(document.getElementById('readinessScore' + n).value) : null,
+    })).filter((s) => s.pose && s.score != null);
+    const fields = {
+      scores: scores.length ? scores : null,
+      note: document.getElementById('readinessNote').value || null,
+    };
+    setReadinessLog(upsertByDate(getReadinessLog(), date, fields));
+    [1, 2, 3].forEach((n) => {
+      document.getElementById('readinessPose' + n).value = '';
+      document.getElementById('readinessScore' + n).value = '';
+    });
+    document.getElementById('readinessNote').value = '';
+    renderReadinessLog();
+  });
+
+  document.getElementById('readinessList').addEventListener('click', (e) => {
+    const del = e.target.closest('[data-del-readiness-date]');
+    if (!del) return;
+    setReadinessLog(getReadinessLog().filter((entry) => entry.date !== del.dataset.delReadinessDate));
+    renderReadinessLog();
+  });
+
+  renderReadinessLog();
+
   document.addEventListener('DOMContentLoaded', function () {
     if (typeof initCloudSync !== 'function') return;
     initCloudSync({
       appKey: 'posing',
-      syncedKeys: ['posing:log'],
-      onApplied: renderPosingLog,
+      syncedKeys: ['posing:log', 'posing:readiness'],
+      onApplied: function () { renderPosingLog(); renderReadinessLog(); },
     });
   });
 })();
