@@ -18,7 +18,11 @@
 <script src="gym-volume-logic.js"></script>
 <script src="gym-season-logic.js"></script>
 <script src="gym-readiness-logic.js"></script>
+<script src="gym-sleep-check-logic.js"></script>
 <script src="readiness-index-logic.js"></script>
+<script src="macro-calc.js"></script>
+<script src="recomp-signal-logic.js"></script>
+<script src="coach-snapshot-logic.js"></script>
 <script src="decisions.js"></script>
 <style>
 :root {
@@ -86,13 +90,33 @@ async function fetchGymState() {
     const rows = await res.json();
     const data = rows[0] && rows[0].data;
     const base = (data && data.po_coach_v1) || { exercises: [], logs: {} };
-    // po_coach_season is a sibling key to po_coach_v1 within the same
-    // app_state row (see gym.html's PC_SYNCED_KEYS), not nested inside
-    // it -- merge it in under `season` so callers get everything from one
+    // po_coach_season/po_coach_weights are sibling keys to po_coach_v1
+    // within the same app_state row (see gym.html's PC_SYNCED_KEYS), not
+    // nested inside it -- merge them in so callers get everything from one
     // fetch. checkins/jointPain are already inside po_coach_v1 itself.
-    return Object.assign({}, base, { season: (data && data.po_coach_season) || null });
+    return Object.assign({}, base, {
+      season: (data && data.po_coach_season) || null,
+      weights: (data && data.po_coach_weights) || [],
+    });
   })();
   return _gymStatePromise;
+}
+
+// food_log is owner-RLS scoped (see fetchAppStateKey's comment below) --
+// needs the real owner JWT, not the anon key. Returns this week's rows
+// (inclusive Monday-Sunday), or [] on any failure/no session.
+async function fetchFoodLogWeek(monday, sunday) {
+  try {
+    const token = await window.RowAuth.getAccessToken();
+    const res = await fetch(
+      'https://vikpcejlyxieguorwysf.supabase.co/rest/v1/food_log?log_date=gte.' + monday + '&log_date=lte.' + sunday + '&select=*',
+      { headers: { apikey: 'sb_publishable_EvWPtfW1FBW5Vf-H6w0yHw_PcXK4imv', Authorization: 'Bearer ' + token } }
+    );
+    if (!res.ok) return [];
+    return await res.json();
+  } catch {
+    return [];
+  }
 }
 
 async function fetchCoachRead() {
@@ -542,9 +566,54 @@ async function renderReadinessPanel() {
     ? `<span style="color:var(--text-1);">${trend.avgLast7.toFixed(1)}/3 ${TREND_ARROW[trend.direction]}</span>`
     : `<span style="color:var(--text-3);">No recovery data logged this week</span>`;
 
-  const [health, posing] = await Promise.all([fetchAppStateKey('health'), fetchAppStateKey('posing')]);
+  const [health, posing, foodLogWeek] = await Promise.all([fetchAppStateKey('health'), fetchAppStateKey('posing'), fetchFoodLogWeek(monday, sunday)]);
   const cardioCount = countEntriesInWeek((health && health['health:cardio']) || [], monday, sunday);
   const posingCount = countEntriesInWeek((posing && posing['posing:log']) || [], monday, sunday);
+
+  // coachSnapshot phase-aware weekly verdict -- see
+  // docs/superpowers/specs/2026-08-20-coachsnapshot-phase-verdict-design.md.
+  // cardio/posing reuse the same Rx-target concept computeScorecard() uses
+  // (the open due decision's details) -- no target set -> null signal,
+  // same null-handling as everywhere else on this page.
+  const cardioRxTarget = existingDecision && existingDecision.details && existingDecision.details.cardio_rx && existingDecision.details.cardio_rx.target;
+  const posingRxTarget = existingDecision && existingDecision.details && existingDecision.details.posing_rx && existingDecision.details.posing_rx.target;
+  const weekSleepEntries = ((health && health['health:sleep']) || []).filter(e => e && e.date && e.date >= monday && e.date <= sunday);
+  const macroTargets = health && health['macro_targets'];
+  const macroDayResults = macroTargets
+    ? Array.from(new Set(foodLogWeek.map(r => r.log_date))).map(day => {
+        const dayRows = foodLogWeek.filter(r => r.log_date === day);
+        const { consumed } = window.MacroCalc.remainingBudget(macroTargets, dayRows);
+        return window.MacroCalc.isPoorMacroAdherence(consumed, macroTargets);
+      })
+    : [];
+  const weightSeries = (gymState.weights || []).map(w => ({ date: w.dateKey, value: w.weight }));
+  const waistSeries = ((health && health['health:measurements']) || []).filter(e => e && e.waist != null).map(e => ({ date: e.date, value: e.waist }));
+  const currentWeight = weightSeries.length ? weightSeries.slice().sort((a, b) => a.date.localeCompare(b.date)).slice(-1)[0].value : null;
+  const recompResult = window.RecompSignalLogic.computeRecompDelta(weightSeries, waistSeries, 14, new Date());
+  const weekPainHigh = Object.keys(gymState.checkins || {}).some(dateKey => dateKey >= monday && dateKey <= sunday && gymState.checkins[dateKey] && gymState.checkins[dateKey].pain === 'high');
+
+  const snapshotSignals = {
+    cardio: window.CoachSnapshotLogic.scoreCountSignal(matchesCountTarget(cardioRxTarget, cardioCount)),
+    posing: window.CoachSnapshotLogic.scoreCountSignal(matchesCountTarget(posingRxTarget, posingCount)),
+    sleep: window.CoachSnapshotLogic.scoreSleepSignal(weekSleepEntries, window.GymSleepCheckLogic.isPoorSleepEntry),
+    macro: window.CoachSnapshotLogic.scoreMacroSignal(macroDayResults),
+    bodyweight: window.CoachSnapshotLogic.scoreBodyweightSignal(recompResult, currentWeight, phase),
+  };
+  const snapshotVerdict = window.CoachSnapshotLogic.computeVerdict(snapshotSignals, phase, weekPainHigh);
+  const SIGNAL_LABEL = { cardio: 'cardio', posing: 'posing', sleep: 'sleep', macro: 'macro adherence', bodyweight: 'bodyweight trend' };
+  const VERDICT_DISPLAY = {
+    on_track: { text: 'On track', color: 'var(--good)' },
+    needs_attention: { text: 'Needs attention', color: 'var(--warn)' },
+    off_track: { text: 'Off track', color: 'var(--bad)' },
+    not_enough_data: { text: 'Not enough data yet', color: 'var(--text-3)' },
+  };
+  const verdictDisplay = VERDICT_DISPLAY[snapshotVerdict.verdict];
+  const offSignalsText = snapshotVerdict.reason === 'pain_override'
+    ? 'pain flagged'
+    : (snapshotVerdict.offSignals || []).map(k => SIGNAL_LABEL[k]).join(', ');
+  const verdictHtml = `<div style="font-size:16px;font-weight:600;color:${verdictDisplay.color};margin-bottom:4px;">
+    ${verdictDisplay.text}${offSignalsText ? ' — ' + offSignalsText : ''}
+  </div>`;
 
   const readinessList = (posing && posing['posing:readiness']) || [];
   const latestReadiness = window.ReadinessIndexLogic.latestCheckin(readinessList);
@@ -577,6 +646,7 @@ async function renderReadinessPanel() {
   el.style.display = 'block';
   el.innerHTML = `
     <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px;">
+      ${verdictHtml}
       <div style="display:flex;justify-content:space-between;align-items:baseline;">
         <span style="font-size:15px;color:var(--text-1);font-weight:600;">${phaseLabel || 'No season set'}</span>
         ${day != null ? `<span style="font-size:12px;color:var(--text-3);">Day ${day}</span>` : ''}
