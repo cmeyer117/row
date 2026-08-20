@@ -52,20 +52,6 @@
 }
 .topbar-home-btn:hover { background: rgba(110, 231, 183, 0.14); border-color: rgba(110, 231, 183, 0.32); }
 .topbar-home-icon { font-size: 17px; line-height: 1; }
-.topbar-coaching-btn {
-  display: inline-flex; align-items: center; justify-content: center;
-  width: 44px; height: 42px;
-  border: 1px solid rgba(255, 255, 255, 0.10);
-  background: rgba(255, 255, 255, 0.04);
-  border-radius: 12px; text-decoration: none;
-  -webkit-tap-highlight-color: transparent;
-  transition: background 0.15s;
-}
-.topbar-coaching-btn:hover { background: rgba(255, 255, 255, 0.08); }
-.topbar-coaching-icon {
-  font-size: 20px; line-height: 1;
-  filter: grayscale(100%) brightness(1.4); opacity: 0.85;
-}
 .topbar-review-btn {
   display: inline-flex; align-items: center; justify-content: center;
   width: 44px; height: 42px;
@@ -111,8 +97,6 @@ body.has-bottombar {
 }
 @media (max-width: 480px) {
   .topbar { padding-left: 10px; padding-right: 10px; gap: 6px; }
-  .topbar-coaching-btn { width: 40px; height: 38px; }
-  .topbar-coaching-icon { font-size: 18px; }
   .topbar-review-btn { width: 40px; height: 38px; }
   .topbar-review-icon { font-size: 18px; }
   .bottombar-tab-icon { font-size: 22px; }
@@ -149,9 +133,6 @@ body.topbar-modal-open { overflow: hidden; touch-action: none; }
 <header class="topbar" id="topbar" role="navigation" aria-label="Quick actions">
   <a href="index.html" class="topbar-home-btn" aria-label="Dashboard hub">
     <span class="topbar-home-icon">⌂</span>
-  </a>
-  <a href="coaching.html" class="topbar-coaching-btn" id="topbarCoaching" aria-label="Coaching">
-    <span class="topbar-coaching-icon">🏋️</span>
   </a>
   <a href="weekly-review.html" class="topbar-review-btn" id="topbarReview" aria-label="Weekly Review">
     <span class="topbar-review-icon">🗓️</span>
