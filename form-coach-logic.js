@@ -29,7 +29,8 @@
     L_WRIST: 15, R_WRIST: 16,
     L_HIP: 23, R_HIP: 24,
     L_KNEE: 25, R_KNEE: 26,
-    L_ANKLE: 27, R_ANKLE: 28
+    L_ANKLE: 27, R_ANKLE: 28,
+    L_FOOT_INDEX: 31, R_FOOT_INDEX: 32
   };
 
   // Real joint-angle triples for the Lift-Form Coach's depth/lockout
@@ -39,7 +40,14 @@
   var ANGLE_TRIPLES = {
     knee: { l: [LANDMARK.L_HIP, LANDMARK.L_KNEE, LANDMARK.L_ANKLE], r: [LANDMARK.R_HIP, LANDMARK.R_KNEE, LANDMARK.R_ANKLE] },
     elbow: { l: [LANDMARK.L_SHOULDER, LANDMARK.L_ELBOW, LANDMARK.L_WRIST], r: [LANDMARK.R_SHOULDER, LANDMARK.R_ELBOW, LANDMARK.R_WRIST] },
-    hip: { l: [LANDMARK.L_SHOULDER, LANDMARK.L_HIP, LANDMARK.L_KNEE], r: [LANDMARK.R_SHOULDER, LANDMARK.R_HIP, LANDMARK.R_KNEE] }
+    hip: { l: [LANDMARK.L_SHOULDER, LANDMARK.L_HIP, LANDMARK.L_KNEE], r: [LANDMARK.R_SHOULDER, LANDMARK.R_HIP, LANDMARK.R_KNEE] },
+    // knee->ankle->foot -- ankle plantarflexion (calf raises). Angle opens
+    // up as the heel rises off the ground.
+    ankle: { l: [LANDMARK.L_KNEE, LANDMARK.L_ANKLE, LANDMARK.L_FOOT_INDEX], r: [LANDMARK.R_KNEE, LANDMARK.R_ANKLE, LANDMARK.R_FOOT_INDEX] },
+    // hip->shoulder->elbow -- shoulder abduction/horizontal-abduction
+    // (lateral raise, front raise, rear delt fly). Angle opens up as the
+    // arm swings away from the torso, regardless of which direction.
+    shoulder_abduction: { l: [LANDMARK.L_HIP, LANDMARK.L_SHOULDER, LANDMARK.L_ELBOW], r: [LANDMARK.R_HIP, LANDMARK.R_SHOULDER, LANDMARK.R_ELBOW] }
   };
 
   // Bilateral angle for the named ANGLE_TRIPLES entry -- average of the

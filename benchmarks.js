@@ -25,13 +25,14 @@
     { names: ['leg extension'], jointAngle: 'knee', depthDirection: 'max', targetAngleDeg: 170, cueLabel: 'knee lockout' },
     // Hamstring/leg curl -- same knee joint as squat/leg-extension, but an
     // isolated curl pattern (deep flexion is the target, not a lockout).
-    // ponytail: no entry for calf raises (ankle plantarflexion) or lateral
-    // raise/front raise/rear delt fly/hip adduction -- none of those
-    // movements' primary joint action has an ANGLE_TRIPLES entry
-    // (ankle/shoulder-abduction/hip-adduction angles aren't tracked), so a
-    // real benchmark for them needs new landmark/angle plumbing, not just
-    // a names widen. Flagged as a follow-up, not built here.
-    { names: ['hamstring curl', 'leg curl', 'lying hamstrings curl', 'seated hamstrings curl'], jointAngle: 'knee', depthDirection: 'min', targetAngleDeg: 60, cueLabel: 'top-of-curl knee flexion' }
+    { names: ['hamstring curl', 'leg curl', 'lying hamstrings curl', 'seated hamstrings curl'], jointAngle: 'knee', depthDirection: 'min', targetAngleDeg: 60, cueLabel: 'top-of-curl knee flexion' },
+    { names: ['calf raise', 'seated calf raise', 'standing calf raise'], jointAngle: 'ankle', depthDirection: 'max', targetAngleDeg: 140, cueLabel: 'ankle plantarflexion' },
+    { names: ['lateral raise', 'dumbbell lateral raise', 'cable lateral raise', 'front raise', 'dumbbell front raise', 'cable front raise'], jointAngle: 'shoulder_abduction', depthDirection: 'max', targetAngleDeg: 85, cueLabel: 'top-of-raise shoulder abduction' },
+    { names: ['rear delt fly', 'reverse fly', 'cable rear delt fly'], jointAngle: 'shoulder_abduction', depthDirection: 'max', targetAngleDeg: 85, cueLabel: 'top-of-fly shoulder abduction' }
+    // ponytail: hip adduction still has no entry -- current hip triple
+    // only tracks sagittal flexion-extension, and a frontal-plane
+    // adduction angle needs different plumbing than the fix above. Flagged
+    // as a follow-up, not built here.
   ];
   if (typeof window !== 'undefined') window.EXERCISE_BENCHMARKS = EXERCISE_BENCHMARKS;
   if (typeof module !== 'undefined' && module.exports) module.exports = EXERCISE_BENCHMARKS;

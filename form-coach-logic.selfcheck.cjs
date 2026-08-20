@@ -63,6 +63,20 @@ assertEqual(FCL.trackedAngles(lmSymmetric, 'not-a-real-pose').values.length, 0, 
 // ANGLE_TRIPLES — a fixed map of real joint-angle triples, reusing LANDMARK indices.
 assertEqual(FCL.ANGLE_TRIPLES.knee.l[1], FCL.LANDMARK.L_KNEE, 'ANGLE_TRIPLES: knee triple vertex is the knee landmark');
 assertEqual(FCL.ANGLE_TRIPLES.elbow.l[1], FCL.LANDMARK.L_ELBOW, 'ANGLE_TRIPLES: elbow triple vertex is the elbow landmark');
+assertEqual(FCL.ANGLE_TRIPLES.ankle.l[1], FCL.LANDMARK.L_ANKLE, 'ANGLE_TRIPLES: ankle triple vertex is the ankle landmark');
+assertEqual(FCL.ANGLE_TRIPLES.ankle.l[2], FCL.LANDMARK.L_FOOT_INDEX, 'ANGLE_TRIPLES: ankle triple traces through the foot landmark (calf raise)');
+assertEqual(FCL.ANGLE_TRIPLES.shoulder_abduction.l[1], FCL.LANDMARK.L_SHOULDER, 'ANGLE_TRIPLES: shoulder_abduction triple vertex is the shoulder landmark');
+
+// bilateralAngle — a calf-raise-style ankle triple reads ~90deg when the
+// foot is flat (knee straight above ankle, foot straight ahead).
+var lmFlatFoot = blankLandmarks();
+lmFlatFoot[FCL.LANDMARK.L_KNEE] = { x: 0, y: -1 };
+lmFlatFoot[FCL.LANDMARK.L_ANKLE] = { x: 0, y: 0 };
+lmFlatFoot[FCL.LANDMARK.L_FOOT_INDEX] = { x: 1, y: 0 };
+lmFlatFoot[FCL.LANDMARK.R_KNEE] = { x: 2, y: -1 };
+lmFlatFoot[FCL.LANDMARK.R_ANKLE] = { x: 2, y: 0 };
+lmFlatFoot[FCL.LANDMARK.R_FOOT_INDEX] = { x: 3, y: 0 };
+assertClose(FCL.bilateralAngle(lmFlatFoot, 'ankle'), 90, 0.01, 'bilateralAngle: ankle triple reads ~90deg for a flat foot');
 
 // matchBenchmark — an exact name match wins.
 var benchmarks = [
@@ -111,6 +125,12 @@ var squatMatch = FCL.matchBenchmark('squat', realBenchmarks);
 assertEqual(squatMatch.jointAngle, 'knee', 'EXERCISE_BENCHMARKS: squat entry tracks the knee joint');
 var benchMatch = FCL.matchBenchmark('bench press', realBenchmarks);
 assertEqual(benchMatch.jointAngle, 'elbow', 'EXERCISE_BENCHMARKS: bench press entry tracks the elbow joint');
+var calfMatch = FCL.matchBenchmark('seated calf raise', realBenchmarks);
+assertEqual(calfMatch.jointAngle, 'ankle', 'EXERCISE_BENCHMARKS: calf raise entry tracks the ankle joint');
+var lateralMatch = FCL.matchBenchmark('dumbbell lateral raise', realBenchmarks);
+assertEqual(lateralMatch.jointAngle, 'shoulder_abduction', 'EXERCISE_BENCHMARKS: lateral raise entry tracks shoulder abduction');
+var rearDeltMatch = FCL.matchBenchmark('rear delt fly', realBenchmarks);
+assertEqual(rearDeltMatch.jointAngle, 'shoulder_abduction', 'EXERCISE_BENCHMARKS: rear delt fly entry tracks shoulder abduction');
 
 // computeSymmetry — perfectly mirrored arms report diffDeg 0.
 var symResult = FCL.computeSymmetry(lmSymmetric, 'front-double-biceps');
