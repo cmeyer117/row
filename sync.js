@@ -159,35 +159,56 @@
       retryDelayMs = Math.min(retryDelayMs + 1, RETRY_DELAYS.length - 1);
       retryTimer = setTimeout(pushNow, delay);
     }
+    // In-flight guard -- without this, the 250ms debounce timer and a
+    // pending backoff retryTimer could both call pushNow() concurrently.
+    // A fresh push succeeding, then an already-in-flight retry finishing
+    // AFTER it and overwriting the status back to 'error', would leave a
+    // false red badge indefinitely (that retry's own next attempt would
+    // then see lastSyncedJson already matching and exit at the line below
+    // without ever clearing the error state) -- and concurrent upserts
+    // built from two different collect() snapshots could let an older one
+    // overwrite a newer one remotely (Codex layered review catch,
+    // 2026-08-20). A call that arrives while one is already running just
+    // requests a rerun once the current one finishes, rather than firing
+    // a second overlapping upsert -- the rerun does a fresh collect(), so
+    // any edit that happened during the in-flight window is still picked up.
+    let inFlight = false, pendingRerun = false;
     async function pushNow() {
       if (!supa || !syncReady) return;
-      const state = collect();
-      if (isTrivial(state)) return;
-      const json = JSON.stringify(state);
-      if (json === lastSyncedJson) return;
-      status = 'pending';
-      broadcastStatus();
+      if (inFlight) { pendingRerun = true; return; }
+      inFlight = true;
       try {
-        const { error } = await supa.from('app_state').upsert(
-          { key: appKey, data: state, updated_at: new Date().toISOString() },
-          { onConflict: 'key' }
-        );
-        if (!error) {
-          lastSyncedJson = json;
-          lastSyncedAt = new Date().toISOString();
-          status = 'synced';
-          retryDelayMs = 0;
-          clearTimeout(retryTimer);
-          broadcastStatus();
-        } else {
+        const state = collect();
+        if (isTrivial(state)) return;
+        const json = JSON.stringify(state);
+        if (json === lastSyncedJson) return;
+        status = 'pending';
+        broadcastStatus();
+        try {
+          const { error } = await supa.from('app_state').upsert(
+            { key: appKey, data: state, updated_at: new Date().toISOString() },
+            { onConflict: 'key' }
+          );
+          if (!error) {
+            lastSyncedJson = json;
+            lastSyncedAt = new Date().toISOString();
+            status = 'synced';
+            retryDelayMs = 0;
+            clearTimeout(retryTimer);
+            broadcastStatus();
+          } else {
+            status = 'error';
+            broadcastStatus();
+            scheduleRetry();
+          }
+        } catch (e) {
           status = 'error';
           broadcastStatus();
           scheduleRetry();
         }
-      } catch (e) {
-        status = 'error';
-        broadcastStatus();
-        scheduleRetry();
+      } finally {
+        inFlight = false;
+        if (pendingRerun) { pendingRerun = false; pushNow(); }
       }
     }
     registerRetryHook(function forceRetry() { clearTimeout(retryTimer); pushNow(); });

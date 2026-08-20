@@ -109,6 +109,36 @@ async function run() {
     assertEqual(calls, 2, 'upsert was called twice -- the failed attempt, then the retry');
   }
 
+  // --- concurrent pushNow() invocations are serialized, never run at once ---
+  // (Codex layered review catch, 2026-08-20: the debounce timer and a
+  // pending backoff retry could both call pushNow() concurrently, and a
+  // fresh success finishing before an already-in-flight retry finishing
+  // as a failure could leave a false red badge indefinitely with no way
+  // to recover, since the corrective rerun would see lastSyncedJson
+  // already matching and skip itself.)
+  {
+    let activeCount = 0, maxActive = 0, upsertCalls = 0;
+    const env = makeSync({
+      supaImpl: () => {
+        activeCount++;
+        maxActive = Math.max(maxActive, activeCount);
+        upsertCalls++;
+        return new Promise((resolve) => setTimeout(() => { activeCount--; resolve({ error: null }); }, 400));
+      },
+    });
+    env.window.initCloudSync({ appKey: 'test4', syncedKeys: ['qux'] });
+    await new Promise((r) => setTimeout(r, 150));
+    env.localStorage.setItem('qux', JSON.stringify([{ id: 1 }]));
+    // Fires an immediate pushNow() via the retry hook right after the edit,
+    // well before the 250ms debounce timer would fire on its own -- while
+    // that first call's slow (400ms) upsert is still in flight, the
+    // debounce timer's own pushNow() call arrives too.
+    env.window.__rowSyncRetry['test4']();
+    await new Promise((r) => setTimeout(r, 600)); // past both the 250ms debounce and the 400ms upsert delay
+    assertEqual(maxActive, 1, 'pushNow() invocations never ran concurrently -- max 1 upsert in flight at a time');
+    assertEqual(upsertCalls >= 1, true, 'at least one upsert actually happened');
+  }
+
   // --- flushOnUnload never optimistically marks itself synced ---
   {
     let fetchCalls = 0;
