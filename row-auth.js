@@ -45,6 +45,32 @@
     });
   }
 
+  // Shown when getSession() times out (flaky connection, not a real auth
+  // failure) instead of either blocking the app shell forever or wrongly
+  // prompting for a password while a valid session likely still exists --
+  // "offline/retry" is a different state from "not signed in" (Codex
+  // review catch, 2026-08-20: ensure() called getSession() with no
+  // timeout at all, unlike getAccessToken() below which already had this
+  // exact bound for the exact same reason).
+  function showOfflineRetry(retry) {
+    return new Promise(function (resolve) {
+      var overlay = document.createElement('div');
+      overlay.id = 'row-auth-offline';
+      overlay.style.cssText = 'position:fixed;inset:0;z-index:100000;display:flex;align-items:center;justify-content:center;background:#080808;font-family:-apple-system,BlinkMacSystemFont,"Inter",sans-serif;visibility:visible;';
+      overlay.innerHTML =
+        '<div style="width:100%;max-width:340px;padding:36px 30px;border-radius:20px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.04);display:flex;flex-direction:column;gap:12px;align-items:center;text-align:center;">' +
+        '<div style="color:#FAFAFA;font-size:16px;font-weight:700;">Can&#39;t reach the server</div>' +
+        '<div style="color:rgba(250,250,250,0.6);font-size:13px;">Check your connection, then retry.</div>' +
+        '<button type="button" id="ra-offline-retry" style="padding:12px 20px;border-radius:12px;border:0;background:#FAFAFA;color:#0A0A0B;font-size:14px;font-weight:700;cursor:pointer;">Retry</button>' +
+        '</div>';
+      appendWhenReady(overlay);
+      overlay.querySelector('#ra-offline-retry').addEventListener('click', async function () {
+        overlay.remove();
+        resolve(await retry());
+      });
+    });
+  }
+
   function appendWhenReady(node) {
     if (document.body) { document.body.appendChild(node); }
     else { document.addEventListener('DOMContentLoaded', function () { document.body.appendChild(node); }, { once: true }); }
@@ -111,10 +137,12 @@
     // responsible for hiding page content until this resolves.
     ensure: function () {
       if (_ensurePromise) return _ensurePromise;
-      _ensurePromise = (async function () {
+      _ensurePromise = (async function attempt() {
         if (!window.supabase) throw new Error('RowAuth.ensure() called before the Supabase CDN script loaded');
         var supa = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-        var got = await supa.auth.getSession();
+        var TIMEOUT = 'row-auth-timeout';
+        var got = await withTimeout(supa.auth.getSession(), 10000, TIMEOUT);
+        if (got === TIMEOUT) return showOfflineRetry(attempt);
         if (got.data.session && isOwner(got.data.session)) { markAuthed(); return got.data.session; }
         if (got.data.session) await supa.auth.signOut();
         return showLogin(supa);
