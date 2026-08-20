@@ -105,6 +105,29 @@ async function run() {
     assertEqual(events[events.length - 1].detail.status, 'synced', 'a plain remote pull with nothing left to push settles back to synced, not stuck on pending');
   }
 
+  // --- local-wins merge (mergeObjects() keeps the local value because it's
+  // newer) still pushes back, even though it writes nothing to localStorage
+  // -- Codex layered review catch, 2026-08-20: the original fix only
+  // scheduled a push when the merge ALSO happened to change local storage,
+  // missing exactly the case where local already had the winning value and
+  // just needed to reach Supabase. ---
+  {
+    let upsertCalls = 0;
+    const env = makeSync({
+      initialRemoteData: { settings: { phase: 'old', updated_at: '2026-01-01T00:00:00Z' } },
+      supaImpl: () => { upsertCalls++; return Promise.resolve({ error: null }); },
+    });
+    // Pre-seed local with a NEWER version of the same key, before
+    // initCloudSync wraps localStorage.setItem -- the merge should keep
+    // this local value outright (nothing to write), but it still differs
+    // from the raw remote payload above and must still push back.
+    env.localStorage.setItem('settings', JSON.stringify({ phase: 'new', updated_at: '2026-01-02T00:00:00Z' }));
+    env.window.initCloudSync({ appKey: 'test6', syncedKeys: ['settings'], mergeableObjectKeys: ['settings'] });
+    await new Promise((r) => setTimeout(r, 500)); // past init's applyRemote + the resulting schedulePush's 250ms debounce
+    assertEqual(upsertCalls >= 1, true, 'a local-wins merge still triggered a real push to Supabase, not silently skipped');
+    assertEqual(JSON.parse(env.localStorage.getItem('settings')).phase, 'new', 'local value (the merge winner) is preserved, not overwritten by the older remote copy');
+  }
+
   // --- pushNow failure -> 'error' status, then automatic retry succeeds ---
   {
     let calls = 0;

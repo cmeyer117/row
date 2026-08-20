@@ -848,6 +848,12 @@ document.addEventListener('DOMContentLoaded', function () {
   initCloudSync({
     appKey: 'health',
     syncedKeys: ['macro_targets'],
+    // See docs/superpowers/specs/2026-08-20-object-key-conflict-merge-design.md
+    // -- health.html/gym.html's own initCloudSync calls already had this;
+    // this page (the actual primary writer of macro_targets) was missing
+    // it, so a pull here still wholesale-replaced instead of merging
+    // (Codex layered review catch, 2026-08-20).
+    mergeableObjectKeys: ['macro_targets'],
     onApplied: function () { refresh(); }
   });
 });

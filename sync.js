@@ -160,37 +160,62 @@
       if (!remote || typeof remote !== 'object') return false;
       suppressSync = true;
       let changed = false;
+      // Distinct from `changed`: a local-wins merge (the merged result
+      // equals what's already stored locally) writes nothing, so `changed`
+      // stays false -- but the merged truth still differs from remote's
+      // raw payload, and that MUST still push back, or the newer local
+      // value never reaches Supabase at all despite "winning" the merge
+      // (Codex layered review catch, 2026-08-20: this was the exact case
+      // the earlier "push after a merge" fix missed -- it only fired when
+      // the merge also happened to change local storage).
+      let needsPushBack = false;
       try {
         for (const k of Object.keys(remote)) {
           if (!matches(k)) continue;
           let incomingValue = remote[k];
+          const rawRemoteJson = JSON.stringify(incomingValue);
+          let merged = false;
           if (Array.isArray(incomingValue)) {
             let localValue = [];
             try { localValue = JSON.parse(localStorage.getItem(k) || '[]'); } catch (e) {}
-            if (Array.isArray(localValue)) incomingValue = mergeArrays(incomingValue, localValue);
+            if (Array.isArray(localValue)) { incomingValue = mergeArrays(incomingValue, localValue); merged = true; }
           } else if (isMergeableObjectKey(k) && incomingValue && typeof incomingValue === 'object') {
             let localValue = null;
             try { localValue = JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) {}
             incomingValue = window.RowSyncMergeObjects(incomingValue, localValue);
+            merged = true;
           }
           const incoming = JSON.stringify(incomingValue);
+          if (merged && incoming !== rawRemoteJson) needsPushBack = true;
           const local = localStorage.getItem(k);
           if (local !== incoming) { try { origSet(k, incoming); changed = true; } catch (e) {} }
         }
       } finally { suppressSync = false; }
-      if (changed) {
+      if (needsPushBack) {
         // A merge (array or object) can produce a result that differs from
         // BOTH the pure-remote and pure-local starting points -- e.g. it
-        // kept a local-only entry the remote side never had. Using origSet
-        // above deliberately avoids re-triggering a push for a value that's
-        // already just a straight remote copy, but a genuinely-merged
-        // result must round-trip back to Supabase or it can vanish again on
-        // a fresh device pull (Codex layered review catch, 2026-08-20 --
-        // this gap already existed for the array-merge path too, not new
-        // to the object-merge work, just never triggered a push either).
+        // kept a local-only entry the remote side never had, or local
+        // simply won outright. Using origSet above deliberately avoids
+        // re-triggering a push for a value that's already just a straight
+        // remote copy, but a genuinely-merged result must round-trip back
+        // to Supabase or it can vanish again on a fresh device pull.
         schedulePush();
-        if (typeof onApplied === 'function') { try { onApplied(); } catch (e) {} }
+      } else {
+        // Nothing left to push after this apply -- genuinely synced,
+        // whether or not anything was written to localStorage. Owning
+        // this here (not splitting it with the caller) is what fixes a
+        // second self-review bug this same fix introduced: a caller that
+        // only checked "is status already 'pending'" after calling
+        // applyRemote() would miss the case where nothing needed pushing
+        // at all (status untouched, still whatever it defaulted to) --
+        // that path used to reach the caller's own 'synced' broadcast, but
+        // splitting the responsibility broke it (self-review catch,
+        // 2026-08-20).
+        lastSyncedAt = new Date().toISOString();
+        status = 'synced';
+        broadcastStatus();
       }
+      if (changed && typeof onApplied === 'function') { try { onApplied(); } catch (e) {} }
       return changed;
     }
     // Once a synced key has ever existed in localStorage, a push where NONE
@@ -341,20 +366,15 @@
           syncReady = true;
           if (data && data.data && Object.keys(data.data).length > 0) {
             lastSyncedJson = JSON.stringify(data.data);
-            // applyRemote() may itself call schedulePush() (a merged
-            // result that differs from the pure-remote copy needs to
-            // round-trip back) -- in that case status is already correctly
-            // 'pending', and unconditionally overwriting it to 'synced'
-            // here would flash a false-green badge for the 250ms until the
-            // scheduled push's own status update corrects it (self-review
-            // catch, 2026-08-20). Only claim 'synced' when nothing needed
-            // pushing back.
-            const applied = applyRemote(data.data);
-            if (!applied) {
-              lastSyncedAt = new Date().toISOString();
-              status = 'synced';
-              broadcastStatus();
-            }
+            // applyRemote() now owns the resulting status itself (schedules
+            // a push and leaves 'pending' if anything still needs to reach
+            // Supabase -- including a local-wins merge that writes nothing
+            // to localStorage but still differs from remote's raw payload
+            // -- or marks 'synced' directly when nothing does). Splitting
+            // that decision between here and applyRemote() was tried and
+            // was itself buggy twice (self-review + Codex layered review
+            // catches, 2026-08-20) -- one function owns it now.
+            applyRemote(data.data);
           } else if (Object.keys(collect()).length > 0) {
             schedulePush();
           } else {
