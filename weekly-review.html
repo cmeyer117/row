@@ -23,6 +23,10 @@
 <script src="macro-calc.js"></script>
 <script src="recomp-signal-logic.js"></script>
 <script src="coach-snapshot-logic.js"></script>
+<script src="training-context-selector.js"></script>
+<script src="gym-workout-events.js"></script>
+<script src="training-insight-engine.js"></script>
+<script src="weekly-coach-packet.js"></script>
 <script src="decisions.js"></script>
 <style>
 :root {
@@ -537,6 +541,7 @@ async function renderReadinessPanel() {
   const day = phase && gymState.season.startDate ? window.GymSeasonLogic.daysSince(gymState.season.startDate) : null;
 
   const counts = window.GymVolumeLogic.weeklySetsByMuscle(gymState.exercises || [], gymState.logs || {});
+  const flaggedMuscles = [];
   const volumeHtml = MUSCLES.map(m => {
     const band = window.GymVolumeLogic.classifyMuscleVolume(m, counts[m] || 0, phase);
     if (!band) return '';
@@ -548,12 +553,14 @@ async function renderReadinessPanel() {
     // missing it defeated the panel's own purpose (code review finding,
     // 2026-08-19).
     if (band.label === 'mrv') {
+      flaggedMuscles.push(m);
       return `<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:12px;">
         <span style="color:var(--text-2);">${m}</span>
         <span style="color:var(--bad);">${counts[m] || 0} — at/above MRV (${band.mrv})</span>
       </div>`;
     }
     if (!band.belowTarget) return '';
+    flaggedMuscles.push(m);
     return `<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:12px;">
       <span style="color:var(--text-2);">${m}</span>
       <span style="color:var(--warn);">${counts[m] || 0} / ${band.target} target</span>
@@ -645,6 +652,105 @@ async function renderReadinessPanel() {
     ? `<div style="background:rgba(251,191,36,0.1);border:1px solid rgba(251,191,36,0.3);border-radius:8px;padding:8px 12px;margin:8px 0;font-size:13px;color:var(--warn);">Holding — no autonomous changes.</div>`
     : '';
 
+  // Items 6/9/10 -- related vault notes, pattern findings, weekly coach
+  // packet. All purely additive: any failure below (missing script,
+  // unreachable index, bad data shape) just means these sections render
+  // empty. Never touches gymState/logging.
+  const queryTags = [phase].concat(flaggedMuscles).filter(Boolean);
+  let vaultIndex = null;
+  try {
+    const res = await fetch('vault-training-index.json');
+    if (res.ok) vaultIndex = await res.json();
+  } catch (e) { vaultIndex = null; }
+
+  let notesHtml = '';
+  try {
+    if (queryTags.length && window.TrainingContextSelector && vaultIndex) {
+      const notes = window.TrainingContextSelector.selectNotes(vaultIndex, queryTags, new Date());
+      if (notes.length) {
+        notesHtml = `<p style="color:var(--text-3);font-size:11px;text-transform:uppercase;letter-spacing:0.05em;margin:12px 0 4px;">Related notes</p>` +
+          notes.map(n => `<div style="padding:3px 0;font-size:12px;">
+            <span style="color:var(--text-1);">${n.title}</span>
+            <span style="color:var(--text-3);"> — ${n.reason}${n.freshness === 'stale' ? ' (stale)' : ''}</span>
+          </div>`).join('');
+      }
+    }
+  } catch (e) {
+    notesHtml = '';
+  }
+
+  let findingsHtml = '';
+  let weeklyPacketMarkdown = '';
+  try {
+    if (window.TrainingInsightEngine && window.GymWorkoutEvents && window.WeeklyCoachPacket) {
+      const exercisesById = {};
+      (gymState.exercises || []).forEach(ex => { exercisesById[ex.id] = ex; });
+      const exposuresByName = {};
+      Object.keys(gymState.logs || {}).forEach(exId => {
+        const ex = exercisesById[exId];
+        if (!ex) return;
+        const entries = (gymState.logs[exId] || []).map(l => ({
+          date: (l.date || '').slice(0, 10),
+          load: ex.bw ? l.reps : window.GymWorkoutEvents.totalLoad(l, ex),
+          reps: l.reps,
+          variantTag: l.variant || null,
+        })).filter(e => e.date && e.load != null);
+        if (entries.length) exposuresByName[ex.name] = entries;
+      });
+      const allEntries = Object.values(gymState.logs || {}).flat();
+      const sessionDates = Array.from(new Set(allEntries.map(l => (l.date || '').slice(0, 10)).filter(Boolean)));
+
+      // Trailing 6 calendar weeks (Mon-Sun, UTC) of total logged sets.
+      const nowRef = new Date();
+      const dow = nowRef.getUTCDay() === 0 ? 7 : nowRef.getUTCDay(); // Mon=1..Sun=7
+      const thisMonday = new Date(nowRef); thisMonday.setUTCDate(nowRef.getUTCDate() - (dow - 1));
+      const weeklySets = [];
+      for (let w = 5; w >= 0; w--) {
+        const wkMonday = new Date(thisMonday); wkMonday.setUTCDate(thisMonday.getUTCDate() - w * 7);
+        const wkSunday = new Date(wkMonday); wkSunday.setUTCDate(wkMonday.getUTCDate() + 6);
+        const mKey = wkMonday.toISOString().slice(0, 10), sKey = wkSunday.toISOString().slice(0, 10);
+        weeklySets.push(allEntries.filter(l => { const d = (l.date || '').slice(0, 10); return d >= mKey && d <= sKey; }).length);
+      }
+
+      const allSleepEntries = ((health && health['health:sleep']) || []).filter(e => e && e.date && e.hours != null);
+
+      const findings = window.TrainingInsightEngine.runInsightEngine({
+        exercises: exposuresByName,
+        sessionDates: sessionDates,
+        weeklySets: weeklySets,
+        phase: phase,
+        sleepEntries: allSleepEntries,
+        now: nowRef,
+      });
+
+      if (findings.length) {
+        findingsHtml = `<p style="color:var(--text-3);font-size:11px;text-transform:uppercase;letter-spacing:0.05em;margin:12px 0 4px;">Pattern findings</p>` +
+          findings.map(f => `<div style="padding:4px 0;font-size:12px;">
+            <span style="color:var(--text-1);">${f.observation}</span>
+            <span style="color:var(--text-3);"> (${f.confidence} confidence)</span>
+          </div>`).join('');
+      }
+
+      const relatedNotes = (window.TrainingContextSelector && queryTags.length && vaultIndex)
+        ? window.TrainingContextSelector.selectNotes(vaultIndex, queryTags, nowRef)
+        : [];
+      weeklyPacketMarkdown = window.WeeklyCoachPacket.buildWeeklyCoachPacket({
+        weekLabel: `${monday} to ${sunday}`,
+        summary: { sessionsLogged: sessionDates.filter(d => d >= monday && d <= sunday).length, totalSets: weeklySets[weeklySets.length - 1], exercisesTouched: Object.keys(exposuresByName).length },
+        adherence: { macroDaysLogged: macroDayResults.length, sleepNightsLogged: weekSleepEntries.length, cardioSessions: cardioCount },
+        findings: findings,
+        notes: relatedNotes,
+        missingData: findings.length ? [] : ['Not enough logged history yet for pattern findings (engine requires 4+ exposures per exercise or 14+ sleep nights).'],
+      });
+    }
+  } catch (e) {
+    findingsHtml = '';
+    weeklyPacketMarkdown = '';
+  }
+  const packetHtml = weeklyPacketMarkdown
+    ? `<details style="margin-top:8px;"><summary style="font-size:12px;color:var(--text-2);cursor:pointer;">Weekly coach packet (Markdown)</summary><textarea readonly style="width:100%;height:160px;margin-top:6px;font-size:11px;font-family:monospace;background:var(--bg);color:var(--text-2);border:1px solid var(--border);border-radius:6px;padding:6px;">${weeklyPacketMarkdown.replace(/</g, '&lt;')}</textarea></details>`
+    : '';
+
   const decisionFlagHtml = existingDecision
     ? `<div style="font-size:13px;color:var(--warn);padding:6px 0;">Needs coach decision — last week's is open and due.</div>`
     : '';
@@ -673,6 +779,9 @@ async function renderReadinessPanel() {
       </div>` : ''}
       <p style="color:var(--text-3);font-size:11px;text-transform:uppercase;letter-spacing:0.05em;margin:12px 0 4px;">Mobility exceptions</p>
       ${exceptionsHtml}
+      ${notesHtml}
+      ${findingsHtml}
+      ${packetHtml}
       ${decisionFlagHtml}
     </div>`;
 }
