@@ -92,6 +92,16 @@ assertEqual(FCL.matchBenchmark('press', pressBenchmarks), null, 'matchBenchmark:
 // A specific enough name still resolves cleanly despite the shared token.
 assertEqual(FCL.matchBenchmark('bench press', pressBenchmarks).cueLabel, 'bench lockout', 'matchBenchmark: a specific full name still resolves even when a generic sub-token is shared');
 
+// matchBenchmark — code review catch, 2026-08-20: a 1-2 letter token
+// (e.g. "b" from "B-Stance") must not spuriously prefix-match an unrelated
+// word (e.g. "bench") -- "Dumbbell B-Stance RDL" was matching the bench
+// press entry instead of the RDL entry it actually belongs to.
+var rdlVsBenchBenchmarks = [
+  { names: ['bench press', 'bench'], jointAngle: 'elbow', depthDirection: 'max', targetAngleDeg: 165, cueLabel: 'bench lockout' },
+  { names: ['deadlift', 'rdl', 'romanian deadlift', 'dumbbell b stance rdl'], jointAngle: 'hip', depthDirection: 'max', targetAngleDeg: 165, cueLabel: 'hip lockout' }
+];
+assertEqual(FCL.matchBenchmark('dumbbell b stance rdl', rdlVsBenchBenchmarks).cueLabel, 'hip lockout', 'matchBenchmark: a short token like "b" does not spuriously prefix-match an unrelated benchmark name');
+
 // EXERCISE_BENCHMARKS — loaded from benchmarks.js, matchBenchmark resolves real entries.
 var fs2 = require('fs');
 vm.runInContext(fs2.readFileSync(path.join(__dirname, 'benchmarks.js'), 'utf8'), sandbox);

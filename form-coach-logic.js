@@ -81,7 +81,15 @@
         var nTokens = name.toLowerCase().split(/\s+/).filter(Boolean);
         var hits = 0;
         qTokens.forEach(function (qt) {
-          if (nTokens.some(function (nt) { return nt.startsWith(qt) || qt.startsWith(nt); })) hits++;
+          // Exact match always counts; a prefix match only counts when
+          // both tokens are at least 3 chars -- otherwise a 1-2 letter
+          // token (e.g. "b" from "B-Stance") spuriously prefix-matches
+          // unrelated words (e.g. "bench"), a real false-positive found
+          // in code review 2026-08-20 ("Dumbbell B-Stance RDL" matching
+          // the bench-press benchmark instead of deadlift/RDL).
+          if (nTokens.some(function (nt) {
+            return nt === qt || (qt.length >= 3 && nt.length >= 3 && (nt.startsWith(qt) || qt.startsWith(nt)));
+          })) hits++;
         });
         var score = (hits * hits) / (Math.max(qTokens.length, 1) * Math.max(nTokens.length, 1));
         if (score > entryBestScore) entryBestScore = score;
