@@ -6332,12 +6332,15 @@ img, video, canvas, svg { max-width: 100%; }
       ? window.GymWeightOutlierLogic.checkWeightOutlier(priorLogs, w)
       : null;
     const activeVariant = getSession(ex.id).activeVariant || null;
-    arr.push(Object.assign({ weight: w, reps: reps, date: isoDate, variant: activeVariant }, entry));
-    arr.sort((a, b) => a.date.localeCompare(b.date));
-    state.logs[ex.id] = arr;
     const eventType = window.GymWorkoutEvents
       ? window.GymWorkoutEvents.classifyWorkoutEvent({ weight: w, reps: reps, weightBasis: entry.weightBasis }, priorLogs, ex)
       : null;
+    // isPR/prDateKey let the undo handler reverse the milestone this exact
+    // set caused, without misattributing a same-day non-PR set logged
+    // afterward -- Codex review 2026-08-21.
+    arr.push(Object.assign({ weight: w, reps: reps, date: isoDate, variant: activeVariant, isPR: eventType === 'pr', prDateKey: dateKey }, entry));
+    arr.sort((a, b) => a.date.localeCompare(b.date));
+    state.logs[ex.id] = arr;
     if (eventType && window.__gym && typeof window.__gym.logWorkoutEvent === 'function') {
       window.__gym.logWorkoutEvent(ex.name, eventType, w, reps, !!ex.bw);
     }
@@ -6375,8 +6378,11 @@ img, video, canvas, svg { max-width: 100%; }
     if (!ex) return;
     const arr = state.logs[ex.id] || [];
     if (!arr.length) return;
-    arr.pop();
+    const popped = arr.pop();
     state.logs[ex.id] = arr;
+    if (popped && popped.isPR && popped.prDateKey && window.GymMilestoneLogic) {
+      state.milestones = window.GymMilestoneLogic.unrecordMilestone(state.milestones, { exercise: ex.name, dateKey: popped.prDateKey });
+    }
     if (!arr.length) $('undoBtn').style.display = 'none';
     saveState(); renderAll();
   });
@@ -6508,15 +6514,15 @@ img, video, canvas, svg { max-width: 100%; }
     var outlier = (!lastPrior || lastPriorBasis !== 'platesPerSide') && window.GymWeightOutlierLogic
       ? window.GymWeightOutlierLogic.checkWeightOutlier(priorLogs, w)
       : null;
-    var entry = { weight: w, reps: reps, date: isoDate, variant: getSession(ex.id).activeVariant || null };
+    var eventType = window.GymWorkoutEvents
+      ? window.GymWorkoutEvents.classifyWorkoutEvent({ weight: w, reps: reps }, priorLogs, ex)
+      : null;
+    var entry = { weight: w, reps: reps, date: isoDate, variant: getSession(ex.id).activeVariant || null, isPR: eventType === 'pr', prDateKey: dk };
     if (parsed.plates != null) { entry.plates = parsed.plates; entry.extraLbs = parsed.extraLbs || 0; }
     if (parsed.rir != null) { entry.rir = parsed.rir; }
     state.logs[ex.id].push(entry);
     state.logs[ex.id].sort(function(a, b) { return a.date.localeCompare(b.date); });
     state.currentEx = ex.id;
-    var eventType = window.GymWorkoutEvents
-      ? window.GymWorkoutEvents.classifyWorkoutEvent({ weight: w, reps: reps }, priorLogs, ex)
-      : null;
     if (window.GymMilestoneLogic) {
       state.milestones = window.GymMilestoneLogic.recordMilestone(state.milestones, { eventType: eventType, exercise: ex.name, dateKey: dk });
     }

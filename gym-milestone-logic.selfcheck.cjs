@@ -9,7 +9,7 @@ const sandbox = { window: {} };
 vm.createContext(sandbox);
 const source = fs.readFileSync(path.join(__dirname, 'gym-milestone-logic.js'), 'utf8');
 vm.runInContext(source, sandbox);
-const { recordMilestone } = sandbox.window.GymMilestoneLogic;
+const { recordMilestone, unrecordMilestone } = sandbox.window.GymMilestoneLogic;
 
 function assertEqual(actual, expected, label) {
   const a = JSON.stringify(actual), e = JSON.stringify(expected);
@@ -44,5 +44,27 @@ for (let i = 0; i < 25; i++) {
 }
 assertEqual(list.length, 20, 'capped at 20 milestones');
 assertEqual(list[0].exercise, 'Ex5', 'oldest milestones dropped off the front');
+
+// unrecordMilestone: undo reverses the exact milestone a set caused.
+assertEqual(
+  unrecordMilestone([{ date: '2026-08-20', exercise: 'Deadlift', type: 'pr' }], { exercise: 'Deadlift', dateKey: '2026-08-20' }),
+  [], 'undo removes the matching PR milestone'
+);
+// Only the LAST matching entry is removed, not all -- a same-day non-PR
+// undo shouldn't touch an earlier real PR for a different exercise.
+assertEqual(
+  unrecordMilestone(
+    [{ date: '2026-08-20', exercise: 'Squat', type: 'pr' }, { date: '2026-08-20', exercise: 'Deadlift', type: 'pr' }],
+    { exercise: 'Squat', dateKey: '2026-08-20' }
+  ),
+  [{ date: '2026-08-20', exercise: 'Deadlift', type: 'pr' }],
+  'undo only removes the matching exercise/date entry, leaves others'
+);
+// No match (e.g. undoing a non-PR set) is a no-op.
+assertEqual(
+  unrecordMilestone([{ date: '2026-08-20', exercise: 'Deadlift', type: 'pr' }], { exercise: 'Bench', dateKey: '2026-08-20' }),
+  [{ date: '2026-08-20', exercise: 'Deadlift', type: 'pr' }],
+  'no matching milestone is a no-op'
+);
 
 console.log('PASS gym-milestone-logic');

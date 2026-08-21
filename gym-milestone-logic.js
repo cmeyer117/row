@@ -19,10 +19,31 @@
     return list.slice(-MAX_MILESTONES);
   }
 
+  // Reverses recordMilestone for one undone set. Caller must only call this
+  // when the set being undone was itself the one that triggered the
+  // milestone (i.e. its own log entry was tagged isPR) -- Codex review
+  // 2026-08-21 found an undo could otherwise leave a stale PR surfaced to
+  // the cross-app Faith-Iron feature after the set that earned it was
+  // removed. Removes the LAST matching {date, exercise, type: 'pr'} entry
+  // (not all matches) so a same-day non-PR set logged after a real PR isn't
+  // mistaken for the one being undone.
+  function unrecordMilestone(milestones, entry) {
+    const list = Array.isArray(milestones) ? milestones.slice() : [];
+    if (!entry || !entry.exercise || !entry.dateKey) return list;
+    for (let i = list.length - 1; i >= 0; i--) {
+      const m = list[i];
+      if (m.type === 'pr' && m.exercise === entry.exercise && m.date === entry.dateKey) {
+        list.splice(i, 1);
+        break;
+      }
+    }
+    return list;
+  }
+
   if (typeof window !== 'undefined') {
-    window.GymMilestoneLogic = { recordMilestone: recordMilestone };
+    window.GymMilestoneLogic = { recordMilestone: recordMilestone, unrecordMilestone: unrecordMilestone };
   }
   if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { recordMilestone: recordMilestone };
+    module.exports = { recordMilestone: recordMilestone, unrecordMilestone: unrecordMilestone };
   }
 })();
