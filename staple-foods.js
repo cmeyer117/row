@@ -50,6 +50,7 @@
     { name: 'Chickpeas (cooked)', protein_100g: 8.9, carb_100g: 27, fat_100g: 2.6, calories_100g: 164 },
     { name: 'Lentils (cooked)', protein_100g: 9, carb_100g: 20, fat_100g: 0.4, calories_100g: 116 },
     { name: 'Banana', protein_100g: 1.1, carb_100g: 23, fat_100g: 0.3, calories_100g: 89 },
+    { name: 'Pumpkin (canned, puree)', protein_100g: 1, carb_100g: 8, fat_100g: 0.3, calories_100g: 34 },
     { name: 'Blueberries', protein_100g: 0.7, carb_100g: 14.5, fat_100g: 0.3, calories_100g: 57 },
     { name: 'Apple', protein_100g: 0.3, carb_100g: 14, fat_100g: 0.2, calories_100g: 52 },
     { name: 'Broccoli (cooked)', protein_100g: 2.8, carb_100g: 7, fat_100g: 0.4, calories_100g: 35 },
