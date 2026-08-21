@@ -52,6 +52,10 @@
 }
 .topbar-home-btn:hover { background: rgba(110, 231, 183, 0.14); border-color: rgba(110, 231, 183, 0.32); }
 .topbar-home-icon { font-size: 17px; line-height: 1; }
+.topbar-mission-clock {
+  font-family: 'JetBrains Mono', ui-monospace, SF Mono, Menlo, Consolas, monospace;
+  font-size: 11px; color: rgba(244,241,234,0.6); white-space: nowrap;
+}
 .topbar-review-btn {
   display: inline-flex; align-items: center; justify-content: center;
   width: 44px; height: 42px;
@@ -165,6 +169,7 @@ body.topbar-modal-open { overflow: hidden; touch-action: none; }
   <a href="index.html" class="topbar-home-btn" aria-label="Dashboard hub">
     <span class="topbar-home-icon">⌂</span>
   </a>
+  <span class="topbar-mission-clock" id="topbarMissionClock"></span>
   <button type="button" class="topbar-sync-btn" id="topbarSync" aria-label="Sync status">
     <span class="topbar-sync-dot" id="topbarSyncDot"></span>
     <div class="topbar-sync-popover" id="topbarSyncPopover"></div>
@@ -215,6 +220,7 @@ body.topbar-modal-open { overflow: hidden; touch-action: none; }
     const topWrap = document.createElement('div');
     topWrap.innerHTML = topbarHtml.trim();
     document.body.insertBefore(topWrap.firstChild, document.body.firstChild);
+    renderMissionClock();
     const bottomWrap = document.createElement('div');
     bottomWrap.innerHTML = bottombarHtml.trim();
     document.body.appendChild(bottomWrap.firstChild);
@@ -223,6 +229,22 @@ body.topbar-modal-open { overflow: hidden; touch-action: none; }
       t.classList.toggle('active', t.getAttribute('data-page') === active);
     });
     document.body.classList.add('has-bottombar');
+  }
+
+  // Mission Clock (ideation pass item 5.2) -- countdown-only cut, mirrors
+  // jarvis/ui/src/lib/mission-clock.ts. Carl's Pro Card target is "middle to
+  // end of 2027" (his words), kept as a range, not a fake precise date.
+  // ponytail: current phase is manually configured here too -- same gap as
+  // the Jarvis-side lib, no live app_state read wired up yet.
+  function renderMissionClock() {
+    const el = document.getElementById('topbarMissionClock');
+    if (!el) return;
+    const MS_PER_WEEK = 7 * 24 * 60 * 60 * 1000;
+    const now = Date.now();
+    const minWeeks = Math.round((new Date('2027-06-01T00:00:00') - now) / MS_PER_WEEK);
+    const maxWeeks = Math.round((new Date('2027-12-31T00:00:00') - now) / MS_PER_WEEK);
+    const phase = 'growth';
+    el.textContent = minWeeks + '–' + maxWeeks + 'wk to Pro (' + phase + ')';
   }
 
   function blockGesture(e) { e.preventDefault(); }
