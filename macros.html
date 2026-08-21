@@ -34,6 +34,14 @@ body {
   padding: 16px; padding-bottom: 100px;
 }
 .mt-shell { max-width: 480px; margin: 0 auto; }
+.mt-error-banner {
+  background: rgba(255,107,107,0.12); border: 1px solid rgba(255,107,107,0.35);
+  color: #FF6B6B; border-radius: 10px; padding: 10px 12px; margin-bottom: 12px;
+  font-size: 13px; display: flex; justify-content: space-between; align-items: center; gap: 8px;
+}
+.mt-error-banner button {
+  background: none; border: 0; color: inherit; font-size: 16px; cursor: pointer; line-height: 1; padding: 0 4px;
+}
 .mt-tabs { display: flex; gap: 8px; margin-bottom: 16px; }
 .mt-tab-btn {
   flex: 1; padding: 10px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.12);
@@ -117,6 +125,7 @@ body {
 </head>
 <body>
 <div class="mt-shell mt-view-log" id="mtShell">
+  <div id="mtErrorBanner" class="mt-error-banner" style="display:none;"></div>
   <div class="mt-tabs">
     <button class="mt-tab-btn active" id="mtTabLog" type="button">Today</button>
     <button class="mt-tab-btn" id="mtTabHistory" type="button">History</button>
@@ -334,11 +343,26 @@ async function deleteEntry(id) {
   return { error };
 }
 
-function showEntryError(message) {
-  // Minimal, dependency-free surfacing — no toast/notification library
-  // exists anywhere in this repo, so a plain alert is the lazy-correct
-  // choice rather than introducing one for a single error path.
-  window.alert(message);
+// window.alert() used to be the surfacing mechanism here, but this page is
+// also embedded via <iframe> in health.html, and alert()/confirm()/prompt()
+// triggered from inside an iframe are silently suppressed by a lot of
+// mobile browsers -- a failed insert looked like "nothing happened" with
+// zero visible error, which is exactly the bug this replaces (2026-08-21:
+// food_log was confirmed empty at the DB level, every historical insert
+// attempt had been failing invisibly). A persistent on-page banner works
+// regardless of iframe/mobile quirks, and includes the real error detail
+// instead of a generic message so the actual cause is visible, not just
+// the fact that *something* failed.
+function showEntryError(message, err) {
+  const banner = $('mtErrorBanner');
+  const detail = err ? (err.message || err.code || String(err)) : '';
+  banner.innerHTML = '<span>' + escapeHtml(message + (detail ? ' (' + detail + ')' : '')) + '</span><button type="button" aria-label="Dismiss">✕</button>';
+  banner.style.display = 'flex';
+  banner.querySelector('button').addEventListener('click', () => { banner.style.display = 'none'; });
+  if (err) console.error('[macros] entry error:', err);
+}
+function escapeHtml(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
 function renderBudget(remaining, targets) {
@@ -375,7 +399,7 @@ function renderTodayList(entries) {
       Math.round(e.protein_g) + 'p / ' + Math.round(e.carb_g) + 'c / ' + Math.round(e.fat_g) + 'f — ' + Math.round(e.calories) + 'cal';
     row.querySelector('.mt-entry-del').addEventListener('click', async () => {
       const { error } = await deleteEntry(e.id);
-      if (error) { showEntryError('Could not delete entry — try again.'); return; }
+      if (error) { showEntryError('Could not delete entry — try again.', error); return; }
       refresh();
     });
     list.appendChild(row);
@@ -404,7 +428,7 @@ function renderQuickAddRow(sectionId, rowId, items) {
         source: item.source,
         barcode: item.barcode,
       });
-      if (error) { showEntryError('Could not add entry — try again.'); pill.disabled = false; return; }
+      if (error) { showEntryError('Could not add entry — try again.', error); pill.disabled = false; return; }
       refresh();
     });
     row.appendChild(pill);
@@ -483,7 +507,7 @@ $('mtManualSave').addEventListener('click', async () => {
     source: 'manual',
     barcode: null,
   });
-  if (error) { showEntryError('Could not save entry — try again.'); return; }
+  if (error) { showEntryError('Could not save entry — try again.', error); return; }
   closeManualModal();
   refresh();
 });
@@ -637,7 +661,7 @@ $('mtScanConfirm').addEventListener('click', async () => {
     source: 'barcode',
     barcode: scannedProduct.barcode,
   });
-  if (error) { showEntryError('Could not save entry — try again.'); return; }
+  if (error) { showEntryError('Could not save entry — try again.', error); return; }
   await closeScanModal();
   refresh();
 });
@@ -814,7 +838,7 @@ $('mtCalcAddToday').addEventListener('click', async () => {
     source: 'manual',
     barcode: null,
   });
-  if (error) { showEntryError('Could not save entry — try again.'); return; }
+  if (error) { showEntryError('Could not save entry — try again.', error); return; }
   closeCalcModal();
   refresh();
 });
