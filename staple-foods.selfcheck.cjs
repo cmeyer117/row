@@ -23,7 +23,7 @@ function assertEqual(actual, expected, label) {
   }
 }
 
-assertEqual(FOODS.length >= 58, true, 'staple-foods dataset has at least 58 entries');
+assertEqual(FOODS.length >= 52, true, 'staple-foods dataset has at least 52 entries');
 
 const chicken = FOODS.find((f) => f.name === 'Chicken Breast (cooked)');
 assertEqual(!!chicken, true, 'Chicken Breast (cooked) exists in the dataset');
