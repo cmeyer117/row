@@ -70,6 +70,8 @@ body {
   background: rgba(255,255,255,0.05); color: #FAFAFA; font-size: 12px; cursor: pointer; white-space: nowrap;
 }
 .mt-quickadd-pill:disabled { opacity: 0.5; cursor: default; }
+.mt-mymeal-wrap { flex: 0 0 auto; display: flex; align-items: center; gap: 2px; }
+.mt-mymeal-wrap .mt-entry-del { font-size: 14px; padding: 0 4px; }
 .mt-btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
 .mt-action-btn {
   padding: 14px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.12);
@@ -111,7 +113,8 @@ body {
   width: 100%; padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.15);
   background: rgba(255,255,255,0.05); color: #FAFAFA; font-size: 14px;
 }
-.mt-modal-actions { display: flex; gap: 10px; margin-top: 16px; }
+.mt-modal-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.mt-modal-actions #mtCalcSaveMeal { flex: 1 1 100%; }
 .mt-modal-actions button {
   flex: 1; padding: 12px; border-radius: 10px; border: none; font-weight: 700; cursor: pointer;
 }
@@ -158,6 +161,11 @@ body {
     <div class="mt-quickadd-section" id="mtCoachPlanSection">
       <div class="mt-quickadd-label">Coach Plan</div>
       <div class="mt-quickadd-row" id="mtCoachPlanRow"></div>
+    </div>
+
+    <div class="mt-quickadd-section" id="mtMyMealsSection" style="display:none;">
+      <div class="mt-quickadd-label">My Meals</div>
+      <div class="mt-quickadd-row" id="mtMyMealsRow"></div>
     </div>
 
     <div class="mt-quickadd-section" id="mtQuickAddRecent" style="display:none;">
@@ -266,7 +274,12 @@ body {
     <div id="mtCalcRows"></div>
     <button class="mt-btn-secondary" id="mtCalcAddRow" type="button" style="width:100%;margin-bottom:12px;">+ Add ingredient</button>
     <div class="mt-calc-totals" id="mtCalcTotals">0p / 0c / 0f — 0cal</div>
+    <div class="mt-field" id="mtSaveMealNameField" style="display:none;">
+      <label for="mtSaveMealName">Meal name</label>
+      <input type="text" id="mtSaveMealName" placeholder="e.g. Protein Pancakes">
+    </div>
     <div class="mt-modal-actions">
+      <button class="mt-btn-secondary" id="mtCalcSaveMeal" type="button">Save as My Meal</button>
       <button class="mt-btn-secondary" id="mtCalcCancel" type="button">Cancel</button>
       <button class="mt-btn-primary" id="mtCalcAddToday" type="button">Add to Today</button>
     </div>
@@ -292,6 +305,39 @@ function saveTargets(targets) {
   // -- see docs/superpowers/specs/2026-08-20-object-key-conflict-merge-design.md.
   targets.updated_at = new Date().toISOString();
   try { localStorage.setItem(LS_KEY, JSON.stringify(targets)); } catch (e) {}
+}
+
+// Carl's own saved multi-ingredient meals (e.g. protein pancakes) -- same
+// {foodName, grams} row shape as CoachMealPlan.MEALS, but user-authored and
+// persisted, not hardcoded in a file. Array-shaped key, so it rides
+// sync.js's mergeArrays() path (id + updated_at + deleted tombstone), same
+// pattern as every other array-shaped synced key in this app.
+const CUSTOM_MEALS_KEY = 'custom_meals';
+function loadCustomMeals() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(CUSTOM_MEALS_KEY) || '[]');
+    return (Array.isArray(raw) ? raw : []).filter((m) => m && !m.deleted);
+  } catch (e) { return []; }
+}
+function loadCustomMealsRaw() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(CUSTOM_MEALS_KEY) || '[]');
+    return Array.isArray(raw) ? raw : [];
+  } catch (e) { return []; }
+}
+function saveCustomMealsRaw(meals) {
+  try { localStorage.setItem(CUSTOM_MEALS_KEY, JSON.stringify(meals)); } catch (e) {}
+}
+function addCustomMeal(label, rows) {
+  const meals = loadCustomMealsRaw();
+  meals.push({ id: 'meal_' + Date.now(), label, rows, updated_at: new Date().toISOString() });
+  saveCustomMealsRaw(meals);
+}
+function deleteCustomMeal(id) {
+  const meals = loadCustomMealsRaw();
+  const m = meals.find((x) => x.id === id);
+  if (m) { m.deleted = true; m.updated_at = new Date().toISOString(); }
+  saveCustomMealsRaw(meals);
 }
 
 function todayKey() {
@@ -791,6 +837,7 @@ function openCalcModal() {
   addCalcRow();
   addCalcRow();
   renderCalcTotals();
+  $('mtSaveMealNameField').style.display = 'none';
   $('mtCalcModalBg').classList.add('show');
 }
 
@@ -804,6 +851,7 @@ function openCalcModalWithMeal(meal) {
   calcRowCount = 0;
   meal.rows.forEach((row) => addCalcRow(row));
   renderCalcTotals();
+  $('mtSaveMealNameField').style.display = 'none';
   $('mtCalcModalBg').classList.add('show');
 }
 
@@ -820,11 +868,63 @@ function renderCoachPlan() {
   });
 }
 
+function renderMyMeals() {
+  const section = $('mtMyMealsSection');
+  const row = $('mtMyMealsRow');
+  const meals = loadCustomMeals();
+  row.innerHTML = '';
+  section.style.display = meals.length ? '' : 'none';
+  meals.forEach((meal) => {
+    const wrap = document.createElement('div');
+    wrap.className = 'mt-mymeal-wrap';
+    const pill = document.createElement('button');
+    pill.type = 'button';
+    pill.className = 'mt-quickadd-pill';
+    pill.textContent = meal.label;
+    pill.addEventListener('click', () => openCalcModalWithMeal(meal));
+    const delBtn = document.createElement('button');
+    delBtn.type = 'button';
+    delBtn.className = 'mt-entry-del';
+    delBtn.setAttribute('aria-label', 'Delete ' + meal.label);
+    delBtn.textContent = '✕';
+    delBtn.addEventListener('click', () => {
+      if (!confirm('Delete "' + meal.label + '"?')) return;
+      deleteCustomMeal(meal.id);
+      renderMyMeals();
+    });
+    wrap.appendChild(pill);
+    wrap.appendChild(delBtn);
+    row.appendChild(wrap);
+  });
+}
+
 function closeCalcModal() { $('mtCalcModalBg').classList.remove('show'); }
 
 $('mtCalcBtn').addEventListener('click', openCalcModal);
 $('mtCalcCancel').addEventListener('click', closeCalcModal);
 $('mtCalcAddRow').addEventListener('click', addCalcRow);
+// window.prompt() would have the same iframe-suppression problem as the
+// alert()s replaced elsewhere in this file -- this modal is also embedded
+// via <iframe> in health.html -- so the meal name is a plain inline field
+// instead, revealed on first click and submitted on the second.
+$('mtCalcSaveMeal').addEventListener('click', () => {
+  const field = $('mtSaveMealNameField');
+  const input = $('mtSaveMealName');
+  if (field.style.display === 'none') {
+    const rows = collectCalcRows().filter((r) => r.foodName && r.grams > 0);
+    if (!rows.length) { showEntryError('Select at least one food and enter grams before saving.'); return; }
+    field.style.display = '';
+    input.value = '';
+    input.focus();
+    return;
+  }
+  const label = input.value.trim();
+  if (!label) { input.focus(); return; }
+  const rows = collectCalcRows().filter((r) => r.foodName && r.grams > 0);
+  addCustomMeal(label, rows);
+  field.style.display = 'none';
+  renderMyMeals();
+});
 $('mtCalcAddToday').addEventListener('click', async () => {
   const name = calcMealName();
   if (!name) { showEntryError('Select at least one food and enter grams before adding.'); return; }
@@ -869,6 +969,7 @@ document.addEventListener('DOMContentLoaded', function () {
   window.RowAuth.ensure().then(function () {
     refresh();
     renderCoachPlan();
+    renderMyMeals();
   });
 });
 
@@ -884,14 +985,16 @@ document.addEventListener('DOMContentLoaded', function () {
   if (typeof initCloudSync !== 'function') return;
   initCloudSync({
     appKey: 'health',
-    syncedKeys: ['macro_targets'],
+    syncedKeys: ['macro_targets', 'custom_meals'],
     // See docs/superpowers/specs/2026-08-20-object-key-conflict-merge-design.md
     // -- health.html/gym.html's own initCloudSync calls already had this;
     // this page (the actual primary writer of macro_targets) was missing
     // it, so a pull here still wholesale-replaced instead of merging
-    // (Codex layered review catch, 2026-08-20).
+    // (Codex layered review catch, 2026-08-20). custom_meals is array-shaped
+    // so it rides sync.js's automatic mergeArrays() path instead -- no entry
+    // needed here, that only applies to object-shaped keys.
     mergeableObjectKeys: ['macro_targets'],
-    onApplied: function () { refresh(); }
+    onApplied: function () { refresh(); renderMyMeals(); }
   });
 });
 </script>
