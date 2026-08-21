@@ -14,8 +14,12 @@
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="row-auth.js" defer></script>
 <script src="topbar.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="staple-foods.js"></script>
 <script src="cooking-coach-data.js"></script>
+<script src="coach-meal-plan.js"></script>
+<script src="macro-calc.js"></script>
+<script src="cooking-coach-suggestions.js"></script>
 <style>
 :root {
   --bg: #000000;
@@ -164,6 +168,9 @@ html, body {
     <p class="cc-subtitle">Salt (Himalayan pink or kosher) goes on everything — each card's Seasoning row is what to add beyond that.</p>
   </div>
 
+  <div class="cc-section-label" id="ccSwapLabel" style="display:none;">Today's Swap</div>
+  <div id="ccSwaps"></div>
+
   <div class="cc-section-label">My Meal Plan</div>
   <div id="ccMealPlan"></div>
 
@@ -305,8 +312,74 @@ html, body {
     if (e.target === $('ccModalBg')) closeGuideModal();
   });
 
+  // -- Today's Swap: real food_log data against remaining macro budget.
+  // Same localStorage targets key + Supabase food_log read as macros.html
+  // (LS_KEY/SUPABASE_URL/SUPABASE_KEY copied 1:1 -- two separate static
+  // pages, no shared module to import them from).
+  var LS_KEY = 'macro_targets';
+  var DEFAULT_TARGETS = { proteinG: 280, carbG: 397, fatG: 58, calories: 3201 };
+  var SUPABASE_URL = 'https://vikpcejlyxieguorwysf.supabase.co';
+  var SUPABASE_KEY = 'sb_publishable_EvWPtfW1FBW5Vf-H6w0yHw_PcXK4imv';
+  var supa = null;
+  function getSupa() {
+    if (!supa && window.supabase) supa = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    return supa;
+  }
+  function loadTargets() {
+    try {
+      var raw = localStorage.getItem(LS_KEY);
+      if (!raw) return Object.assign({}, DEFAULT_TARGETS);
+      return Object.assign({}, DEFAULT_TARGETS, JSON.parse(raw));
+    } catch (e) { return Object.assign({}, DEFAULT_TARGETS); }
+  }
+  function todayKey() {
+    var d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+  async function fetchTodayEntries() {
+    var client = getSupa();
+    if (!client) return null; // Supabase not ready -- treated as missing data, not zero consumption
+    var res = await client.from('food_log').select('*').eq('log_date', todayKey());
+    if (res.error) return null;
+    return res.data || [];
+  }
+
+  function renderSwaps(suggestions) {
+    var label = $('ccSwapLabel');
+    var wrap = $('ccSwaps');
+    wrap.innerHTML = '';
+    if (!suggestions.length) { label.style.display = 'none'; return; }
+    label.style.display = '';
+    suggestions.forEach(function (s) {
+      var card = document.createElement('div');
+      card.className = 'cc-meal-card';
+
+      var head = document.createElement('div');
+      head.className = 'cc-meal-label';
+      head.textContent = s.slotLabel + ' — ' + Math.round(s.gapProteinG) + 'g protein short today';
+
+      var body = document.createElement('div');
+      body.className = 'cc-meal-build';
+      var m = s.swapMacros;
+      body.textContent = 'Swap in ' + s.swapLabel + ' (' + Math.round(m.protein_g) + 'p / ' +
+        Math.round(m.carb_g) + 'c / ' + Math.round(m.fat_g) + 'f — ' + Math.round(m.calories) + 'cal) to close the gap.';
+
+      card.appendChild(head);
+      card.appendChild(body);
+      wrap.appendChild(card);
+    });
+  }
+
+  async function renderTodaySwap() {
+    if (!window.CoachMealPlan || !window.CookingCoachSuggestions || !window.MacroCalc) return;
+    var entries = await fetchTodayEntries();
+    var suggestions = window.CookingCoachSuggestions.suggestMealSwaps(loadTargets(), entries, window.CoachMealPlan.MEALS, FOODS);
+    renderSwaps(suggestions);
+  }
+
   renderMealPlan();
   renderStapleList();
+  renderTodaySwap();
 })();
 </script>
 </body>
