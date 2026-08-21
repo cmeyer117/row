@@ -61,7 +61,13 @@
     { name: 'Cucumber (raw)', protein_100g: 0.7, carb_100g: 3.6, fat_100g: 0.1, calories_100g: 15 },
     { name: 'Mixed Greens / Lettuce (raw)', protein_100g: 1.4, carb_100g: 2.9, fat_100g: 0.2, calories_100g: 15 },
     { name: 'Avocado', protein_100g: 2, carb_100g: 8.5, fat_100g: 14.7, calories_100g: 160 },
-    { name: 'Butter', protein_100g: 0.9, carb_100g: 0.1, fat_100g: 81, calories_100g: 717 },
+    { name: 'Peanut Butter', protein_100g: 25, carb_100g: 20, fat_100g: 50, calories_100g: 588 },
+    // Powdered PB (e.g. PB2) reconstituted with water + stevia — log the DRY POWDER
+    // grams only, same convention as Oats/Cream of Rice. Water and stevia are both
+    // ~0 calories, so they don't change the macros; weighing the finished paste would
+    // just dilute the number for no reason.
+    { name: 'Peanut Butter, Powdered (dry)', protein_100g: 33, carb_100g: 42, fat_100g: 13, calories_100g: 375 },
+    { name: 'Almond Butter', protein_100g: 21, carb_100g: 19, fat_100g: 55, calories_100g: 614 },
     { name: 'Protein Bar (generic)', protein_100g: 20, carb_100g: 25, fat_100g: 8, calories_100g: 220 },
     // Kombucha is brand-variable (sugar content especially) — see the
     // sauce-rule caveat in Cooking Coach vault notes. This is a generic
