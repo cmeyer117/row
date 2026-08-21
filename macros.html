@@ -68,7 +68,7 @@ body {
   background: rgba(255,255,255,0.05); color: #FAFAFA; font-weight: 700; font-size: 14px;
   cursor: pointer;
 }
-.mt-calc-row { display: flex; gap: 8px; margin-bottom: 8px; align-items: center; }
+.mt-calc-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; align-items: center; }
 .mt-calc-row select, .mt-calc-row input {
   padding: 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.15);
   background: rgba(255,255,255,0.05); color: #FAFAFA; font-size: 14px;
@@ -76,6 +76,7 @@ body {
 .mt-calc-row select { flex: 1; min-width: 0; }
 .mt-calc-row input { flex: 0 0 60px; min-width: 0; }
 .mt-calc-row button { flex: 0 0 auto; }
+.mt-calc-food-macro { flex: 0 0 100%; font-size: 11px; color: rgba(255,255,255,0.45); padding-left: 2px; }
 .mt-calc-totals {
   font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 13px;
   margin: 12px 0; padding: 10px; border-radius: 8px; background: rgba(255,255,255,0.04);
@@ -717,13 +718,25 @@ function addCalcRow(prefill) {
   delBtn.className = 'mt-entry-del';
   delBtn.textContent = '✕';
 
+  const macroLine = document.createElement('div');
+  macroLine.className = 'mt-calc-food-macro';
+
   row.appendChild(select);
   row.appendChild(input);
   row.appendChild(delBtn);
+  row.appendChild(macroLine);
 
-  select.addEventListener('change', renderCalcTotals);
+  function updateMacroLine() {
+    const f = window.StapleFoods.FOODS.find((food) => food.name === select.value);
+    macroLine.textContent = f
+      ? f.calories_100g + ' cal · ' + f.protein_100g + 'p / ' + f.carb_100g + 'c / ' + f.fat_100g + 'f per 100g'
+      : '';
+  }
+
+  select.addEventListener('change', () => { updateMacroLine(); renderCalcTotals(); });
   input.addEventListener('input', renderCalcTotals);
   delBtn.addEventListener('click', () => { row.remove(); renderCalcTotals(); });
+  updateMacroLine();
   $('mtCalcRows').appendChild(row);
 }
 
