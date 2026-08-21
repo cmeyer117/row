@@ -17,6 +17,7 @@
 <script src="topbar.js" defer></script>
 <script src="sync.js" defer></script>
 <script src="readiness-index-logic.js" defer></script>
+<script src="posing-checklists.js" defer></script>
 <style>
 :root {
   --bg: #000000;
@@ -114,6 +115,15 @@ html, body {
 .mob-ex-name { font-size: 13px; font-weight: 600; color: var(--text-1); margin-bottom: 2px; }
 .mob-ex-detail { font-size: 12px; color: var(--text-2); line-height: 1.4; }
 .mob-ex-note { font-size: 11px; color: var(--text-3); font-style: italic; margin-top: 3px; line-height: 1.4; }
+
+/* ── Judges' checklist (pose-specific, from posing-checklists.js) ── */
+.pose-checklist-title {
+  font-family: var(--font-mono); font-size: 9px; font-weight: 800;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--accent); margin: 10px 0 4px;
+}
+.pose-checklist { margin: 0; padding-left: 16px; }
+.pose-checklist li { font-size: 12px; color: var(--text-2); line-height: 1.5; }
 
 /* ── Expandable exercise row ── */
 .mob-ex-head {
@@ -652,6 +662,34 @@ html, body {
     };
     img.src = 'assets/mobility/' + img.dataset.slug + '.png';
   });
+
+  // ── Judges' checklist: inject under mandatory poses with a confident
+  // checklist match (posing-checklists.js). No injection at all — not a
+  // generic placeholder — when the pose name has no confident match, same
+  // "null rather than guessing" discipline as form-coach-logic's benchmark
+  // matching. ──
+  if (window.PosingChecklists) {
+    document.querySelectorAll('#section-competition .mob-ex-row').forEach(function (row) {
+      var nameEl = row.querySelector('.mob-ex-name');
+      var panel = row.querySelector('.mob-ex-panel');
+      if (!nameEl || !panel) return;
+      var poseName = nameEl.textContent.replace(/^\d+\.\s*/, '');
+      var checklist = window.PosingChecklists.matchChecklist(poseName);
+      if (!checklist) return;
+      var title = document.createElement('div');
+      title.className = 'pose-checklist-title';
+      title.textContent = 'What Judges Score';
+      var list = document.createElement('ul');
+      list.className = 'pose-checklist';
+      checklist.items.forEach(function (item) {
+        var li = document.createElement('li');
+        li.textContent = item;
+        list.appendChild(li);
+      });
+      panel.appendChild(title);
+      panel.appendChild(list);
+    });
+  }
 
   // ── Lightbox: tap a photo to view it full-size ──
   var lightbox = document.getElementById('mobLightbox');
