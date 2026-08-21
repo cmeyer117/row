@@ -190,12 +190,6 @@ body.topbar-modal-open { overflow: hidden; touch-action: none; }
   <a href="gym.html" class="bottombar-tab" data-page="fitness">
     <span class="bottombar-tab-icon">💪</span><span>Fitness</span>
   </a>
-  <a href="mobility.html" class="bottombar-tab" data-page="mobility">
-    <span class="bottombar-tab-icon">🧘</span><span>Mobility</span>
-  </a>
-  <a href="coach.html" class="bottombar-tab" data-page="coach">
-    <span class="bottombar-tab-icon">🏆</span><span>Coach</span>
-  </a>
 </nav>`;
 
   function isEmbedded() {
@@ -210,9 +204,8 @@ body.topbar-modal-open { overflow: hidden; touch-action: none; }
   function currentPageKey() {
     const p = (window.location.pathname || '').toLowerCase();
     if (p.endsWith('health.html') || p.endsWith('/health')) return 'health';
-    if (p.endsWith('gym.html') || p.endsWith('/gym')) return 'fitness';
-    if (p.endsWith('mobility.html') || p.endsWith('/mobility')) return 'mobility';
-    if (p.endsWith('coach.html') || p.endsWith('/coach') || p.endsWith('form-coach.html') || p.endsWith('posing.html')) return 'coach';
+    if (p.endsWith('gym.html') || p.endsWith('/gym') || p.endsWith('mobility.html') || p.endsWith('/mobility') ||
+        p.endsWith('coach.html') || p.endsWith('/coach') || p.endsWith('form-coach.html') || p.endsWith('posing.html')) return 'fitness';
     if (p.endsWith('main.html') || p.endsWith('/main')) return 'main';
     if (p.endsWith('index.html') || p === '/' || p.endsWith('/row/')) return '';
     return 'main';
