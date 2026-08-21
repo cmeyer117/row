@@ -1,8 +1,8 @@
 // coach-meal-plan.js — default ingredient rows for the coach's prescribed
 // 5-meal plan, one row per StapleFoods entry + grams. NOT a live sync from
-// the vault — reflects the coaching phase as of 2026-08-06: Black Magma
-// Fitness, Coach Chris Eastman, "Recomp Phase," started 8/2/26. Source PDF:
-// G:\My Drive\Coaching documents\BLACK MAGMA FITNESS CLIENT Carl - Macros.doc.pdf
+// the vault — reflects the coaching phase as of 2026-08-21: Black Magma
+// Fitness, Coach Chris Eastman, "Growth Phase," starts 8/22/26. Source PDF:
+// G:\My Drive\Coaching documents\BLACK MAGMA FITNESS CLIENT Carl - Macros (1).doc.pdf
 // (check that folder for the newest-dated file next time this needs updating).
 //
 // Where the coach's plan lists an OR choice (protein, carb), the row here
@@ -19,10 +19,10 @@
       label: 'Meal 1',
       rows: [
         { foodName: 'Eggs, whole (cooked)', grams: 100 },
-        { foodName: 'Egg Whites', grams: 45 },
+        { foodName: 'Egg Whites', grams: 90 },
         { foodName: 'Turkey Bacon (cooked, generic)', grams: 30 },
         { foodName: 'Banana', grams: 200 },
-        { foodName: 'Oats (dry, rolled)', grams: 20 },
+        { foodName: 'Oats (dry, rolled)', grams: 25 },
         { foodName: 'Broccoli (cooked)', grams: 150 },
       ],
     },
@@ -38,7 +38,7 @@
       label: 'Meal 3',
       rows: [
         { foodName: 'Chicken Breast (cooked)', grams: 170 },
-        { foodName: 'White Rice (cooked)', grams: 200 },
+        { foodName: 'White Rice (cooked)', grams: 250 },
         { foodName: 'Broccoli (cooked)', grams: 150 },
       ],
     },
