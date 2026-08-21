@@ -132,6 +132,28 @@ assertEqual(lateralMatch.jointAngle, 'shoulder_abduction', 'EXERCISE_BENCHMARKS:
 var rearDeltMatch = FCL.matchBenchmark('rear delt fly', realBenchmarks);
 assertEqual(rearDeltMatch.jointAngle, 'shoulder_abduction', 'EXERCISE_BENCHMARKS: rear delt fly entry tracks shoulder abduction');
 
+// EXERCISE_BENCHMARKS — item 2.4 additions (2026-08-21): newly-added
+// lifts resolve, both exact and fuzzy, and existing entries are unchanged.
+var pecFlyExact = FCL.matchBenchmark('incline cable pec fly', realBenchmarks);
+assertEqual(pecFlyExact && pecFlyExact.jointAngle, 'shoulder_abduction', 'EXERCISE_BENCHMARKS: incline cable pec fly (exact) tracks shoulder abduction');
+assertEqual(pecFlyExact && pecFlyExact.depthDirection, 'min', 'EXERCISE_BENCHMARKS: pec fly entry targets the top-of-squeeze (min direction), opposite of raise family');
+var pecFlyFuzzy = FCL.matchBenchmark('pec dec fly', realBenchmarks);
+assertEqual(pecFlyFuzzy && pecFlyFuzzy.cueLabel, 'top-of-fly chest squeeze', 'EXERCISE_BENCHMARKS: pec dec fly (sub name) fuzzy-resolves to the chest fly entry');
+// A generic "fly" alone must not collide with rear delt fly's "reverse fly" name.
+var rearDeltStillWorks = FCL.matchBenchmark('reverse fly', realBenchmarks);
+assertEqual(rearDeltStillWorks && rearDeltStillWorks.cueLabel, 'top-of-fly shoulder abduction', 'EXERCISE_BENCHMARKS: rear delt fly still resolves correctly after the chest fly entry was added (no cross-entry collision)');
+
+var goodMorningExact = FCL.matchBenchmark('v squat good morning', realBenchmarks);
+assertEqual(goodMorningExact && goodMorningExact.cueLabel, 'hip lockout', 'EXERCISE_BENCHMARKS: "v squat good morning" resolves to the hip-hinge entry, not the squat (knee) entry, despite sharing the "squat" token');
+var hipExtensionMatch = FCL.matchBenchmark('cable hip extension machine', realBenchmarks);
+assertEqual(hipExtensionMatch && hipExtensionMatch.jointAngle, 'hip', 'EXERCISE_BENCHMARKS: cable hip extension machine resolves to the hip-hinge entry');
+// Regression: the squat entry itself is unaffected by the good-morning names added to a different entry.
+var squatStillWorks = FCL.matchBenchmark('squat', realBenchmarks);
+assertEqual(squatStillWorks && squatStillWorks.jointAngle, 'knee', 'EXERCISE_BENCHMARKS: plain "squat" still resolves to the squat (knee) entry, not the hip-hinge entry');
+// Regression: existing RDL names still resolve unchanged.
+var rdlStillWorks = FCL.matchBenchmark('romanian deadlift', realBenchmarks);
+assertEqual(rdlStillWorks && rdlStillWorks.cueLabel, 'hip lockout', 'EXERCISE_BENCHMARKS: "romanian deadlift" still resolves after the good-morning names were added to the same entry');
+
 // computeSymmetry — perfectly mirrored arms report diffDeg 0.
 var symResult = FCL.computeSymmetry(lmSymmetric, 'front-double-biceps');
 assertEqual(symResult.length, 1, 'computeSymmetry: front-double-biceps has exactly one symmetry pair (elbow)');

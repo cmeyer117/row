@@ -19,6 +19,8 @@
 <script src="cooking-coach-data.js"></script>
 <script src="coach-meal-plan.js"></script>
 <script src="macro-calc.js"></script>
+<script src="gym-workout-events.js"></script>
+<script src="training-insight-engine.js"></script>
 <script src="cooking-coach-suggestions.js"></script>
 <style>
 :root {
@@ -344,12 +346,73 @@ html, body {
     return res.data || [];
   }
 
+  // Recovery-signal note (item 2.5): reuses the exact sleep-deviation +
+  // performance-stall signal weekly-review.html already computes via
+  // TrainingInsightEngine -- this just re-runs the same pure detector
+  // against the same two app_state keys (po-coach is anon-readable per
+  // fetchGymState's pattern there; health is owner-RLS, needs the real
+  // JWT like fetchAppStateKey there). Never throws -- any fetch failure
+  // just means no recovery note today, not a broken swap list.
+  async function fetchRecoverySignal() {
+    try {
+      if (!window.TrainingInsightEngine || !window.GymWorkoutEvents) return null;
+      var gymRes = await fetch(SUPABASE_URL + '/rest/v1/app_state?key=eq.po-coach&select=data', {
+        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY },
+      });
+      var gymRows = await gymRes.json();
+      var gymData = (gymRows[0] && gymRows[0].data && gymRows[0].data.po_coach_v1) || { exercises: [], logs: {} };
+
+      var token = window.RowAuth ? await window.RowAuth.getAccessToken() : null;
+      if (!token) return null;
+      var healthRes = await fetch(SUPABASE_URL + '/rest/v1/app_state?key=eq.health&select=data', {
+        headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + token },
+      });
+      if (!healthRes.ok) return null;
+      var healthRows = await healthRes.json();
+      var healthData = (healthRows[0] && healthRows[0].data) || null;
+      var sleepEntries = ((healthData && healthData['health:sleep']) || []).filter(function (e) { return e && e.date && e.hours != null; });
+
+      var exercisesById = {};
+      (gymData.exercises || []).forEach(function (ex) { exercisesById[ex.id] = ex; });
+      var exposuresByName = {};
+      Object.keys(gymData.logs || {}).forEach(function (exId) {
+        var ex = exercisesById[exId];
+        if (!ex) return;
+        var entries = (gymData.logs[exId] || []).map(function (l) {
+          return {
+            date: (l.date || '').slice(0, 10),
+            load: ex.bw ? l.reps : window.GymWorkoutEvents.totalLoad(l, ex),
+            reps: l.reps,
+            variantTag: l.variant || null,
+          };
+        }).filter(function (e) { return e.date && e.load != null; });
+        if (entries.length) exposuresByName[ex.name] = entries;
+      });
+
+      var findings = window.TrainingInsightEngine.runInsightEngine({
+        exercises: exposuresByName,
+        sleepEntries: sleepEntries,
+        now: new Date(),
+      });
+      var recovery = findings.filter(function (f) { return f.type === 'recovery-signal'; })[0];
+      return recovery || null;
+    } catch (e) {
+      return null;
+    }
+  }
+
   function renderSwaps(suggestions) {
     var label = $('ccSwapLabel');
     var wrap = $('ccSwaps');
     wrap.innerHTML = '';
-    if (!suggestions.length) { label.style.display = 'none'; return; }
+    if (!suggestions.length && !suggestions.recoveryNote) { label.style.display = 'none'; return; }
     label.style.display = '';
+    if (suggestions.recoveryNote) {
+      var noteCard = document.createElement('div');
+      noteCard.className = 'cc-meal-card';
+      noteCard.textContent = suggestions.recoveryNote;
+      wrap.appendChild(noteCard);
+    }
     suggestions.forEach(function (s) {
       var card = document.createElement('div');
       card.className = 'cc-meal-card';
@@ -372,8 +435,9 @@ html, body {
 
   async function renderTodaySwap() {
     if (!window.CoachMealPlan || !window.CookingCoachSuggestions || !window.MacroCalc) return;
-    var entries = await fetchTodayEntries();
-    var suggestions = window.CookingCoachSuggestions.suggestMealSwaps(loadTargets(), entries, window.CoachMealPlan.MEALS, FOODS);
+    var results = await Promise.all([fetchTodayEntries(), fetchRecoverySignal()]);
+    var entries = results[0], recoverySignal = results[1];
+    var suggestions = window.CookingCoachSuggestions.suggestMealSwaps(loadTargets(), entries, window.CoachMealPlan.MEALS, FOODS, recoverySignal);
     renderSwaps(suggestions);
   }
 

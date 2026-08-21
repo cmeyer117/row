@@ -71,4 +71,49 @@ function entry(protein_g) {
   assertEqual(suggestions.length, 3, 'no meals logged yet -> all 3 slots remain, still get suggestions');
 }
 
+// --- item 2.5: recovery-signal note ---
+
+// Carb-heavy Meal 1 (oats+banana-equivalent) MEALS set so "higher carb
+// among remaining options" has an unambiguous answer distinct from the
+// protein-density winner used above.
+const CARB_MEALS = [
+  { label: 'Meal 1', rows: [{ foodName: 'Oats (dry, rolled)', grams: 200 }] }, // high carb
+  { label: 'Meal 2', rows: [{ foodName: 'Chicken Breast (cooked)', grams: 300 }] }, // low carb
+];
+
+// --- signal firing produces the extra note, pointing at the genuinely
+// higher-carb remaining option (not just always the same food) ---
+{
+  const suggestions = suggestMealSwaps(TARGETS, [], CARB_MEALS, FOODS, { type: 'recovery-signal' });
+  if (typeof suggestions.recoveryNote !== 'string' || !suggestions.recoveryNote.includes('Meal 1')) {
+    console.error(`FAIL: recovery signal firing should note the higher-carb remaining option (Meal 1)\n  actual: ${suggestions.recoveryNote}`);
+    process.exit(1);
+  }
+}
+
+// --- the higher-carb pick is relative to today's remaining options, not
+// hardcoded -- once the carb-heavy meal is already logged (no longer
+// "remaining"), the note should point at whichever remaining option is
+// now relatively higher-carb instead ---
+{
+  // loggedCount=1 -> Meal 1 slot is done, only Meal 2 (chicken) remains.
+  const suggestions = suggestMealSwaps(TARGETS, [entry(0)], CARB_MEALS, FOODS, { type: 'recovery-signal' });
+  if (typeof suggestions.recoveryNote !== 'string' || !suggestions.recoveryNote.includes('Meal 2')) {
+    console.error(`FAIL: with Meal 1 already logged, the recovery note should point at the remaining option (Meal 2), not a hardcoded pick\n  actual: ${suggestions.recoveryNote}`);
+    process.exit(1);
+  }
+}
+
+// --- signal not firing does not force a note ---
+{
+  const suggestions = suggestMealSwaps(TARGETS, [], CARB_MEALS, FOODS, null);
+  assertEqual('recoveryNote' in suggestions, false, 'no recovery signal -> no recoveryNote key at all');
+}
+
+// --- signal firing with no remaining slots today produces no note (nothing to point at) ---
+{
+  const suggestions = suggestMealSwaps(TARGETS, [entry(0), entry(0)], CARB_MEALS, FOODS, { type: 'recovery-signal' });
+  assertEqual('recoveryNote' in suggestions, false, 'recovery signal firing with no remaining meal slots -> no note');
+}
+
 console.log('cooking-coach-suggestions.selfcheck: all checks passed');
