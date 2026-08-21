@@ -1345,12 +1345,10 @@ main {
     return `${y}-${m}-${d}`;
   }
 
-  const TEMPLATE_VERSION = 9;
+  const TEMPLATE_VERSION = 10;
 
   const STACK_DEFAULTS = [
     // Morning
-    { id: 'reta',     name: 'Retatrutide',                  dose: '1mg',          window: 'morning', note: 'Mon & Thu only — inject morning',                      tag: null, ordered: true },
-    { id: 'clen',     name: 'Clen',                          dose: '20mcg',        window: 'morning', note: 'Daily',                                                tag: null, ordered: true },
     { id: 'morphogen',name: 'Morphogen Prime',               dose: '',             window: 'morning', note: 'AM — code ELMAGMA for discount',                       tag: null, ordered: true },
     { id: 'kidney',   name: 'Kidney (Morphogen)',            dose: '4 pills',      window: 'morning', note: 'AM',                                                    tag: null, ordered: true },
     { id: 'enzymes',  name: 'Digestive Enzymes (Morphogen)', dose: '1 pill',       window: 'morning', note: 'Take with meals 1, 2, and 5',                          tag: null, ordered: true },
