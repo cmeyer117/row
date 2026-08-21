@@ -3348,6 +3348,7 @@ img, video, canvas, svg { max-width: 100%; }
     });
     s.logs = (s.logs && typeof s.logs === 'object') ? s.logs : {};
     if (!s.sessions || typeof s.sessions !== 'object') s.sessions = {};
+    if (!Array.isArray(s.milestones)) s.milestones = [];
     // One entry per day a check-in was submitted: { pain, recovery, pump },
     // each 'low'|'med'|'high'. Keyed by the date the check-in was collected
     // (same day as that day's last logged set) — getRx() looks this up by
@@ -6340,6 +6341,9 @@ img, video, canvas, svg { max-width: 100%; }
     if (eventType && window.__gym && typeof window.__gym.logWorkoutEvent === 'function') {
       window.__gym.logWorkoutEvent(ex.name, eventType, w, reps, !!ex.bw);
     }
+    if (window.GymMilestoneLogic) {
+      state.milestones = window.GymMilestoneLogic.recordMilestone(state.milestones, { eventType: eventType, exercise: ex.name, dateKey: dateKey });
+    }
     if (plateMode) { plateCounts = {}; updatePlateUI(); }
     resetChipToToday('logDateChip', 'logDateInput');
     startRestTimer(ex, eventType);
@@ -6510,11 +6514,14 @@ img, video, canvas, svg { max-width: 100%; }
     state.logs[ex.id].push(entry);
     state.logs[ex.id].sort(function(a, b) { return a.date.localeCompare(b.date); });
     state.currentEx = ex.id;
-    saveState(); renderAll();
-    if (typeof wtRender === 'function') wtRender();
     var eventType = window.GymWorkoutEvents
       ? window.GymWorkoutEvents.classifyWorkoutEvent({ weight: w, reps: reps }, priorLogs, ex)
       : null;
+    if (window.GymMilestoneLogic) {
+      state.milestones = window.GymMilestoneLogic.recordMilestone(state.milestones, { eventType: eventType, exercise: ex.name, dateKey: dk });
+    }
+    saveState(); renderAll();
+    if (typeof wtRender === 'function') wtRender();
     if (eventType && window.__gym && typeof window.__gym.logWorkoutEvent === 'function') {
       window.__gym.logWorkoutEvent(ex.name, eventType, w, reps, !!ex.bw);
     }
@@ -7168,6 +7175,7 @@ img, video, canvas, svg { max-width: 100%; }
 <script src="gym-weight-photos.js"></script>
 <script src="gym-weight-outlier-logic.js"></script>
 <script src="gym-workout-events.js"></script>
+<script src="gym-milestone-logic.js"></script>
 <script src="gym-rx-phase-logic.js"></script>
 <script src="gym-rx-deload-logic.js"></script>
 <script src="gym-peak-phase-logic.js"></script>
