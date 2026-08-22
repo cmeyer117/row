@@ -39,6 +39,7 @@
     { name: 'Brown Rice (cooked)', protein_100g: 2.6, carb_100g: 23, fat_100g: 0.9, calories_100g: 111 },
     { name: 'Cream of Rice (cooked)', protein_100g: 1.4, carb_100g: 17, fat_100g: 0.1, calories_100g: 75 },
     { name: 'Oats (dry, rolled)', protein_100g: 13.5, carb_100g: 68, fat_100g: 6.5, calories_100g: 379 },
+    { name: 'Cocoa Powder (unsweetened)', protein_100g: 19.6, carb_100g: 57.9, fat_100g: 13.7, calories_100g: 228 },
     { name: 'White Potato (baked, w/ skin)', protein_100g: 2, carb_100g: 21, fat_100g: 0.1, calories_100g: 93 },
     { name: 'Sweet Potato (baked)', protein_100g: 2, carb_100g: 20.7, fat_100g: 0.1, calories_100g: 90 },
     { name: 'Sourdough Bread', protein_100g: 8.8, carb_100g: 51, fat_100g: 1.6, calories_100g: 231 },
@@ -74,6 +75,11 @@
     // sauce-rule caveat in Cooking Coach vault notes. This is a generic
     // low-sugar commercial average; swap in a label value if precision matters.
     { name: 'Kombucha (generic, bottled)', protein_100g: 0, carb_100g: 3.5, fat_100g: 0, calories_100g: 18 },
+    // Carl's brand: ~10 cal per 2 tbsp (30ml). Carb estimated from typical
+    // sugar-alcohol-based "sugar free" syrups at that calorie level (~4g
+    // per 2 tbsp) -- swap in the actual label carb figure if it's known
+    // and differs, same caveat as Kombucha/PB2 above.
+    { name: 'Sugar-Free Maple Syrup', protein_100g: 0, carb_100g: 10, fat_100g: 0, calories_100g: 26 },
   ];
 
   const api = { FOODS };
