@@ -11,7 +11,7 @@ import { timingSafeEqual } from 'crypto';
 
 const SUPABASE_URL = 'https://vikpcejlyxieguorwysf.supabase.co';
 
-function safeEqual(a, b) {
+export function safeEqual(a, b) {
   const bufA = Buffer.from(String(a));
   const bufB = Buffer.from(String(b));
   if (bufA.length !== bufB.length) return false;
