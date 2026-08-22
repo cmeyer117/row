@@ -386,6 +386,15 @@ async function renderCloseout(decision) {
       ${scorecardHtml}
       ${manualVerdictRowsHtml('Anchor lifts', anchorItems)}
       ${manualVerdictRowsHtml('Pain / recovery', painItems)}
+      <p style="color:var(--text-3);font-size:11px;text-transform:uppercase;letter-spacing:0.05em;margin:12px 0 4px;">Coach's response this week (optional)</p>
+      <select id="coachStatusSelect" style="width:100%;padding:8px;margin-bottom:6px;">
+        <option value="">No status...</option>
+        <option value="approved">Approved</option>
+        <option value="modified">Modified</option>
+        <option value="hold">Hold</option>
+        <option value="needs_more_data">Needs more data</option>
+      </select>
+      <textarea id="coachNoteText" placeholder="What did your coach actually say?" style="width:100%;padding:8px;min-height:50px;margin-bottom:8px;"></textarea>
       <select id="verdictSelect" style="width:100%;padding:8px;margin-bottom:8px;">
         <option value="">Verdict...</option>
         <option value="worked">Worked</option>
@@ -410,6 +419,10 @@ async function renderCloseout(decision) {
     });
     if (scorecard && scorecard.cardioRx.verdict && details.cardio_rx) details.cardio_rx.verdict = scorecard.cardioRx.verdict;
     if (scorecard && scorecard.posingRx.verdict && details.posing_rx) details.posing_rx.verdict = scorecard.posingRx.verdict;
+
+    const coachResponse = buildCoachResponse(document.getElementById('coachStatusSelect').value, document.getElementById('coachNoteText').value);
+    if (coachResponse) details.coach_response = coachResponse;
+    else delete details.coach_response;
 
     await window.closeDecision(decision.id, verdict, note, details);
     el.style.display = 'none';
