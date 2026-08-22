@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Log — Coaching</title>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="coaching-templates.js"></script>
 <script src="coaching-exercise-meta.js"></script>
 <style>
@@ -50,10 +49,9 @@ body { padding: max(28px, env(safe-area-inset-top)) 20px 60px; }
 <script>
 (function () {
   'use strict';
-  const SUPABASE_URL = 'https://vikpcejlyxieguorwysf.supabase.co';
-  const SUPABASE_KEY = 'sb_publishable_EvWPtfW1FBW5Vf-H6w0yHw_PcXK4imv';
-  const supa = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-  const clientId = new URLSearchParams(window.location.search).get('id');
+  const params = new URLSearchParams(window.location.search);
+  const clientId = params.get('id');
+  const clientToken = params.get('token');
   let plan = null;
 
   // Copied from gym.html/coaching-plan.html, not reimplemented — same progression logic everywhere.
@@ -83,8 +81,11 @@ body { padding: max(28px, env(safe-area-inset-top)) 20px 60px; }
   }
 
   async function getClientLogs(clientIdArg, exerciseName) {
-    const { data, error } = await supa.rpc('get_coaching_client_logs', { p_id: clientIdArg, p_exercise: exerciseName });
-    return (error || !data) ? [] : data;
+    const res = await fetch('/api/coaching-client?action=logs&id=' + encodeURIComponent(clientIdArg) +
+      '&token=' + encodeURIComponent(clientToken) + '&exercise=' + encodeURIComponent(exerciseName));
+    if (!res.ok) return [];
+    const { data } = await res.json();
+    return data || [];
   }
 
   function renderDay(dayIndex) {
@@ -117,9 +118,11 @@ body { padding: max(28px, env(safe-area-inset-top)) 20px 60px; }
         if (!Number.isFinite(weight) || weight < 0 || !Number.isInteger(reps) || reps <= 0) return;
         btn.disabled = true;
         const meta = window.CoachingExerciseMeta.getMeta(exName);
-        const { error } = await supa.rpc('log_coaching_exercise', {
-          p_id: clientId, p_exercise: exName, p_weight: weight, p_reps: reps, p_is_bodyweight: meta.bw
+        const res = await fetch('/api/coaching-client?action=log-exercise', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: clientId, token: clientToken, exercise: exName, weight, reps, isBodyweight: meta.bw }),
         });
+        const error = !res.ok;
         btn.textContent = error ? 'Failed' : 'Logged';
         if (!error) { weightEl.value = ''; repsEl.value = ''; await refreshRx(exListEl, exName); }
         btn.disabled = false;
@@ -141,10 +144,12 @@ body { padding: max(28px, env(safe-area-inset-top)) 20px 60px; }
   }
 
   async function load() {
-    if (!clientId) { document.getElementById('clientTitle').textContent = 'No client ID given'; return; }
-    const { data: rows, error } = await supa.rpc('get_coaching_plan', { p_id: clientId });
-    const data = rows && rows[0];
-    if (error || !data) { document.getElementById('clientTitle').textContent = 'Client not found'; return; }
+    if (!clientId || !clientToken) { document.getElementById('clientTitle').textContent = 'No client link given'; return; }
+    const res = await fetch('/api/coaching-client?action=plan&id=' + encodeURIComponent(clientId) +
+      '&token=' + encodeURIComponent(clientToken));
+    const body = res.ok ? await res.json() : null;
+    const data = body && body.data && body.data[0];
+    if (!res.ok || !data) { document.getElementById('clientTitle').textContent = 'Client not found'; return; }
     document.getElementById('clientTitle').textContent = data.name;
     const intake = {
       stage: data.stage, goal: data.goal, equipment: data.equipment,
@@ -169,8 +174,11 @@ body { padding: max(28px, env(safe-area-inset-top)) 20px 60px; }
     const statusEl = document.getElementById('weightStatus');
     const weight = Number(document.getElementById('weightInput').value);
     if (!Number.isFinite(weight) || weight <= 0) { statusEl.textContent = 'Enter a valid weight.'; return; }
-    const result = await supa.rpc('upsert_coaching_weight', { p_id: clientId, p_weight: weight });
-    statusEl.textContent = result.error ? 'Save failed: ' + result.error.message : 'Saved.';
+    const res = await fetch('/api/coaching-client?action=upsert-weight', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: clientId, token: clientToken, weight }),
+    });
+    statusEl.textContent = res.ok ? 'Saved.' : 'Save failed.';
   });
 
   load();
