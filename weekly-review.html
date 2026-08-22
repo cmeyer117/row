@@ -235,6 +235,16 @@ function hasRx(entry) {
   return entry.target != null || !!entry.guardrail;
 }
 
+// Builds the optional coach_response detail entry for a closeout save --
+// null (omitted from details entirely) when both fields are blank, so an
+// old decision closed out before this feature shipped and a new one with
+// no coach check-in that week look identical (no dangling empty object).
+function buildCoachResponse(status, note) {
+  const trimmedNote = (note || '').trim();
+  if (!status && !trimmedNote) return null;
+  return { status: status || null, note: trimmedNote || null };
+}
+
 async function computeScorecard(decision) {
   const scoreWeekRef = easternCalendarDate(new Date(decision.created_at));
   scoreWeekRef.setUTCDate(scoreWeekRef.getUTCDate() + 7);
