@@ -89,7 +89,7 @@ async function fetchGymState() {
     const res = await fetch('https://vikpcejlyxieguorwysf.supabase.co/rest/v1/app_state?key=eq.po-coach&select=data', {
       headers: {
         apikey: window.SUPABASE_CONFIG.KEY,
-        Authorization: 'Bearer sb_publishable_EvWPtfW1FBW5Vf-H6w0yHw_PcXK4imv',
+        Authorization: 'Bearer ' + window.SUPABASE_CONFIG.KEY,
       },
     });
     const rows = await res.json();
