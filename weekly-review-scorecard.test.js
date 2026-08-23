@@ -26,7 +26,7 @@ const pageScriptSource = scriptMatch[1];
 function makePage({ poCoachData, healthData, posingData } = {}) {
   const fetchCalls = [];
   const sandbox = {
-    window: {},
+    window: { SUPABASE_CONFIG: { URL: 'https://example.supabase.co', KEY: 'test-key' } },
     document: { addEventListener: () => {}, getElementById: () => null },
     fetch: (url) => {
       fetchCalls.push(url);

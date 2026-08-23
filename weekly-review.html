@@ -12,6 +12,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="supabase-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="row-auth.js" defer></script>
 <script src="topbar.js" defer></script>
@@ -87,7 +88,7 @@ async function fetchGymState() {
   _gymStatePromise = (async () => {
     const res = await fetch('https://vikpcejlyxieguorwysf.supabase.co/rest/v1/app_state?key=eq.po-coach&select=data', {
       headers: {
-        apikey: 'sb_publishable_EvWPtfW1FBW5Vf-H6w0yHw_PcXK4imv',
+        apikey: window.SUPABASE_CONFIG.KEY,
         Authorization: 'Bearer sb_publishable_EvWPtfW1FBW5Vf-H6w0yHw_PcXK4imv',
       },
     });
@@ -114,7 +115,7 @@ async function fetchFoodLogWeek(monday, sunday) {
     const token = await window.RowAuth.getAccessToken();
     const res = await fetch(
       'https://vikpcejlyxieguorwysf.supabase.co/rest/v1/food_log?log_date=gte.' + monday + '&log_date=lte.' + sunday + '&select=*',
-      { headers: { apikey: 'sb_publishable_EvWPtfW1FBW5Vf-H6w0yHw_PcXK4imv', Authorization: 'Bearer ' + token } }
+      { headers: { apikey: window.SUPABASE_CONFIG.KEY, Authorization: 'Bearer ' + token } }
     );
     if (!res.ok) return [];
     return await res.json();
@@ -148,7 +149,7 @@ async function fetchAppStateKey(key) {
     const token = await window.RowAuth.getAccessToken();
     const res = await fetch('https://vikpcejlyxieguorwysf.supabase.co/rest/v1/app_state?key=eq.' + key + '&select=data', {
       headers: {
-        apikey: 'sb_publishable_EvWPtfW1FBW5Vf-H6w0yHw_PcXK4imv',
+        apikey: window.SUPABASE_CONFIG.KEY,
         Authorization: 'Bearer ' + token,
       },
     });

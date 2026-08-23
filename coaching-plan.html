@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Plan — Carl's Dashboard</title>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="supabase-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="row-auth.js" defer></script>
 <script src="topbar.js" defer></script>
@@ -89,8 +90,8 @@ textarea { width: 100%; min-height: 90px; padding: 10px; border-radius: 10px; bo
 <script>
 (function () {
   'use strict';
-  const SUPABASE_URL = 'https://vikpcejlyxieguorwysf.supabase.co';
-  const SUPABASE_KEY = 'sb_publishable_EvWPtfW1FBW5Vf-H6w0yHw_PcXK4imv';
+  const SUPABASE_URL = window.SUPABASE_CONFIG.URL;
+  const SUPABASE_KEY = window.SUPABASE_CONFIG.KEY;
   const supa = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
   const clientId = new URLSearchParams(window.location.search).get('id');
   let currentClient = null;

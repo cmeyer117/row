@@ -170,6 +170,7 @@ html, body {
   </div>
 </nav>
 
+<script src="supabase-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="form-coach-logic.js"></script>
 <script src="benchmarks.js"></script>
@@ -184,8 +185,8 @@ html, body {
 // its own client since this page intentionally doesn't touch gym.html's
 // sync machinery.
 (function () {
-  var FC_SUPABASE_URL = 'https://vikpcejlyxieguorwysf.supabase.co';
-  var FC_SUPABASE_KEY = 'sb_publishable_EvWPtfW1FBW5Vf-H6w0yHw_PcXK4imv';
+  var FC_SUPABASE_URL = window.SUPABASE_CONFIG.URL;
+  var FC_SUPABASE_KEY = window.SUPABASE_CONFIG.KEY;
   var FC_HISTORY_KEY = 'row:form-coach-history';
   var fcSupa = null;
 

@@ -8,7 +8,7 @@ const path = require('path');
 const vm = require('vm');
 
 const src = fs.readFileSync(path.join(__dirname, 'sync.js'), 'utf8');
-const sandbox = { window: {} };
+const sandbox = { window: { SUPABASE_CONFIG: { URL: 'https://example.supabase.co', KEY: 'test-key' } } };
 vm.createContext(sandbox);
 vm.runInContext(src, sandbox);
 const mergeObjects = sandbox.window.RowSyncMergeObjects;

@@ -12,6 +12,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="supabase-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="sync.js" defer></script>
 <script src="row-auth.js" defer></script>
@@ -1015,8 +1016,8 @@ body::after {
   }
 
   // --- Daily routine checklist: Vessel read + local checkbox state ---
-  const RC_SUPABASE_URL = 'https://vikpcejlyxieguorwysf.supabase.co';
-  const RC_SUPABASE_KEY = 'sb_publishable_EvWPtfW1FBW5Vf-H6w0yHw_PcXK4imv';
+  const RC_SUPABASE_URL = window.SUPABASE_CONFIG.URL;
+  const RC_SUPABASE_KEY = window.SUPABASE_CONFIG.KEY;
   let rcSupa = null;
   function rcGetSupa() {
     if (!rcSupa && window.supabase) rcSupa = window.supabase.createClient(RC_SUPABASE_URL, RC_SUPABASE_KEY);

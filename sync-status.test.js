@@ -32,6 +32,7 @@ function makeSync({ supaImpl, fetchImpl, initialRemoteData } = {}) {
   }
   const listeners = {};
   const windowStub = {
+    SUPABASE_CONFIG: { URL: 'https://example.supabase.co', KEY: 'test-key' },
     supabase: {
       createClient: () => ({
         auth: {

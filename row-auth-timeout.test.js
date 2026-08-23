@@ -14,6 +14,7 @@ function makeAuth(getSessionImpl) {
   const sandbox = {
     window: {
       supabase: { createClient: () => ({ auth: { getSession: getSessionImpl } }) },
+      SUPABASE_CONFIG: { URL: 'https://example.supabase.co', KEY: 'test-key' },
     },
     setTimeout,
     clearTimeout,
@@ -35,7 +36,10 @@ function makeAuthWithDom(getSessionImpl) {
   const btnStub = { addEventListener: (evt, fn) => { retryHandler = fn; } };
   const overlayStub = { style: {}, innerHTML: '', querySelector: () => btnStub, remove: () => {} };
   const sandbox = {
-    window: { supabase: { createClient: () => ({ auth: { getSession: getSessionImpl, signOut: () => Promise.resolve() } }) } },
+    window: {
+      supabase: { createClient: () => ({ auth: { getSession: getSessionImpl, signOut: () => Promise.resolve() } }) },
+      SUPABASE_CONFIG: { URL: 'https://example.supabase.co', KEY: 'test-key' },
+    },
     document: { createElement: () => overlayStub, body: { appendChild: () => {} } },
     setTimeout,
     clearTimeout,

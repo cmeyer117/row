@@ -8,8 +8,8 @@
 // those files.
 (function () {
   'use strict';
-  const SUPABASE_URL = 'https://vikpcejlyxieguorwysf.supabase.co';
-  const SUPABASE_KEY = 'sb_publishable_EvWPtfW1FBW5Vf-H6w0yHw_PcXK4imv';
+  const SUPABASE_URL = window.SUPABASE_CONFIG.URL;
+  const SUPABASE_KEY = window.SUPABASE_CONFIG.KEY;
   const AUTH_KEY = 'row_auth';
   // Matches coaching_is_owner()'s check server-side -- this client-side
   // check is defense-in-depth (RLS is the real boundary), but the gate's

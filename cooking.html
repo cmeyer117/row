@@ -14,6 +14,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="row-auth.js" defer></script>
 <script src="topbar.js" defer></script>
+<script src="supabase-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="staple-foods.js"></script>
 <script src="cooking-coach-data.js"></script>
@@ -320,8 +321,8 @@ html, body {
   // pages, no shared module to import them from).
   var LS_KEY = 'macro_targets';
   var DEFAULT_TARGETS = { proteinG: 280, carbG: 397, fatG: 58, calories: 3201 };
-  var SUPABASE_URL = 'https://vikpcejlyxieguorwysf.supabase.co';
-  var SUPABASE_KEY = 'sb_publishable_EvWPtfW1FBW5Vf-H6w0yHw_PcXK4imv';
+  var SUPABASE_URL = window.SUPABASE_CONFIG.URL;
+  var SUPABASE_KEY = window.SUPABASE_CONFIG.KEY;
   var supa = null;
   function getSupa() {
     if (!supa && window.supabase) supa = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);

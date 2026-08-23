@@ -12,6 +12,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="supabase-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="macro-calc.js"></script>
 <script src="sync.js" defer></script>
@@ -546,8 +547,8 @@ body::after {
         await new Promise((resolve) => document.addEventListener('DOMContentLoaded', resolve, { once: true }));
       }
       const client = window.supabase.createClient(
-        'https://vikpcejlyxieguorwysf.supabase.co',
-        'sb_publishable_EvWPtfW1FBW5Vf-H6w0yHw_PcXK4imv'
+        window.SUPABASE_CONFIG.URL,
+        window.SUPABASE_CONFIG.KEY
       );
       const now = new Date();
       const todayKey = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
@@ -571,8 +572,8 @@ body::after {
     try {
       if (!window.supabase) return;
       const client = window.supabase.createClient(
-        'https://vikpcejlyxieguorwysf.supabase.co',
-        'sb_publishable_EvWPtfW1FBW5Vf-H6w0yHw_PcXK4imv'
+        window.SUPABASE_CONFIG.URL,
+        window.SUPABASE_CONFIG.KEY
       );
       const { data, error } = await client.from('app_state').select('data').eq('key', 'vision:coach_read').maybeSingle();
       if (error || !data || !data.data || !data.data.narrative) return;
