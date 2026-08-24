@@ -80,8 +80,9 @@
 }
 .topbar-sync-dot {
   width: 9px; height: 9px; border-radius: 50%;
-  background: #6EE7B7; transition: background 0.2s;
+  background: rgba(255,255,255,0.25); transition: background 0.2s;
 }
+.topbar-sync-dot.synced { background: #6EE7B7; }
 .topbar-sync-dot.pending { background: #F2C063; }
 .topbar-sync-dot.error { background: #FF6B6B; animation: topbar-sync-pulse 1.2s ease-in-out infinite; }
 @keyframes topbar-sync-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
@@ -304,7 +305,9 @@ body.topbar-modal-open { overflow: hidden; touch-action: none; }
       return 'synced';
     }
     function render() {
-      dot.className = 'topbar-sync-dot' + (worstStatus() !== 'synced' ? ' ' + worstStatus() : '');
+      // Neutral gray until the first real status event — a green default
+      // read as "synced" even on pages where sync never initialized.
+      dot.className = 'topbar-sync-dot' + (Object.keys(state).length ? ' ' + worstStatus() : '');
       popover.innerHTML = Object.keys(state).length
         ? Object.keys(state).sort().map((key) => {
             const s = state[key];

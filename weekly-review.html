@@ -86,7 +86,7 @@ let _gymStatePromise = null;
 async function fetchGymState() {
   if (_gymStatePromise) return _gymStatePromise;
   _gymStatePromise = (async () => {
-    const res = await fetch('https://vikpcejlyxieguorwysf.supabase.co/rest/v1/app_state?key=eq.po-coach&select=data', {
+    const res = await fetch(window.SUPABASE_CONFIG.URL + '/rest/v1/app_state?key=eq.po-coach&select=data', {
       headers: {
         apikey: window.SUPABASE_CONFIG.KEY,
         Authorization: 'Bearer ' + window.SUPABASE_CONFIG.KEY,
@@ -114,7 +114,7 @@ async function fetchFoodLogWeek(monday, sunday) {
   try {
     const token = await window.RowAuth.getAccessToken();
     const res = await fetch(
-      'https://vikpcejlyxieguorwysf.supabase.co/rest/v1/food_log?log_date=gte.' + monday + '&log_date=lte.' + sunday + '&select=*',
+      window.SUPABASE_CONFIG.URL + '/rest/v1/food_log?log_date=gte.' + monday + '&log_date=lte.' + sunday + '&select=*',
       { headers: { apikey: window.SUPABASE_CONFIG.KEY, Authorization: 'Bearer ' + token } }
     );
     if (!res.ok) return [];
@@ -147,7 +147,7 @@ async function fetchCoachRead() {
 async function fetchAppStateKey(key) {
   try {
     const token = await window.RowAuth.getAccessToken();
-    const res = await fetch('https://vikpcejlyxieguorwysf.supabase.co/rest/v1/app_state?key=eq.' + key + '&select=data', {
+    const res = await fetch(window.SUPABASE_CONFIG.URL + '/rest/v1/app_state?key=eq.' + key + '&select=data', {
       headers: {
         apikey: window.SUPABASE_CONFIG.KEY,
         Authorization: 'Bearer ' + token,
@@ -811,13 +811,22 @@ async function renderReadinessPanel() {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
-  const existing = await window.getOpenDueDecision('weekly-coach-loop');
-  document.getElementById('loading').style.display = 'none';
-  renderReadinessPanel();
-  if (existing) {
-    renderCloseout(existing);
-  } else {
-    renderNewDecisionForm();
+  try {
+    const existing = await window.getOpenDueDecision('weekly-coach-loop');
+    // Awaited so a failure inside these (e.g. fetchGymState) still lands in
+    // the catch below instead of leaving a silently half-rendered page.
+    await renderReadinessPanel();
+    if (existing) {
+      await renderCloseout(existing);
+    } else {
+      await renderNewDecisionForm();
+    }
+    document.getElementById('loading').style.display = 'none';
+  } catch (err) {
+    // Without this, any failed fetch (weak gym wifi) left the page stuck
+    // on "Loading..." forever with no way forward.
+    document.getElementById('loading').innerHTML =
+      'Couldn\'t load — check your connection. <button type="button" style="margin-left:8px;padding:6px 14px;" onclick="location.reload()">Retry</button>';
   }
 });
 </script>
