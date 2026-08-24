@@ -27,7 +27,7 @@ At the start of any Cowork session, immediately request access to `G:\My Drive\C
 
 This repo (`row`) is the Row fitness dashboard: a single static multi-page vanilla HTML/JS app with Supabase for persistence, no build step, no framework. Deployed to Vercel at `https://row-sage.vercel.app`.
 
-Pages: `index.html`, `main.html`, `health.html`, `gym.html`, `mobility.html`, `po-water.html`, `coaching.html`, `coaching-plan.html`. Personal finance (income/credit/targets) lives in the standalone `steward` app, not this repo.
+Pages: `index.html`, `main.html`, `health.html`, `gym.html`, `mobility.html`, `po-water.html`. Coaching-client business features (client intake/plan/log/billing) were removed 2026-08-24 — that's now its own standalone app. Personal finance (income/credit/targets) lives in the standalone `steward` app, not this repo.
 
 Shared logic:
 - `sync.js` — cloud sync to a Supabase `app_state` table

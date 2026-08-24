@@ -1,5 +1,5 @@
-// Single entry point for all four cron-triggered push nudges, selected by
-// ?type= (workout | morning-launch | macro-drift | coaching-inquiry). Replaced
+// Single entry point for all cron-triggered push nudges, selected by
+// ?type= (workout | morning-launch | macro-drift | meal-log). Replaced
 // four separate serverless functions after Row hit Vercel's Hobby-plan cap of
 // 12 Serverless Functions per deployment; the nudges themselves live in
 // _lib/nudges.js, which Vercel doesn't count toward that limit.

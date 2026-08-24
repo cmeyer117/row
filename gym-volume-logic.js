@@ -73,9 +73,8 @@
 
   // Name-keyed map of exercises with a well-established (EMG-supported),
   // textbook secondary muscle mover -- not an exhaustive biomechanical
-  // model, just the strong/obvious cases. Keyed by exercise .name (stable),
-  // same convention as coaching-exercise-meta.js's META. An exercise absent
-  // from this map contributes only to its primary (.muscle) -- that's the
+  // model, just the strong/obvious cases. Keyed by exercise .name (stable).
+  // An exercise absent from this map contributes only to its primary (.muscle) -- that's the
   // expected case for isolation moves, not an omission.
   // Sourced 2026-08-14, see docs/superpowers/specs/2026-08-14-volume-progression-datamodel-design.md
   // for the full citation/reasoning trail (includes a Gemini independent

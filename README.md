@@ -12,7 +12,6 @@ Carl Meyer's personal fitness/life dashboard — a set of vanilla HTML/JS pages,
 | `health.html` | Supplement / daily stack tracker |
 | `mobility.html` | Mobility, warm-ups, joint care |
 | `macros.html` | Macro calculator |
-| `coaching.html` / `coaching-plan.html` | Coaching Dashboard — client management for Carl's online coaching brand |
 | `offline.html` | PWA offline fallback |
 
 ## How it works

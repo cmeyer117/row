@@ -149,34 +149,10 @@ async function mealLog(mealIndex, force) {
   return push({ body: 'Log a meal — quick add', url: '/macros.html' });
 }
 
-async function coachingInquiry(force) {
-  const since = new Date(Date.now() - 20 * 60 * 1000).toISOString();
-  const inquiries = force ? [{ name: 'Diagnostic Test' }] : await fetchRecentNewInquiries(since);
-
-  if (!inquiries.length) {
-    return { status: 200, body: { message: 'No new inquiries, no push sent' } };
-  }
-
-  return push({
-    body: inquiries.length === 1
-      ? `New coaching application from ${inquiries[0].name}`
-      : `${inquiries.length} new coaching applications`,
-  });
-}
-
-async function fetchRecentNewInquiries(sinceIso) {
-  const r = await fetch(
-    `${SUPABASE_URL}/rest/v1/coaching_inquiries?status=eq.new&created_at=gte.${encodeURIComponent(sinceIso)}&select=name`,
-    { headers: authHeaders() }
-  );
-  return r.json();
-}
-
 // The ?type= values api/send-nudge.js accepts. Adding a nudge = one entry here.
 export const NUDGES = {
   workout,
   'morning-launch': morningLaunch,
   'macro-drift': macroDrift,
-  'coaching-inquiry': coachingInquiry,
   'meal-log': mealLog,
 };
