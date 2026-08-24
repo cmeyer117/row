@@ -14,6 +14,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="supabase-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="gym-season-logic.js"></script>
 <script src="gym-volume-logic.js"></script>
 <script src="macro-calc.js"></script>
 <script src="recomp-signal-logic.js"></script>
@@ -54,7 +55,7 @@ h1 { font-family: 'Instrument Serif', Georgia, serif; font-size: 28px; margin: 0
 </head>
 <body>
 <h1>State of Me</h1>
-<p class="subtitle">This week, at a glance.</p>
+<p class="subtitle" id="somPhase">This week, at a glance.</p>
 <div id="somContent"></div>
 
 <script>
@@ -83,6 +84,26 @@ h1 { font-family: 'Instrument Serif', Georgia, serif; font-size: 28px; margin: 0
 
   function loadGymState() {
     try { return JSON.parse(localStorage.getItem('po_coach_v1') || '{}'); } catch (e) { return {}; }
+  }
+  function loadSeason() {
+    try { return JSON.parse(localStorage.getItem('po_coach_season') || 'null'); } catch (e) { return null; }
+  }
+  function loadStackItems() {
+    try { return JSON.parse(localStorage.getItem('stack:items') || 'null'); } catch (e) { return null; }
+  }
+  function loadStackTaken(dateKey) {
+    try { return JSON.parse(localStorage.getItem('stack:taken:' + dateKey) || '{}'); } catch (e) { return {}; }
+  }
+  // Last N calendar dates (YYYY-MM-DD) ending today, oldest first — same
+  // window shape renderSleep()/renderWeight() already use.
+  function lastNDates(n) {
+    var out = [];
+    for (var i = n - 1; i >= 0; i--) {
+      var d = new Date();
+      d.setDate(d.getDate() - i);
+      out.push(d.toISOString().slice(0, 10));
+    }
+    return out;
   }
   function loadWeights() {
     try { return JSON.parse(localStorage.getItem('po_coach_weights') || '[]'); } catch (e) { return []; }
@@ -149,6 +170,41 @@ h1 { font-family: 'Instrument Serif', Georgia, serif; font-size: 28px; margin: 0
     return card('Recomp Signal (30 days)', esc(result.label), 'Weight ' + weightStr + ' · Waist ' + waistStr);
   }
 
+  function renderPhaseHeader() {
+    var season = loadSeason();
+    var el = document.getElementById('somPhase');
+    if (!season || !season.phase) { el.textContent = 'This week, at a glance.'; return; }
+    var label = (window.GymSeasonLogic.PHASES[season.phase] || season.phase);
+    var day = season.startDate ? window.GymSeasonLogic.daysSince(season.startDate) : null;
+    el.textContent = label + (day != null ? ' — Day ' + day : '') + ' · this week, at a glance.';
+  }
+
+  function renderSteps() {
+    var state = loadGymState();
+    var checkins = state.checkins || {};
+    var dates = lastNDates(7);
+    var vals = dates.map(function (d) { return checkins[d] && checkins[d].steps; }).filter(function (v) { return v != null; });
+    if (!vals.length) return card('Steps (7-day avg)', '—', 'No steps logged yet — use the quick-entry on the hub');
+    var avg = Math.round(vals.reduce(function (a, b) { return a + b; }, 0) / vals.length);
+    return card('Steps (7-day avg)', avg.toLocaleString(), vals.length + '/7 days logged');
+  }
+
+  function renderStackAdherence() {
+    var items = loadStackItems();
+    if (!Array.isArray(items) || !items.length) return card('Stack Adherence (7-day)', '—', 'No stack set up yet');
+    var dates = lastNDates(7);
+    var pcts = dates.map(function (d) {
+      var taken = loadStackTaken(d);
+      return items.filter(function (i) { return taken[i.id]; }).length / items.length;
+    });
+    var avgPct = Math.round((pcts.reduce(function (a, b) { return a + b; }, 0) / pcts.length) * 100);
+    var daysAny = dates.filter(function (d) {
+      var taken = loadStackTaken(d);
+      return items.some(function (i) { return taken[i.id]; });
+    }).length;
+    return card('Stack Adherence (7-day)', avgPct + '%', daysAny + '/7 days with at least one dose logged');
+  }
+
   function renderSleep() {
     var entries = loadSleep();
     var cutoff = new Date();
@@ -202,8 +258,9 @@ h1 { font-family: 'Instrument Serif', Georgia, serif; font-size: 28px; margin: 0
     });
   }
 
+  renderPhaseHeader();
   Promise.all([renderMacros(), renderFaithIron()]).then(function (results) {
-    var html = renderVolume() + renderWeight() + renderRecomp() + renderSleep() + results[0] + results[1];
+    var html = renderSteps() + renderStackAdherence() + renderVolume() + renderWeight() + renderRecomp() + renderSleep() + results[0] + results[1];
     document.getElementById('somContent').innerHTML = html;
   });
 })();
