@@ -40,6 +40,8 @@
     { name: 'Cream of Rice (cooked)', protein_100g: 1.4, carb_100g: 17, fat_100g: 0.1, calories_100g: 75 },
     { name: 'Oats (dry, rolled)', protein_100g: 13.5, carb_100g: 68, fat_100g: 6.5, calories_100g: 379 },
     { name: 'Cocoa Powder (unsweetened)', protein_100g: 19.6, carb_100g: 57.9, fat_100g: 13.7, calories_100g: 228 },
+    { name: 'Self-Raising Flour', protein_100g: 10, carb_100g: 76, fat_100g: 1, calories_100g: 364 },
+    { name: 'Corn Flakes (dry)', protein_100g: 7, carb_100g: 84, fat_100g: 0.9, calories_100g: 378 },
     { name: 'White Potato (baked, w/ skin)', protein_100g: 2, carb_100g: 21, fat_100g: 0.1, calories_100g: 93 },
     { name: 'Sweet Potato (baked)', protein_100g: 2, carb_100g: 20.7, fat_100g: 0.1, calories_100g: 90 },
     { name: 'Sourdough Bread', protein_100g: 8.8, carb_100g: 51, fat_100g: 1.6, calories_100g: 231 },
