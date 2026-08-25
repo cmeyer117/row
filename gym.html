@@ -5361,6 +5361,9 @@ img, video, canvas, svg { max-width: 100%; }
         state.bonusSessionDates[todayKey] = true;
         saveState();
       }
+      // Row Hype Director session-close wind-down (2026-08-25) -- only on the
+      // marking-done transition, never on undo.
+      if (window.HypeAudio) window.HypeAudio.playStateMode('locked_in');
     }
     saveDoneDays(doneDays);
     renderTodaysWorkout();
@@ -5886,6 +5889,16 @@ img, video, canvas, svg { max-width: 100%; }
     $('restTimerBar').style.display = 'none';
   }
 
+  // True once today's logged-set count for this exercise hits its planned
+  // numSets exactly -- Row Hype Director final-set push (2026-08-25).
+  function isFinalSetOfDay(ex) {
+    if (!ex.numSets) return false;
+    const todayKey = wtDateKey(new Date());
+    const arr = state.logs[ex.id] || [];
+    const todayCount = arr.filter(l => l.date.slice(0, 10) === todayKey).length;
+    return todayCount === ex.numSets;
+  }
+
   function startRestTimer(ex, eventType) {
     stopRestTimer();
     restTimerEventType = eventType || null;
@@ -5904,6 +5917,7 @@ img, video, canvas, svg { max-width: 100%; }
       if (restTimerEventType === 'pr') window.HypeAudio.playPrRant();
       else if (restTimerEventType === 'grind') window.HypeAudio.playStateMode('need_discipline');
       else if (restTimerEventType === 'miss') window.HypeAudio.playStateMode('post_failure_reset');
+      else if (isFinalSetOfDay(ex)) window.HypeAudio.playStateMode('heavy_day');
       else window.HypeAudio.playMidSetHype();
     }
     restTimerInterval = setInterval(function() {
