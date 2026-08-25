@@ -52,6 +52,26 @@
       });
   };
 
+  // Returns the most recently created open decision for a category, whether
+  // its review date is still in the future or is already due. Dashboard
+  // surfaces use this; weekly-review closeout must keep using
+  // getOpenDueDecision().
+  window.getLatestOpenDecision = function (category) {
+    if (!window.supabase) return Promise.reject(new Error('supabase-js not loaded'));
+    const supa = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    return supa.from('decisions')
+      .select('*')
+      .eq('app', 'row')
+      .eq('category', category)
+      .eq('status', 'open')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .then(function (res) {
+        if (res.error) throw new Error('getLatestOpenDecision failed: ' + res.error.message);
+        return res.data && res.data[0] ? res.data[0] : null;
+      });
+  };
+
   // `details` is optional -- pass the caller's already-merged details object
   // (item verdicts folded in) to persist it alongside the whole-decision
   // verdict in the same update. Omit it to leave details untouched, same as
