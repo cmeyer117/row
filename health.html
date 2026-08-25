@@ -14,6 +14,9 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="supabase-config.js"></script>
+<script src="macro-calc.js"></script>
+<script src="staple-foods.js"></script>
+<script src="coach-meal-plan.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="sync.js" defer></script>
 <script src="row-auth.js" defer></script>
@@ -900,6 +903,21 @@ main {
       note: 'No low-fat bread' },
   ];
 
+  // Calories per meal, computed live from coach-meal-plan.js's structured
+  // food+grams rows (the same source macros.html's Coach Plan pills read) --
+  // not a second hardcoded number, so this can't drift from the real plan
+  // the way the old duplicated-across-3-files state did (Carl's ask,
+  // 2026-08-25). MEALS here has its own free-text `items` describing the
+  // same meals; matched to coach-meal-plan.js by label ("Meal 1" etc).
+  // Intra Workout has no coach-meal-plan.js equivalent (it's not a
+  // food-quantity meal in that schema) -- skipped, no calorie shown.
+  function mealCalories(mealName) {
+    if (!window.CoachMealPlan || !window.MacroCalc || !window.StapleFoods) return null;
+    const planMeal = window.CoachMealPlan.MEALS.find((m) => m.label === mealName);
+    if (!planMeal) return null;
+    return Math.round(window.MacroCalc.sumIngredients(planMeal.rows, window.StapleFoods.FOODS).calories);
+  }
+
   function getMealEaten() { return _get('meals:eaten:' + mealActiveDate()) || {}; }
   function setMealEaten(map) { _set('meals:eaten:' + mealActiveDate(), map); }
   function getMealMods() { return _get('meals:mods') || {}; } // persistent
@@ -948,7 +966,8 @@ main {
 
       const nameEl = document.createElement('div');
       nameEl.className = 'meal-name';
-      nameEl.textContent = meal.name + (meal.isIntra ? ' 🔥' : '');
+      const cal = meal.isIntra ? null : mealCalories(meal.name);
+      nameEl.textContent = meal.name + (meal.isIntra ? ' 🔥' : (cal != null ? ' · ' + cal + ' cal' : ''));
       body.appendChild(nameEl);
 
       const itemsEl = document.createElement('div');

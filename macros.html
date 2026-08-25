@@ -863,7 +863,10 @@ function renderCoachPlan() {
     const pill = document.createElement('button');
     pill.type = 'button';
     pill.className = 'mt-quickadd-pill';
-    pill.textContent = meal.label;
+    // Calorie total shown inline so the plan's cost is visible before
+    // opening the calculator, not just after (Carl's ask, 2026-08-25).
+    const macros = window.MacroCalc.sumIngredients(meal.rows, window.StapleFoods.FOODS);
+    pill.textContent = meal.label + ' · ' + Math.round(macros.calories) + ' cal';
     pill.addEventListener('click', () => openCalcModalWithMeal(meal));
     row.appendChild(pill);
   });
@@ -881,7 +884,8 @@ function renderMyMeals() {
     const pill = document.createElement('button');
     pill.type = 'button';
     pill.className = 'mt-quickadd-pill';
-    pill.textContent = meal.label;
+    const macros = window.MacroCalc.sumIngredients(meal.rows, window.StapleFoods.FOODS);
+    pill.textContent = meal.label + ' · ' + Math.round(macros.calories) + ' cal';
     pill.addEventListener('click', () => openCalcModalWithMeal(meal));
     const delBtn = document.createElement('button');
     delBtn.type = 'button';
