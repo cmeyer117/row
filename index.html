@@ -20,6 +20,7 @@
 <script src="topbar.js" defer></script>
 <script src="decisions.js"></script>
 <script src="coach-decision-action-strip-logic.js"></script>
+<script src="coach-read-recovery-logic.js"></script>
 <style>
 :root {
   --text-primary: #F4F1EA;
@@ -325,6 +326,12 @@ body::after {
 }
 .coach-read-week { color: var(--text-tertiary); font-weight: 500; text-transform: none; letter-spacing: normal; }
 .coach-read-text { font-size: 14px; line-height: 1.5; color: var(--text-secondary); }
+.coach-read-recovery { display: flex; flex-direction: column; gap: 8px; }
+.coach-read-recovery a {
+  font-size: 14px; line-height: 1.5; color: var(--text-secondary); text-decoration: none;
+}
+.coach-read-recovery a:hover { color: var(--text-primary); }
+.coach-read-recovery a#coachReadReview { color: var(--accent); }
 
 .weekly-focus-card {
   padding: 14px 16px; border-radius: 16px; margin: 0 0 20px;
@@ -414,6 +421,11 @@ body::after {
   <div class="coach-read-card" id="coachReadCard" style="display:none">
     <div class="coach-read-label">Coach's Read <span class="coach-read-week" id="coachReadWeek"></span></div>
     <div class="coach-read-text" id="coachReadText"></div>
+    <div class="coach-read-recovery" id="coachReadRecovery" hidden>
+      <a id="coachReadWeight" href="gym.html"></a>
+      <a id="coachReadSleep" href="#sleepQuick"></a>
+      <a id="coachReadReview" href="weekly-review.html"></a>
+    </div>
   </div>
 
   <section class="weekly-focus-card" id="weeklyFocusCard" hidden aria-labelledby="weeklyFocusTitle">
@@ -612,6 +624,20 @@ body::after {
   // writes (vendored from Jarvis's original deterministic logic, zero
   // LLM cost either way). Row never computes or writes this data, only
   // displays it.
+  function localDateKey() {
+    const now = new Date();
+    return now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+  }
+
+  function readJsonArray(key) {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(key) || '[]');
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
   (async function initCoachRead() {
     try {
       if (!window.supabase) return;
@@ -622,11 +648,34 @@ body::after {
       const { data, error } = await client.from('app_state').select('data').eq('key', 'vision:coach_read').maybeSingle();
       if (error || !data || !data.data || !data.data.narrative) return;
       const read = data.data;
-      document.getElementById('coachReadText').textContent = read.narrative;
       const weekEl = document.getElementById('coachReadWeek');
-      if (read.weekOf) {
-        const days = Math.round((Date.now() - new Date(read.weekOf + 'T00:00:00Z').getTime()) / 86400000);
-        weekEl.textContent = days > 10 ? '· stale (week of ' + read.weekOf + ')' : '· week of ' + read.weekOf;
+      const textEl = document.getElementById('coachReadText');
+      const recoveryEl = document.getElementById('coachReadRecovery');
+
+      const recovery = window.CoachReadRecoveryLogic && window.CoachReadRecoveryLogic.buildStaleCoachReadRecovery({
+        weekOf: read.weekOf,
+        nowMs: Date.now(),
+        today: localDateKey(),
+        weights: readJsonArray('po_coach_weights'),
+        sleep: readJsonArray('health:sleep'),
+      });
+
+      if (!recovery) {
+        textEl.textContent = read.narrative;
+        textEl.style.display = '';
+        if (read.weekOf) weekEl.textContent = '· week of ' + read.weekOf;
+        recoveryEl.hidden = true;
+        document.getElementById('coachReadWeight').textContent = '';
+        document.getElementById('coachReadSleep').textContent = '';
+        document.getElementById('coachReadReview').textContent = '';
+      } else {
+        weekEl.textContent = recovery.weekLabel;
+        textEl.textContent = '';
+        textEl.style.display = 'none';
+        document.getElementById('coachReadWeight').textContent = recovery.weight.text;
+        document.getElementById('coachReadSleep').textContent = recovery.sleep.text;
+        document.getElementById('coachReadReview').textContent = recovery.review.text;
+        recoveryEl.hidden = false;
       }
       document.getElementById('coachReadCard').style.display = '';
     } catch (e) {}
