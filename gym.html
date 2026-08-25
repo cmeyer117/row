@@ -7593,6 +7593,17 @@ document.addEventListener('DOMContentLoaded', function () {
           const incoming = JSON.stringify(merged);
           if (localStorage.getItem(k) !== incoming) {
             try { _pcOrigSet(k, incoming); changed = true; } catch {}
+          } else if (incoming !== JSON.stringify(remote[k])) {
+            // Local-wins case: the merge kept local's value (already
+            // correct in localStorage, so no write happened above), but
+            // that value still differs from remote's raw payload -- must
+            // still push back, or a newer local log/jointPain/checkin/
+            // exerciseCloseout entry never reaches Supabase despite
+            // "winning" the merge (same gap already fixed for
+            // po_coach_season below and sync.js's applyRemote(); caught by
+            // Codex layered review while building the workout-closeout
+            // feature, 2026-08-25).
+            changed = true;
           }
           continue;
         }
