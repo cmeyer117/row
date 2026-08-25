@@ -3063,6 +3063,10 @@ img, video, canvas, svg { max-width: 100%; }
         <textarea id="autopsyDeviationNote" class="po-quick-input" placeholder="Optional note" style="width:100%;margin-top:6px;min-height:40px;"></textarea>
       </div>
       <div id="autopsySuggestedChange" class="po-checkin-row-label" style="display:none;margin-top:10px;"></div>
+      <div id="autopsyCloseoutSection" style="display:none;margin-top:10px;">
+        <div class="po-checkin-row-label">Carry into next session (optional)</div>
+        <div id="autopsyCloseoutCandidates" style="display:flex;flex-direction:column;gap:6px;margin-top:6px;"></div>
+      </div>
       <div class="sub-modal-actions">
         <button type="button" class="po-btn-secondary" id="checkinSkip">Skip</button>
         <button type="button" class="po-btn-primary" id="checkinSave">Save</button>
@@ -3259,6 +3263,7 @@ img, video, canvas, svg { max-width: 100%; }
 
 <script src="voice-helpers.js"></script>
 <script src="stt-prompt-logic.js"></script>
+<script src="gym-workout-closeout-logic.js"></script>
 <script>
 // ── Seed: bodyweight history (Apr 17 – Jun 10 2026) ──────────────────────────
 // Merges historical entries with existing data — never overwrites a date the
@@ -3605,6 +3610,20 @@ img, video, canvas, svg { max-width: 100%; }
     return { rir: 0, note: ' + partials to failure' };
   }
 
+  // Advisory only -- attaches an acknowledged workout-closeout note (if
+  // still pending) to an already-decided Rx result, same non-authoritative
+  // pattern as volumeAdvisory/mesocycleAdvisory. Never touches type/weight/
+  // reps/tag/reason.
+  function attachCloseoutAdvisory(result, ex) {
+    if (!result || !ex || !window.GymWorkoutCloseoutLogic) return result;
+    const text = window.GymWorkoutCloseoutLogic.getPendingCloseoutAdvisory({
+      closeout: state.exerciseCloseouts && state.exerciseCloseouts[ex.id],
+      exerciseLogs: state.logs && state.logs[ex.id],
+    });
+    if (text) result.closeoutAdvisory = text;
+    return result;
+  }
+
   // Prescription engine — "what should I do next session?"
   // Upgrade trigger: hits CONFIG.upgradeAtReps (default 8) OR the
   // exercise's repMax, whichever fires first. So a 5-8 lifter hits
@@ -3641,7 +3660,7 @@ img, video, canvas, svg { max-width: 100%; }
       frozen.reason = bw
         ? 'Peak week: holding at ' + last.reps + ' reps, no autonomous changes. Flag anything off (pain, unusual fatigue, missed lifts) to your coach directly.'
         : 'Peak week: holding at ' + last.weight + unit() + ' × ' + last.reps + ', no autonomous changes. Flag anything off (pain, unusual fatigue, missed lifts) to your coach directly.';
-      return applyCheckinOverride(frozen, last, ex, stuck);
+      return attachCloseoutAdvisory(applyCheckinOverride(frozen, last, ex, stuck), ex);
     }
     if (bw) {
       // Bodyweight exercises track reps, not weight — "stalled" here means
@@ -3654,7 +3673,7 @@ img, video, canvas, svg { max-width: 100%; }
       if (reps >= upgradeAt) bwResult = { type: 'up', weight: 0, reps: reps + 1, tag: 'Push for more', reason: reps + ' reps — strong. Push for ' + (reps + 1) + ' next time.', bw: true, stuck: bwStuck };
       else if (reps >= repMin) bwResult = { type: 'hold', weight: 0, reps: reps + 1, tag: 'Add a rep', reason: reps + ' reps. Push for ' + (reps + 1) + ' next session.', bw: true, stuck: bwStuck };
       else bwResult = { type: 'hold', weight: 0, reps: repMin, tag: 'Repeat', reason: reps + ' reps fell short. Repeat until you hit ' + repMin + '+.', bw: true, stuck: bwStuck };
-      return applyCheckinOverride(bwResult, last, ex, bwStuck);
+      return attachCloseoutAdvisory(applyCheckinOverride(bwResult, last, ex, bwStuck), ex);
     }
     let result;
     if (stuck >= stuckThreshold && reps < repMin) {
@@ -3709,7 +3728,7 @@ img, video, canvas, svg { max-width: 100%; }
       const rirT = getMesocycleRirTarget(mesoWeek);
       finalResult.mesocycleAdvisory = 'Lift Lab Week ' + mesoWeek + '/9 — target ' + rirT.rir + ' RIR' + rirT.note + '.';
     }
-    return finalResult;
+    return attachCloseoutAdvisory(finalResult, ex);
   }
 
   // Looks up the health:sleep entry (a separate page's localStorage key --
@@ -4501,7 +4520,10 @@ img, video, canvas, svg { max-width: 100%; }
     const mesoNote = rx.mesocycleAdvisory
       ? '<p class="po-rx-reason" style="opacity:0.7;font-size:11px;">' + escape(rx.mesocycleAdvisory) + '</p>'
       : '';
-    wrap.innerHTML = '<div class="po-rx-card po-rx-' + rx.type + ' po-rx-tappable" ' + tapAttrs + '><div class="po-rx-label">' + escape(displayName) + '</div><div class="po-rx-headline">' + head + '</div><span class="po-rx-tag ' + rx.type + '">' + rx.tag + '</span><p class="po-rx-reason">' + rx.reason + ' Tap to log it.</p>' + pumpNote + mesoNote + liftLabNote + '</div>';
+    const closeoutNote = rx.closeoutAdvisory
+      ? '<p class="po-rx-reason" style="opacity:0.7;font-size:11px;">' + escape(rx.closeoutAdvisory) + '</p>'
+      : '';
+    wrap.innerHTML = '<div class="po-rx-card po-rx-' + rx.type + ' po-rx-tappable" ' + tapAttrs + '><div class="po-rx-label">' + escape(displayName) + '</div><div class="po-rx-headline">' + head + '</div><span class="po-rx-tag ' + rx.type + '">' + rx.tag + '</span><p class="po-rx-reason">' + rx.reason + ' Tap to log it.</p>' + pumpNote + mesoNote + closeoutNote + liftLabNote + '</div>';
   }
   function renderStats() {
     const ex = getCurrentEx();
@@ -5340,13 +5362,27 @@ img, video, canvas, svg { max-width: 100%; }
     const exercises = (state.exercises || []).concat(getAdhocExercises());
     const rxList = [];
     const names = [];
+    const closeoutCandidates = [];
     exercises.forEach(function(ex) {
       const allExLogs = allLogs[ex.id] || [];
       const loggedToday = allExLogs.some(function(l) { return l && l.date && l.date.slice(0, 10) === today; });
       if (!loggedToday) return;
       const priorLogs = allExLogs.filter(function(l) { return l && l.date && l.date.slice(0, 10) < today; });
-      rxList.push(getRx(ex, priorLogs));
+      const rx = getRx(ex, priorLogs);
+      rxList.push(rx);
       names.push(ex.name);
+      if (window.GymWorkoutCloseoutLogic) {
+        const outcome = window.GymAutopsyLogic.classifyRxOutcome(rx);
+        const candidates = window.GymWorkoutCloseoutLogic.buildCloseoutCandidates({
+          today: today,
+          exerciseId: ex.id,
+          exerciseName: ex.name,
+          activeVariant: getSession(ex.id).activeVariant,
+          outcome: outcome,
+          jointPain: state.jointPain || [],
+        });
+        closeoutCandidates.push.apply(closeoutCandidates, candidates);
+      }
     });
     if (!rxList.length) return null;
     const outcomes = rxList.map(window.GymAutopsyLogic.classifyRxOutcome);
@@ -5356,7 +5392,8 @@ img, video, canvas, svg { max-width: 100%; }
       rxSummary: overall,
       needsReason: window.GymAutopsyLogic.sessionNeedsReason(outcomes),
       missedNames: missedNames,
-      suggestedChange: window.GymAutopsyLogic.pickSuggestedChange(rxList)
+      suggestedChange: window.GymAutopsyLogic.pickSuggestedChange(rxList),
+      closeoutCandidates: closeoutCandidates
     };
   }
 
@@ -5432,6 +5469,8 @@ img, video, canvas, svg { max-width: 100%; }
       $('autopsyReasonSection').style.display = 'none';
       $('autopsySuggestedChange').style.display = 'none';
       $('autopsyRxSummary').textContent = '';
+      $('autopsyCloseoutSection').style.display = 'none';
+      $('autopsyCloseoutCandidates').innerHTML = '';
       autopsyPayload = { rxSummary: null, suggestedChange: null };
     }
     $('checkinSkip').addEventListener('click', function() {
@@ -5509,6 +5548,31 @@ img, video, canvas, svg { max-width: 100%; }
         if (autopsy.suggestedChange) {
           $('autopsySuggestedChange').textContent = 'Suggested change: ' + autopsy.suggestedChange;
           $('autopsySuggestedChange').style.display = 'block';
+        }
+        if (autopsy.closeoutCandidates && autopsy.closeoutCandidates.length) {
+          const list = $('autopsyCloseoutCandidates');
+          autopsy.closeoutCandidates.forEach(function(candidate) {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'po-btn-secondary';
+            btn.style.width = '100%';
+            btn.style.textAlign = 'left';
+            btn.textContent = 'Carry forward: ' + candidate.text;
+            btn.addEventListener('click', function() {
+              if (!state.exerciseCloseouts || typeof state.exerciseCloseouts !== 'object') state.exerciseCloseouts = {};
+              state.exerciseCloseouts[candidate.exerciseId] = {
+                date: getActiveDate(),
+                kind: candidate.kind,
+                text: candidate.text,
+                acknowledgedAt: new Date().toISOString()
+              };
+              saveState();
+              btn.disabled = true;
+              btn.textContent = 'Saved for next session';
+            });
+            list.appendChild(btn);
+          });
+          $('autopsyCloseoutSection').style.display = 'block';
         }
       }
       bg.classList.add('show');
