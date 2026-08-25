@@ -77,6 +77,11 @@
     // sauce-rule caveat in Cooking Coach vault notes. This is a generic
     // low-sugar commercial average; swap in a label value if precision matters.
     { name: 'Kombucha (generic, bottled)', protein_100g: 0, carb_100g: 3.5, fat_100g: 0, calories_100g: 18 },
+    // Zero/near-zero sugar bottled kombucha (e.g. GT's Zero Sugar-style
+    // lines) -- residual sugar is what drives kombucha's calories, so a
+    // sugar-free label runs close to 0 rather than this file's generic
+    // entry's 18 cal/100g. Swap in the actual label figure if it's known.
+    { name: 'Kombucha (sugar-free)', protein_100g: 0, carb_100g: 1, fat_100g: 0, calories_100g: 5 },
     // Carl's brand: ~10 cal per 2 tbsp (30ml). Carb estimated from typical
     // sugar-alcohol-based "sugar free" syrups at that calorie level (~4g
     // per 2 tbsp) -- swap in the actual label carb figure if it's known

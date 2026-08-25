@@ -9,8 +9,10 @@
 // defaults to the first-listed option — macros.html's Calculator modal's
 // existing per-row food dropdown is the picker: change the dropdown to log
 // what was actually eaten instead of the default. Fruit/veggie rows default
-// to Banana/Broccoli since the coach's plan names those generically
+// to Blueberries/Broccoli since the coach's plan names those generically
 // ("fruit", "veggies — anything but corn"), not as a specific OR choice.
+// Blueberries over Banana specifically (2026-08-25, Carl's ask): same
+// generic-fruit-slot role, lower calories per 200g serving.
 (function () {
   'use strict';
 
@@ -21,7 +23,7 @@
         { foodName: 'Eggs, whole (cooked)', grams: 100 },
         { foodName: 'Egg Whites', grams: 90 },
         { foodName: 'Turkey Bacon (cooked, generic)', grams: 30 },
-        { foodName: 'Banana', grams: 200 },
+        { foodName: 'Blueberries', grams: 200 },
         { foodName: 'Oats (dry, rolled)', grams: 25 },
         { foodName: 'Broccoli (cooked)', grams: 150 },
       ],
@@ -56,8 +58,8 @@
         { foodName: 'Ground Beef 93/7 (cooked)', grams: 170 },
         { foodName: 'Sourdough Bread', grams: 65 },
         { foodName: 'Broccoli (cooked)', grams: 150 },
-        { foodName: 'Kombucha (generic, bottled)', grams: 227 },
-        { foodName: 'Banana', grams: 200 },
+        { foodName: 'Kombucha (sugar-free)', grams: 227 },
+        { foodName: 'Blueberries', grams: 200 },
       ],
     },
     {
