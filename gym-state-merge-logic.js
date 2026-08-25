@@ -1,15 +1,16 @@
 // gym-state-merge-logic.js — pure merge logic for po_coach_v1's `logs`,
-// `jointPain`, and `checkins`. No DOM, no Supabase.
+// `jointPain`, `checkins`, and `exerciseCloseouts`. No DOM, no Supabase.
 //
 // po_coach_v1 is pushed as a full-object replace on every save (like every
 // other PC_SYNCED_KEYS entry that isn't po_coach_weights/po_coach_photos --
 // those two already have union-merge protection after a prior incident,
 // per the comment on po_coach_weights's merge in gym.html). `logs`,
-// `jointPain`, and `checkins` are the irreplaceable-history parts of
-// po_coach_v1 (the rest -- exercises, days, gyms, settings -- is current
-// config, fine to let the remote value win outright). Without this, any
-// client that pushes a stale/reduced local copy permanently wipes real
-// history for every other device, with nothing to detect or undo it.
+// `jointPain`, `checkins`, and `exerciseCloseouts` are the irreplaceable-
+// history/user-acknowledged parts of po_coach_v1 (the rest -- exercises,
+// days, gyms, settings -- is current config, fine to let the remote value
+// win outright). Without this, any client that pushes a stale/reduced
+// local copy permanently wipes real history for every other device, with
+// nothing to detect or undo it.
 (function () {
   'use strict';
 
@@ -100,6 +101,36 @@
     return merged;
   }
 
+  // exerciseCloseouts is a plain object keyed by exerciseId, one acknowledged
+  // next-session note per exercise. Unlike logs/jointPain (arrays to union)
+  // or checkins (per-field merge), there's exactly one live record per key,
+  // so a same-exercise conflict is resolved by acknowledgedAt recency rather
+  // than a union or field-by-field combine.
+  function mergeExerciseCloseouts(remoteObj, localObj) {
+    remoteObj = remoteObj && typeof remoteObj === 'object' && !Array.isArray(remoteObj) ? remoteObj : {};
+    localObj = localObj && typeof localObj === 'object' && !Array.isArray(localObj) ? localObj : {};
+    const merged = {};
+    const ids = new Set([...Object.keys(remoteObj), ...Object.keys(localObj)]);
+    ids.forEach(function (exerciseId) {
+      const remote = remoteObj[exerciseId];
+      const local = localObj[exerciseId];
+      const valid = function (value) {
+        return value
+          && typeof value === 'object'
+          && typeof value.date === 'string'
+          && typeof value.text === 'string'
+          && value.text.trim() !== ''
+          && typeof value.acknowledgedAt === 'string'
+          && !Number.isNaN(Date.parse(value.acknowledgedAt));
+      };
+      if (!valid(remote) && !valid(local)) return;
+      if (!valid(remote)) { merged[exerciseId] = local; return; }
+      if (!valid(local)) { merged[exerciseId] = remote; return; }
+      merged[exerciseId] = local.acknowledgedAt > remote.acknowledgedAt ? local : remote;
+    });
+    return merged;
+  }
+
   // Total logged-set count across all exercises, for the push-time
   // shrink tripwire (mirrors pcWarnIfShrinking's weights check).
   function totalLogCount(logs) {
@@ -108,9 +139,9 @@
   }
 
   if (typeof window !== 'undefined') {
-    window.GymStateMergeLogic = { mergeLogs: mergeLogs, mergeJointPain: mergeJointPain, mergeCheckins: mergeCheckins, totalLogCount: totalLogCount };
+    window.GymStateMergeLogic = { mergeLogs: mergeLogs, mergeJointPain: mergeJointPain, mergeCheckins: mergeCheckins, mergeExerciseCloseouts: mergeExerciseCloseouts, totalLogCount: totalLogCount };
   }
   if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { mergeLogs: mergeLogs, mergeJointPain: mergeJointPain, mergeCheckins: mergeCheckins, totalLogCount: totalLogCount };
+    module.exports = { mergeLogs: mergeLogs, mergeJointPain: mergeJointPain, mergeCheckins: mergeCheckins, mergeExerciseCloseouts: mergeExerciseCloseouts, totalLogCount: totalLogCount };
   }
 })();

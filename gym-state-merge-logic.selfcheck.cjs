@@ -13,7 +13,7 @@ const source = fs.readFileSync(path.join(__dirname, 'gym-state-merge-logic.js'),
 const sandbox = { window: {} };
 vm.createContext(sandbox);
 vm.runInContext(source, sandbox);
-const { mergeLogs, mergeCheckins, totalLogCount } = sandbox.window.GymStateMergeLogic;
+const { mergeLogs, mergeCheckins, totalLogCount, mergeExerciseCloseouts } = sandbox.window.GymStateMergeLogic;
 
 function assertEqual(actual, expected, label) {
   const a = JSON.stringify(actual), e = JSON.stringify(expected);
@@ -106,6 +106,35 @@ assertEqual(
   ),
   { '2026-08-04': { pain: 'high', recovery: null, pump: null, steps: null } },
   'genuine same-field conflict on the same day: remote wins'
+);
+
+const closeoutA = {
+  date: '2026-08-25', kind: 'substitution', text: 'Use neutral grip.',
+  acknowledgedAt: '2026-08-25T18:00:00.000Z'
+};
+const closeoutB = {
+  date: '2026-08-26', kind: 'missed-progression', text: 'Repeat before adding.',
+  acknowledgedAt: '2026-08-26T18:00:00.000Z'
+};
+assertEqual(
+  mergeExerciseCloseouts({}, { press: closeoutA }),
+  { press: closeoutA },
+  'local-only acknowledged closeout survives an empty remote object'
+);
+assertEqual(
+  mergeExerciseCloseouts({ row: closeoutA }, {}),
+  { row: closeoutA },
+  'remote-only acknowledged closeout is retained'
+);
+assertEqual(
+  mergeExerciseCloseouts({ press: closeoutA }, { press: closeoutB }),
+  { press: closeoutB },
+  'later local acknowledgement wins a same-exercise conflict'
+);
+assertEqual(
+  mergeExerciseCloseouts({ press: { date: '2026-08-25', text: '', acknowledgedAt: 'bad' } }, {}),
+  {},
+  'invalid closeout record is omitted rather than rendered later'
 );
 
 console.log('gym-state-merge-logic.selfcheck.cjs: all assertions passed');
