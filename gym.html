@@ -5889,17 +5889,19 @@ img, video, canvas, svg { max-width: 100%; }
     $('restTimerBar').style.display = 'none';
   }
 
-  // True once today's logged-set count for this exercise hits its planned
-  // numSets exactly -- Row Hype Director final-set push (2026-08-25).
-  function isFinalSetOfDay(ex) {
+  // True once the logged-set count for this exercise on dateKey hits its
+  // planned numSets exactly -- Row Hype Director final-set push (2026-08-25).
+  // Takes the same dateKey the caller just logged the set under (not "today"
+  // recomputed independently) so it stays correct across the 6AM day-rollover
+  // and backdated log entries (Codex catch, 2026-08-25).
+  function isFinalSetOfDay(ex, dateKey) {
     if (!ex.numSets) return false;
-    const todayKey = wtDateKey(new Date());
     const arr = state.logs[ex.id] || [];
-    const todayCount = arr.filter(l => l.date.slice(0, 10) === todayKey).length;
-    return todayCount === ex.numSets;
+    const todayCount = arr.filter(l => l.date.slice(0, 10) === dateKey).length;
+    return todayCount === Number(ex.numSets);
   }
 
-  function startRestTimer(ex, eventType) {
+  function startRestTimer(ex, eventType, dateKey) {
     stopRestTimer();
     restTimerEventType = eventType || null;
     const repMin = parseInt(ex.repMin, 10) || 8;
@@ -5917,7 +5919,7 @@ img, video, canvas, svg { max-width: 100%; }
       if (restTimerEventType === 'pr') window.HypeAudio.playPrRant();
       else if (restTimerEventType === 'grind') window.HypeAudio.playStateMode('need_discipline');
       else if (restTimerEventType === 'miss') window.HypeAudio.playStateMode('post_failure_reset');
-      else if (isFinalSetOfDay(ex)) window.HypeAudio.playStateMode('heavy_day');
+      else if (isFinalSetOfDay(ex, dateKey)) window.HypeAudio.playStateMode('heavy_day');
       else window.HypeAudio.playMidSetHype();
     }
     restTimerInterval = setInterval(function() {
@@ -6368,7 +6370,7 @@ img, video, canvas, svg { max-width: 100%; }
     }
     if (plateMode) { plateCounts = {}; updatePlateUI(); }
     resetChipToToday('logDateChip', 'logDateInput');
-    startRestTimer(ex, eventType);
+    startRestTimer(ex, eventType, dateKey);
     saveState(); renderAll();
     // Strength changed → composition estimate may shift
     if (typeof wtRender === 'function') wtRender();
@@ -6550,7 +6552,7 @@ img, video, canvas, svg { max-width: 100%; }
     if (eventType && window.__gym && typeof window.__gym.logWorkoutEvent === 'function') {
       window.__gym.logWorkoutEvent(ex.name, eventType, w, reps, !!ex.bw);
     }
-    if (typeof startRestTimer === 'function') startRestTimer(ex, eventType);
+    if (typeof startRestTimer === 'function') startRestTimer(ex, eventType, dk);
     var msg = '✓  ' + ex.name + '  ·  ' + formatSet(entry, ex);
     if (outlier) msg = '⚠ Logged, but ' + w + unit() + ' is ' + outlier.multiplier + '× your last (' + outlier.priorWeight + unit() + '). Typo? Edit it in History if so.';
     return { ok: true, msg: msg, outlier: !!outlier };
