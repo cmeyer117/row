@@ -52,20 +52,6 @@ html, body {
 .mob-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
 .mob-title { font-size: 22px; font-weight: 700; letter-spacing: -0.015em; margin: 0; }
 .mob-subtitle { font-size: 12px; color: var(--text-3); margin: 2px 0 0; }
-.mob-tabs { display: flex; gap: 6px; margin-bottom: 20px; overflow-x: auto; scrollbar-width: none; }
-.mob-tabs::-webkit-scrollbar { display: none; }
-.mob-tab-btn {
-  flex-shrink: 0; padding: 8px 16px; border-radius: 999px;
-  font-size: 13px; font-weight: 600; letter-spacing: 0.01em;
-  color: var(--text-3); background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.08); cursor: pointer;
-  transition: color 0.15s, background 0.15s, border-color 0.15s;
-  -webkit-tap-highlight-color: transparent; font-family: inherit;
-}
-.mob-tab-btn:hover { color: var(--text-1); }
-.mob-tab-btn.active { color: var(--text-1); background: rgba(110,231,183,0.10); border-color: rgba(110,231,183,0.30); }
-.mob-section { display: none; }
-.mob-section.active { display: block; }
 .mob-card { background: rgba(255,255,255,0.025); border: 1px solid var(--border); border-radius: 16px; padding: 16px 18px; margin-bottom: 10px; }
 .mob-card-body { font-size: 13px; color: var(--text-2); line-height: 1.55; }
 .mob-card-body strong { color: var(--text-1); font-weight: 600; }
@@ -77,23 +63,10 @@ html, body {
 .fc-camera-wrap { position: relative; width: 100%; aspect-ratio: 3 / 4; background: #050506; border-radius: 16px; overflow: hidden; margin-bottom: 12px; }
 .fc-camera-wrap video, .fc-camera-wrap canvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .fc-camera-wrap canvas { pointer-events: none; }
-.fc-hold-ring { position: absolute; top: 12px; right: 12px; width: 44px; height: 44px; }
-.fc-hold-ring circle { fill: none; stroke-width: 4; }
-.fc-hold-ring .bg { stroke: rgba(255,255,255,0.15); }
-.fc-hold-ring .fg { stroke: var(--accent); stroke-linecap: round; transform: rotate(-90deg); transform-origin: 50% 50%; transition: stroke-dashoffset 0.1s linear; }
 .fc-status-banner { position: absolute; left: 12px; right: 12px; bottom: 12px; padding: 8px 12px; border-radius: 10px; background: rgba(0,0,0,0.65); font-size: 12px; color: var(--text-2); text-align: center; }
 .fc-status-banner.warn { color: var(--warn); }
 .fc-status-banner.bad { color: var(--bad); }
-.fc-compare { display: flex; gap: 8px; margin-bottom: 12px; }
-.fc-compare > div { flex: 1; }
-.fc-compare img, .fc-compare canvas { width: 100%; border-radius: 10px; display: block; }
-.fc-compare .fc-compare-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-3); margin-bottom: 4px; }
-.fc-pose-picker { display: flex; gap: 6px; overflow-x: auto; margin-bottom: 12px; scrollbar-width: none; }
-.fc-pose-picker::-webkit-scrollbar { display: none; }
-.fc-pose-chip { flex-shrink: 0; padding: 8px 14px; border-radius: 999px; font-size: 12px; font-weight: 600; color: var(--text-2); background: rgba(255,255,255,0.04); border: 1px solid var(--border); cursor: pointer; -webkit-tap-highlight-color: transparent; font-family: inherit; }
-.fc-pose-chip.active { color: var(--text-1); background: rgba(110,231,183,0.10); border-color: rgba(110,231,183,0.30); }
-.fc-symmetry-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
-.fc-symmetry-row:last-child { border-bottom: none; }
+.fc-info-stub { padding: 16px 18px; border: 1px dashed var(--border-strong); border-radius: 16px; color: var(--text-3); font-size: 13px; text-align: center; }
 .fc-rep-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
 .fc-rep-row:last-child { border-bottom: none; }
 .fc-rep-flag { font-size: 11px; padding: 3px 8px; border-radius: 999px; background: rgba(255,138,138,0.12); color: var(--bad); }
@@ -120,41 +93,20 @@ html, body {
     </div>
   </div>
 
-  <div class="mob-tabs">
-    <button class="mob-tab-btn active" data-section="posing" type="button">Posing Coach</button>
-    <button class="mob-tab-btn" data-section="lift" type="button">Lift-Form Coach</button>
+  <div class="mob-rule"><strong>How it works:</strong> name the exercise, record a set, get a rep-by-rep readout of ROM/tempo/stability scored against your own average for that set.</div>
+
+  <input class="fc-input" id="liftExerciseName" type="text" placeholder="Exercise name (e.g. Hack Squat)">
+
+  <div class="fc-camera-wrap" id="liftCameraWrap">
+    <video id="liftVideo" autoplay playsinline muted></video>
+    <div class="fc-status-banner" id="liftStatus">Requesting camera…</div>
   </div>
 
-  <div class="mob-section active" id="section-posing">
-    <div class="mob-rule"><strong>How it works:</strong> pick a pose, hold it steady for ~1.5s and the camera auto-captures a still to compare against the reference photo.</div>
+  <button class="fc-btn fc-btn-primary" id="recordSetBtn" type="button">Record Set</button>
+  <div id="liftResult"></div>
 
-    <div class="fc-pose-picker" id="posePicker"></div>
-
-    <div class="fc-camera-wrap" id="posingCameraWrap">
-      <video id="posingVideo" autoplay playsinline muted></video>
-      <svg class="fc-hold-ring" id="holdRing" viewBox="0 0 44 44">
-        <circle class="bg" cx="22" cy="22" r="18"></circle>
-        <circle class="fg" cx="22" cy="22" r="18" stroke-dasharray="113" stroke-dashoffset="113"></circle>
-      </svg>
-      <div class="fc-status-banner" id="posingStatus">Requesting camera…</div>
-    </div>
-
-    <div id="posingResult"></div>
-  </div>
-
-  <div class="mob-section" id="section-lift">
-    <div class="mob-rule"><strong>How it works:</strong> name the exercise, record a set, get a rep-by-rep readout of ROM/tempo/stability scored against your own average for that set.</div>
-
-    <input class="fc-input" id="liftExerciseName" type="text" placeholder="Exercise name (e.g. Hack Squat)">
-
-    <div class="fc-camera-wrap" id="liftCameraWrap">
-      <video id="liftVideo" autoplay playsinline muted></video>
-      <div class="fc-status-banner" id="liftStatus">Requesting camera…</div>
-    </div>
-
-    <button class="fc-btn fc-btn-primary" id="recordSetBtn" type="button">Record Set</button>
-    <div id="liftResult"></div>
-  </div>
+  <div class="mob-divider"></div>
+  <div class="fc-info-stub">Form cues and technique breakdowns are coming here — planned separately.</div>
 </div>
 
 <nav class="gym-tabbar">
@@ -163,9 +115,9 @@ html, body {
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="3" width="12" height="2" rx="1" fill="currentColor"/><rect x="2" y="7" width="8" height="2" rx="1" fill="currentColor"/><rect x="2" y="11" width="10" height="2" rx="1" fill="currentColor"/></svg>
       Fitness
     </a>
-    <a class="gym-tab active" href="form-coach.html">
+    <a class="gym-tab" href="coach.html">
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="2" width="12" height="9" rx="1.5" stroke="currentColor" stroke-width="1.3" fill="none"/><circle cx="8" cy="6.5" r="1.6" stroke="currentColor" stroke-width="1.2" fill="none"/><path d="M2 13h12" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-      Form Coach
+      Coach
     </a>
   </div>
 </nav>
@@ -223,38 +175,22 @@ html, body {
 <script type="module">
 import { PoseLandmarker, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest";
 
-// Posing Coach and Lift-Form Coach used to share one getUserMedia stream +
-// one PoseLandmarker instance (a lock ensured only the first mode's call
-// actually acquired the camera/model, the second just reused it). Carl
-// asked for full separation (2026-08-25) -- own camera, own model, own
-// data per mode, no shared state. Each mode gets its own state slot below.
-//
-// Model load (landmarkerPromise) is cached forever per mode once started --
-// no reason to re-download the WASM/model on every tab revisit. The camera
-// STREAM is different: acquired fresh on each tab visit and explicitly torn
-// down (stopCamera) when switching away, rather than left running. Codex
-// review catch (2026-08-25): an earlier version left the outgoing stream
-// running when switching tabs (camera light stays on, RAF loop runs
-// forever) and had no serialization against a fast switch requesting both
-// cameras concurrently -- exactly the device-conflict risk this whole
-// change was meant to avoid. The tab-switcher below now calls stopCamera on
-// the outgoing mode BEFORE starting the incoming one, synchronously, so the
-// two getUserMedia calls can never be in flight at the same time.
-var FormCoachCamera = {
-  posing: { landmarker: null, landmarkerPromise: null, stream: null, ready: false, error: null, cancelLoop: null },
-  lift: { landmarker: null, landmarkerPromise: null, stream: null, ready: false, error: null, cancelLoop: null },
-};
-window.FormCoachCamera = FormCoachCamera;
+// Single-camera module (2026-08-25 Coach tab split) -- this page now owns
+// only the lift camera (posing moved to posing.html), so the old mode-keyed
+// FormCoachCamera is replaced with an unkeyed equivalent. Same
+// stop-before-start discipline as before (730d13d), now triggered by
+// postMessage from the parent coach.html frame instead of a same-page tab
+// click.
+var LiftCamera = { landmarker: null, landmarkerPromise: null, stream: null, ready: false, error: null, cancelLoop: null };
 
-function loadLandmarker(mode, statusEl) {
-  var slot = FormCoachCamera[mode];
-  if (!slot.landmarkerPromise) {
-    slot.landmarkerPromise = (async function () {
+function loadLandmarker(statusEl) {
+  if (!LiftCamera.landmarkerPromise) {
+    LiftCamera.landmarkerPromise = (async function () {
       try {
         var vision = await FilesetResolver.forVisionTasks(
           "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
         );
-        slot.landmarker = await PoseLandmarker.createFromOptions(vision, {
+        LiftCamera.landmarker = await PoseLandmarker.createFromOptions(vision, {
           baseOptions: {
             modelAssetPath: "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task",
             delegate: "GPU"
@@ -264,278 +200,64 @@ function loadLandmarker(mode, statusEl) {
         });
         return true;
       } catch (err) {
-        slot.error = 'model-load-failed';
+        LiftCamera.error = 'model-load-failed';
         if (statusEl) { statusEl.textContent = 'Pose detection failed to load — check your connection and reload.'; statusEl.classList.add('bad'); }
         return false;
       }
     })();
   }
-  return slot.landmarkerPromise;
+  return LiftCamera.landmarkerPromise;
 }
 
-async function initCamera(mode, videoEl, statusEl) {
-  var slot = FormCoachCamera[mode];
-  var modelOk = await loadLandmarker(mode, statusEl);
+async function initCamera(videoEl, statusEl) {
+  var modelOk = await loadLandmarker(statusEl);
   if (!modelOk) return false;
-
   try {
-    slot.stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
+    LiftCamera.stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
   } catch (err) {
-    slot.error = 'camera-denied';
+    LiftCamera.error = 'camera-denied';
     if (statusEl) { statusEl.textContent = 'Camera access denied. Allow camera access in your browser settings, then reload.'; statusEl.classList.add('bad'); }
     return false;
   }
-
-  slot.ready = true;
-  videoEl.srcObject = slot.stream;
+  LiftCamera.ready = true;
+  videoEl.srcObject = LiftCamera.stream;
   await new Promise(function (resolve) { videoEl.onloadedmetadata = resolve; });
   if (statusEl) { statusEl.textContent = ''; statusEl.classList.remove('bad', 'warn'); }
   return true;
 }
 
-// Stops this mode's camera stream and detection loop (called when
-// switching away from its tab). Deliberately does NOT discard the loaded
-// landmarker/model -- that stays cached so returning to this tab later
-// only re-acquires the camera, not a full model re-download.
-function stopCamera(mode, videoEl) {
-  var slot = FormCoachCamera[mode];
-  if (slot.stream) {
-    slot.stream.getTracks().forEach(function (t) { t.stop(); });
-    slot.stream = null;
+function stopCamera(videoEl) {
+  if (LiftCamera.stream) {
+    LiftCamera.stream.getTracks().forEach(function (t) { t.stop(); });
+    LiftCamera.stream = null;
   }
   if (videoEl) videoEl.srcObject = null;
-  slot.ready = false;
-  if (slot.cancelLoop) { slot.cancelLoop(); slot.cancelLoop = null; }
+  LiftCamera.ready = false;
+  if (LiftCamera.cancelLoop) { LiftCamera.cancelLoop(); LiftCamera.cancelLoop = null; }
 }
 
-// Runs this mode's own pose landmarker against one video element on a
-// throttled interval and calls onResult(landmarks|null, timestampMs) each
-// time. landmarks is null when no person is detected in frame — callers
-// must handle that (show a "step back" message), not assume a result.
-// isActiveFn: detection work (and onResult) is skipped while it returns
-// false, same as before -- but the loop itself is now also explicitly
-// cancellable via slot.cancelLoop (set here, invoked by stopCamera above)
-// rather than running forever once started.
-function startDetectionLoop(mode, videoEl, onResult, intervalMs, isActiveFn) {
-  var slot = FormCoachCamera[mode];
+function startDetectionLoop(videoEl, onResult, intervalMs, isActiveFn) {
   var lastRun = 0;
   var cancelled = false;
   function tick(nowMs) {
     if (cancelled) return;
-    if (isActiveFn() && slot.ready && slot.landmarker && nowMs - lastRun >= intervalMs) {
+    if (isActiveFn() && LiftCamera.ready && LiftCamera.landmarker && nowMs - lastRun >= intervalMs) {
       lastRun = nowMs;
-      var result = slot.landmarker.detectForVideo(videoEl, performance.now());
+      var result = LiftCamera.landmarker.detectForVideo(videoEl, performance.now());
       var landmarks = (result.landmarks && result.landmarks.length) ? result.landmarks[0] : null;
       onResult(landmarks, nowMs);
     }
     requestAnimationFrame(tick);
   }
-  slot.cancelLoop = function () { cancelled = true; };
+  LiftCamera.cancelLoop = function () { cancelled = true; };
   requestAnimationFrame(tick);
 }
 
-window.FormCoachCamera.initCamera = initCamera;
-window.FormCoachCamera.stopCamera = stopCamera;
-window.FormCoachCamera.startDetectionLoop = startDetectionLoop;
-// This module script is deferred (type="module" always is), so it runs
-// AFTER the plain <script> blocks below it in document order -- including
-// the tab-switcher and both mode sections, which reference
-// window.FormCoachCamera. This readiness event is how they know it's safe
-// to call in (same handshake the original shared-camera version used;
-// still required even though the camera itself is no longer shared).
-window.dispatchEvent(new Event('form-coach-camera-ready'));
-</script>
-<script>
-// Which mode's tab is currently visible — read by each mode's
-// detection-loop isActiveFn (see the camera module above) so detection
-// work only runs against the visible tab. Also drives lazy per-mode
-// camera init: each mode's own section script (below, later in the
-// document) checks window.FormCoachActiveMode against its own name once
-// at load -- this script block runs first and already sets it to 'posing'
-// (the markup's default-active tab) below, so that check covers the
-// initial load with no event needed. 'form-coach-tab-active' is only for
-// LATER switches, after every section's listener is registered -- firing
-// it here too, before those listeners exist, would fire into the void.
-window.FormCoachActiveMode = 'posing';
-// video element per mode, keyed the same as FormCoachCamera's slots --
-// used here only to stop the outgoing mode's stream on switch (Codex
-// review catch, 2026-08-25: switching tabs used to leave the outgoing
-// camera running indefinitely and could race a fast switch into two
-// concurrent getUserMedia calls). Stopping happens synchronously, before
-// the incoming mode's own start logic runs (via the dispatched event
-// below), so the two acquisitions can never overlap.
-var FORM_COACH_VIDEO_IDS = { posing: 'posingVideo', lift: 'liftVideo' };
-(function () {
-  var tabs = document.querySelectorAll('.mob-tab-btn');
-  tabs.forEach(function (btn) {
-    btn.addEventListener('click', function () {
-      var outgoing = window.FormCoachActiveMode;
-      var incoming = btn.dataset.section;
-      if (outgoing !== incoming && window.FormCoachCamera && window.FormCoachCamera.stopCamera) {
-        window.FormCoachCamera.stopCamera(outgoing, document.getElementById(FORM_COACH_VIDEO_IDS[outgoing]));
-      }
-      tabs.forEach(function (b) { b.classList.remove('active'); });
-      btn.classList.add('active');
-      document.querySelectorAll('.mob-section').forEach(function (s) { s.classList.remove('active'); });
-      document.getElementById('section-' + incoming).classList.add('active');
-      window.FormCoachActiveMode = incoming;
-      window.dispatchEvent(new CustomEvent('form-coach-tab-active', { detail: { mode: incoming } }));
-    });
-  });
-})();
-</script>
-<script>
-(function () {
-  var POSE_SLUGS = Object.keys(window.FormCoachLogic.POSE_CONFIGS);
-  var activeSlug = POSE_SLUGS[0];
-  var holdTracker = window.FormCoachLogic.createHoldTracker();
-  var HOLD_TOLERANCE_DEG = 6;
-  var HOLD_DURATION_MS = 1500;
-  var frozen = false;
-
-  async function fetchPoseCritique(imageBase64) {
-    var controller = new AbortController();
-    var timer = setTimeout(function () { controller.abort(); }, 25000);
-    try {
-      // 2026-08-12 audit fix: was a client-visible shared secret, now the
-      // real owner session token -- see row-auth.js's getAccessToken().
-      var token = await window.RowAuth.getAccessToken();
-      var res = await fetch('/api/vision-pose-critique', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-        body: JSON.stringify({ imageBase64: imageBase64, mediaType: 'image/jpeg' }),
-        signal: controller.signal,
-      });
-      if (!res.ok) return null;
-      var data = await res.json();
-      return (data && typeof data.critique === 'string') ? data : null;
-    } catch (err) {
-      console.warn('[form-coach] pose critique fetch failed:', err && err.message);
-      return null;
-    } finally {
-      clearTimeout(timer);
-    }
-  }
-
-  var picker = document.getElementById('posePicker');
-  POSE_SLUGS.forEach(function (slug) {
-    var chip = document.createElement('button');
-    chip.type = 'button';
-    chip.className = 'fc-pose-chip' + (slug === activeSlug ? ' active' : '');
-    chip.textContent = window.FormCoachLogic.POSE_CONFIGS[slug].label;
-    chip.dataset.slug = slug;
-    chip.addEventListener('click', function () {
-      activeSlug = slug;
-      holdTracker = window.FormCoachLogic.createHoldTracker();
-      frozen = false;
-      document.querySelectorAll('.fc-pose-chip').forEach(function (c) { c.classList.toggle('active', c.dataset.slug === activeSlug); });
-      document.getElementById('posingResult').innerHTML = '';
-    });
-    picker.appendChild(chip);
-  });
-
-  var video = document.getElementById('posingVideo');
-  var statusEl = document.getElementById('posingStatus');
-  var ring = document.querySelector('#holdRing .fg');
-  var RING_CIRCUMFERENCE = 113;
-
-  function renderSymmetry(symmetry) {
-    if (!symmetry.length) return '<div class="mob-card-body">No side-to-side comparison for this pose — hold time confirmed above.</div>';
-    return symmetry.map(function (s) {
-      if (s.diffDeg === null) return '<div class="fc-symmetry-row"><span>' + s.joint + '</span><span>Not fully visible</span></div>';
-      var side = s.diffDeg > 0 ? 'left higher' : (s.diffDeg < 0 ? 'right higher' : 'even');
-      return '<div class="fc-symmetry-row"><span>' + s.joint + '</span><span>' + Math.abs(s.diffDeg) + '&deg; ' + side + '</span></div>';
-    }).join('');
-  }
-
-  function captureFreeze(holdMs) {
-    frozen = true;
-    // Captured now, not read fresh from the outer scope inside the async
-    // .then() below -- activeSlug can change (pose picker, Try Again) while
-    // the AI critique fetch is still in flight, which would otherwise
-    // mislabel this capture's history record with whatever pose is active
-    // by the time the fetch resolves, not the one actually captured.
-    var capturedSlug = activeSlug;
-    var canvas = document.createElement('canvas');
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    canvas.getContext('2d').drawImage(video, 0, 0);
-    var symmetry = window.FormCoachLogic.computeSymmetry(lastLandmarks, capturedSlug);
-    document.getElementById('posingResult').innerHTML =
-      '<div class="fc-compare">' +
-        '<div><div class="fc-compare-label">You</div></div>' +
-        '<div><div class="fc-compare-label">Reference</div><img src="assets/mobility/' + capturedSlug + '.png" alt=""></div>' +
-      '</div>' +
-      '<div class="mob-card"><div class="mob-card-body"><strong>Held ' + (holdMs / 1000).toFixed(1) + 's</strong></div></div>' +
-      '<div class="mob-card">' + renderSymmetry(symmetry) + '</div>' +
-      '<div class="mob-card" id="poseCritiqueCard"><div class="mob-card-body">Getting AI critique&hellip;</div></div>' +
-      '<button class="fc-btn fc-btn-secondary" id="tryAgainBtn" type="button">Try Again</button>';
-    document.querySelector('.fc-compare > div:first-child').appendChild(canvas);
-    document.getElementById('tryAgainBtn').addEventListener('click', function () {
-      frozen = false;
-      holdTracker = window.FormCoachLogic.createHoldTracker();
-      document.getElementById('posingResult').innerHTML = '';
-    });
-
-    var imageBase64 = canvas.toDataURL('image/jpeg', 0.85).replace(/^data:image\/jpeg;base64,/, '');
-    fetchPoseCritique(imageBase64).then(function (result) {
-      var card = document.getElementById('poseCritiqueCard');
-      if (result) {
-        if (card) card.querySelector('.mob-card-body').textContent = result.pose ? (result.pose + ': ' + result.critique) : result.critique;
-        window.FormCoachHistory.logSession('posing', { pose: capturedSlug, holdTimeMs: holdMs, symmetry: symmetry, poseCritique: result });
-      } else {
-        // Symmetry card above is unaffected -- this card just disappears
-        // rather than showing an error on top of an already-successful capture.
-        if (card) card.remove();
-        window.FormCoachHistory.logSession('posing', { pose: capturedSlug, holdTimeMs: holdMs, symmetry: symmetry });
-      }
-    });
-  }
-
-  var lastLandmarks = null;
-
-  // No "started once" guard here (Codex review catch, 2026-08-25): every
-  // call is meant to genuinely restart, since the tab-switcher now stops
-  // this mode's camera on switch-away -- a revisit needs a fresh
-  // getUserMedia + a fresh detection loop, not a skip. The two listeners
-  // below are mutually exclusive per activation ('camera-ready' fires once
-  // ever on page load; 'tab-active' only fires on an actual later click),
-  // so there's no double-invocation risk to guard against either.
-  function startPosingCamera() {
-    window.FormCoachCamera.initCamera('posing', video, statusEl).then(function (ok) {
-      if (!ok) return;
-      window.FormCoachCamera.startDetectionLoop('posing', video, function (landmarks, nowMs) {
-        if (frozen) return;
-        lastLandmarks = landmarks;
-        if (!landmarks) {
-          statusEl.textContent = 'Step back so your full body is visible';
-          statusEl.classList.add('warn');
-          holdTracker = window.FormCoachLogic.createHoldTracker();
-          ring.style.strokeDashoffset = RING_CIRCUMFERENCE;
-          return;
-        }
-        statusEl.textContent = '';
-        statusEl.classList.remove('warn');
-        var tracked = window.FormCoachLogic.trackedAngles(landmarks, activeSlug);
-        var step = window.FormCoachLogic.updateHoldTracker(holdTracker, tracked.values, nowMs, HOLD_TOLERANCE_DEG, HOLD_DURATION_MS);
-        holdTracker = step.tracker;
-        var progress = Math.min(1, step.elapsedMs / HOLD_DURATION_MS);
-        ring.style.strokeDashoffset = String(RING_CIRCUMFERENCE * (1 - progress));
-        if (step.ready) captureFreeze(step.elapsedMs);
-      }, 120, function () { return window.FormCoachActiveMode === 'posing'; });
-    });
-  }
-  // Own camera, own model, own data -- no longer shared with Lift-Form
-  // Coach (Carl's ask, 2026-08-25). Started once the camera module signals
-  // ready AND posing is the visible tab -- covers both the page-load case
-  // (posing is the markup's default-active tab) and later tab switches.
-  window.addEventListener('form-coach-camera-ready', function () {
-    if (window.FormCoachActiveMode === 'posing') startPosingCamera();
-  });
-  window.addEventListener('form-coach-tab-active', function (e) {
-    if (e.detail.mode === 'posing' && window.FormCoachCamera && window.FormCoachCamera.initCamera) startPosingCamera();
-  });
-})();
+window.LiftCamera = LiftCamera;
+window.LiftCamera.initCamera = initCamera;
+window.LiftCamera.stopCamera = stopCamera;
+window.LiftCamera.startDetectionLoop = startDetectionLoop;
+window.dispatchEvent(new Event('lift-camera-module-ready'));
 </script>
 <script>
 (function () {
@@ -551,6 +273,7 @@ var FORM_COACH_VIDEO_IDS = { posing: 'posingVideo', lift: 'liftVideo' };
   var buffer = []; // [{ t, landmarks }]
   var lastLandmarks = null;
   var cameraStarted = false;
+  var isTabActive = false; // set true/false by the coach-tab-active/inactive postMessage handler below
   var LIFT_LANDMARK = window.FormCoachLogic.LANDMARK;
 
   async function fetchLiftCritique(exercise, reps) {
@@ -652,30 +375,33 @@ var FORM_COACH_VIDEO_IDS = { posing: 'posingVideo', lift: 'liftVideo' };
     resultEl.innerHTML = '<div class="mob-card"><div class="mob-card-body"><strong>' + escape(exerciseName || 'Set') + '</strong> — ' + scored.length + ' reps, ' + formatSeconds(totalTut) + ' total TUT</div></div><div class="mob-card">' + rows + '</div>';
   }
 
-  // Own camera, own model, own data -- no longer shared with Posing Coach
-  // (Carl's ask, 2026-08-25). No "started once" guard (Codex review catch,
-  // same as the posing section above): the tab-switcher stops this mode's
-  // camera on switch-away, so every call here is meant to genuinely
-  // restart, and cameraStarted gets correctly re-set from each fresh
-  // initCamera() resolution below rather than needing its own reset.
   function startLiftCamera() {
-    window.FormCoachCamera.initCamera('lift', video, statusEl).then(function (ok) {
+    window.LiftCamera.initCamera(video, statusEl).then(function (ok) {
       cameraStarted = ok;
       if (!ok) return;
-      window.FormCoachCamera.startDetectionLoop('lift', video, function (landmarks, nowMs) {
+      window.LiftCamera.startDetectionLoop(video, function (landmarks, nowMs) {
         lastLandmarks = landmarks;
         if (recording && landmarks) buffer.push({ t: nowMs, landmarks: landmarks });
-      }, 100, function () { return window.FormCoachActiveMode === 'lift'; });
+      }, 100, function () { return isTabActive; });
     });
   }
-  // Same handshake as the posing section above -- the camera module
-  // (type="module", deferred) hasn't necessarily run by the time this
-  // plain script executes, so wait for its readiness event too.
-  window.addEventListener('form-coach-camera-ready', function () {
-    if (window.FormCoachActiveMode === 'lift') startLiftCamera();
+
+  // Cross-frame handshake with coach.html -- see posing.html's identical
+  // pattern for the full rationale (origin check, child-ready timing).
+  window.addEventListener('message', function (event) {
+    if (event.origin !== window.location.origin) return;
+    if (!event.data || typeof event.data !== 'object') return;
+    if (event.data.type === 'coach-tab-active') {
+      isTabActive = true;
+      startLiftCamera();
+    } else if (event.data.type === 'coach-tab-inactive') {
+      isTabActive = false;
+      window.LiftCamera.stopCamera(video);
+    }
   });
-  window.addEventListener('form-coach-tab-active', function (e) {
-    if (e.detail.mode === 'lift' && window.FormCoachCamera && window.FormCoachCamera.initCamera) startLiftCamera();
+
+  window.addEventListener('lift-camera-module-ready', function () {
+    if (window.parent !== window) window.parent.postMessage({ type: 'coach-child-ready' }, window.location.origin);
   });
 
   recordBtn.addEventListener('click', function () {
