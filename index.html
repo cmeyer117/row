@@ -18,6 +18,8 @@
 <script src="sync.js" defer></script>
 <script src="row-auth.js" defer></script>
 <script src="topbar.js" defer></script>
+<script src="decisions.js"></script>
+<script src="coach-decision-action-strip-logic.js"></script>
 <style>
 :root {
   --text-primary: #F4F1EA;
@@ -324,6 +326,26 @@ body::after {
 .coach-read-week { color: var(--text-tertiary); font-weight: 500; text-transform: none; letter-spacing: normal; }
 .coach-read-text { font-size: 14px; line-height: 1.5; color: var(--text-secondary); }
 
+.weekly-focus-card {
+  padding: 14px 16px; border-radius: 16px; margin: 0 0 20px;
+  background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06);
+}
+.weekly-focus-label {
+  font-family: var(--font-mono); font-size: 11px; font-weight: 700;
+  letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent);
+  margin-bottom: 8px;
+}
+.weekly-focus-actions { display: flex; flex-direction: column; gap: 8px; }
+.weekly-focus-action {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
+  text-decoration: none; padding: 6px 0;
+}
+.weekly-focus-action-kind {
+  font-family: var(--font-mono); font-size: 11px; font-weight: 700;
+  color: var(--text-tertiary); text-transform: uppercase; white-space: nowrap;
+}
+.weekly-focus-action-text { font-size: 13px; line-height: 1.4; color: var(--text-secondary); text-align: right; }
+
 /* ===== Responsive ===== */
 @media (max-width: 720px) {
   .bento {
@@ -393,6 +415,11 @@ body::after {
     <div class="coach-read-label">Coach's Read <span class="coach-read-week" id="coachReadWeek"></span></div>
     <div class="coach-read-text" id="coachReadText"></div>
   </div>
+
+  <section class="weekly-focus-card" id="weeklyFocusCard" hidden aria-labelledby="weeklyFocusTitle">
+    <div class="weekly-focus-label" id="weeklyFocusTitle">This Week's Focus</div>
+    <div class="weekly-focus-actions" id="weeklyFocusActions"></div>
+  </section>
 
   <div class="bento">
 
@@ -602,6 +629,42 @@ body::after {
         weekEl.textContent = days > 10 ? '· stale (week of ' + read.weekOf + ')' : '· week of ' + read.weekOf;
       }
       document.getElementById('coachReadCard').style.display = '';
+    } catch (e) {}
+  })();
+
+  // This Week's Focus — surfaces the active weekly coach decision's
+  // cardio/posing Rx (or its decision text, if no Rx) so the week's decision
+  // shapes today instead of living only in weekly-review.html. Read-only:
+  // links to health.html/posing.html/weekly-review.html, no completion
+  // tracking here — that stays owned entirely by weekly-review's scorecard
+  // (health:cardio / posing:log).
+  function escapeHtml(value) {
+    return String(value == null ? '' : value).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function renderWeeklyFocus(decision) {
+    const card = document.getElementById('weeklyFocusCard');
+    const actions = window.CoachDecisionActionStripLogic.buildWeeklyFocusActions(decision);
+    if (!actions.length) { card.hidden = true; return; }
+    document.getElementById('weeklyFocusActions').innerHTML = actions.map(function (a) {
+      return '<a class="weekly-focus-action" href="' + escapeHtml(a.href) + '">' +
+        '<span class="weekly-focus-action-kind">' + escapeHtml(a.label) + '</span>' +
+        '<span class="weekly-focus-action-text">' + escapeHtml(a.text) + '</span></a>';
+    }).join('');
+    card.hidden = false;
+  }
+  (async function initWeeklyFocus() {
+    try {
+      if (!window.supabase || !window.getLatestOpenDecision || !window.CoachDecisionActionStripLogic) return;
+      // Same no-login-gate treatment as initMacroChip above -- this is a
+      // non-critical dashboard chip, not a page that should force a
+      // blocking RowAuth.ensure() login prompt.
+      if (document.readyState === 'loading') {
+        await new Promise((resolve) => document.addEventListener('DOMContentLoaded', resolve, { once: true }));
+      }
+      const decision = await window.getLatestOpenDecision('weekly-coach-loop');
+      if (decision) renderWeeklyFocus(decision);
     } catch (e) {}
   })();
 
