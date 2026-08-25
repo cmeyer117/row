@@ -19,6 +19,7 @@
 <script src="sync.js" defer></script>
 <script src="readiness-index-logic.js" defer></script>
 <script src="posing-checklists.js" defer></script>
+<script src="form-coach-logic.js" defer></script>
 <style>
 :root {
   --bg: #000000;
@@ -170,6 +171,29 @@ html, body {
   height: 1px; background: var(--border); margin: 20px 0;
 }
 
+/* ── Camera + capture (moved from form-coach.html, 2026-08-25) ── */
+.fc-camera-wrap { position: relative; width: 100%; aspect-ratio: 3 / 4; background: #050506; border-radius: 16px; overflow: hidden; margin-bottom: 12px; }
+.fc-camera-wrap video, .fc-camera-wrap canvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.fc-camera-wrap canvas { pointer-events: none; }
+.fc-hold-ring { position: absolute; top: 12px; right: 12px; width: 44px; height: 44px; }
+.fc-hold-ring circle { fill: none; stroke-width: 4; }
+.fc-hold-ring .bg { stroke: rgba(255,255,255,0.15); }
+.fc-hold-ring .fg { stroke: var(--accent); stroke-linecap: round; transform: rotate(-90deg); transform-origin: 50% 50%; transition: stroke-dashoffset 0.1s linear; }
+.fc-status-banner { position: absolute; left: 12px; right: 12px; bottom: 12px; padding: 8px 12px; border-radius: 10px; background: rgba(0,0,0,0.65); font-size: 12px; color: var(--text-2); text-align: center; }
+.fc-status-banner.warn { color: var(--warn); }
+.fc-status-banner.bad { color: var(--bad); }
+.fc-compare { display: flex; gap: 8px; margin-bottom: 12px; }
+.fc-compare > div { flex: 1; }
+.fc-compare img, .fc-compare canvas { width: 100%; border-radius: 10px; display: block; }
+.fc-compare .fc-compare-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-3); margin-bottom: 4px; }
+.fc-pose-picker { display: flex; gap: 6px; overflow-x: auto; margin-bottom: 12px; scrollbar-width: none; }
+.fc-pose-picker::-webkit-scrollbar { display: none; }
+.fc-pose-chip { flex-shrink: 0; padding: 8px 14px; border-radius: 999px; font-size: 12px; font-weight: 600; color: var(--text-2); background: rgba(255,255,255,0.04); border: 1px solid var(--border); cursor: pointer; -webkit-tap-highlight-color: transparent; font-family: inherit; }
+.fc-pose-chip.active { color: var(--text-1); background: rgba(110,231,183,0.10); border-color: rgba(110,231,183,0.30); }
+.fc-btn { width: 100%; padding: 14px; border-radius: 12px; font-size: 14px; font-weight: 700; font-family: inherit; border: none; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.fc-btn-primary { background: var(--accent); color: #04150e; }
+.fc-btn-secondary { background: rgba(255,255,255,0.06); color: var(--text-1); border: 1px solid var(--border); }
+
 /* ── Posing practice log ── */
 .pose-log-card {
   background: rgba(255,255,255,0.025); border: 1px solid var(--border);
@@ -238,6 +262,21 @@ html, body {
       <div class="mob-subtitle">Mandatory pose practice</div>
     </div>
   </div>
+
+  <div class="mob-rule"><strong>How it works:</strong> pick a pose, hold it steady for ~1.5s and the camera auto-captures a still to compare against the reference photo.</div>
+
+  <div class="fc-pose-picker" id="posePicker"></div>
+
+  <div class="fc-camera-wrap" id="posingCameraWrap">
+    <video id="posingVideo" autoplay playsinline muted></video>
+    <svg class="fc-hold-ring" id="holdRing" viewBox="0 0 44 44">
+      <circle class="bg" cx="22" cy="22" r="18"></circle>
+      <circle class="fg" cx="22" cy="22" r="18" stroke-dasharray="113" stroke-dashoffset="113"></circle>
+    </svg>
+    <div class="fc-status-banner" id="posingStatus">Requesting camera…</div>
+  </div>
+
+  <div id="posingResult"></div>
 
   <div class="pose-log-card">
     <div class="pose-log-row">
@@ -623,9 +662,9 @@ html, body {
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="8" cy="3.5" r="1.5" fill="currentColor"/><path d="M5 7c0-1.1.9-2 2-2h2c1.1 0 2 .9 2 2v2.5l1.5 3.5h-1.5L10 11H6l-1 2H3.5L5 9.5V7z" fill="currentColor"/></svg>
       Mobility
     </a>
-    <a class="gym-tab" href="form-coach.html">
+    <a class="gym-tab" href="coach.html">
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="2" width="12" height="9" rx="1.5" stroke="currentColor" stroke-width="1.3" fill="none"/><circle cx="8" cy="6.5" r="1.6" stroke="currentColor" stroke-width="1.2" fill="none"/><path d="M2 13h12" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-      Form Coach
+      Coach
     </a>
   </div>
 </nav>
@@ -813,6 +852,243 @@ html, body {
       syncedKeys: ['posing:log', 'posing:readiness'],
       onApplied: function () { renderPosingLog(); renderReadinessLog(); },
     });
+  });
+})();
+</script>
+<script type="module">
+import { PoseLandmarker, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest";
+
+// Single-camera module (2026-08-25 Coach tab split) -- unlike form-coach.html's
+// old FormCoachCamera, no mode key is needed: this page owns exactly one
+// camera. Model load is cached forever once started; the camera STREAM is
+// acquired fresh each time the parent (coach.html) tells us we're the active
+// tab, and explicitly torn down when told we're not -- same stop-before-start
+// discipline as form-coach.html's Codex-reviewed fix (730d13d), just
+// triggered by postMessage from the parent frame instead of a same-page tab
+// click.
+var PosingCamera = { landmarker: null, landmarkerPromise: null, stream: null, ready: false, error: null, cancelLoop: null };
+
+function loadLandmarker(statusEl) {
+  if (!PosingCamera.landmarkerPromise) {
+    PosingCamera.landmarkerPromise = (async function () {
+      try {
+        var vision = await FilesetResolver.forVisionTasks(
+          "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
+        );
+        PosingCamera.landmarker = await PoseLandmarker.createFromOptions(vision, {
+          baseOptions: {
+            modelAssetPath: "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task",
+            delegate: "GPU"
+          },
+          runningMode: "VIDEO",
+          numPoses: 1
+        });
+        return true;
+      } catch (err) {
+        PosingCamera.error = 'model-load-failed';
+        if (statusEl) { statusEl.textContent = 'Pose detection failed to load — check your connection and reload.'; statusEl.classList.add('bad'); }
+        return false;
+      }
+    })();
+  }
+  return PosingCamera.landmarkerPromise;
+}
+
+async function initCamera(videoEl, statusEl) {
+  var modelOk = await loadLandmarker(statusEl);
+  if (!modelOk) return false;
+  try {
+    PosingCamera.stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
+  } catch (err) {
+    PosingCamera.error = 'camera-denied';
+    if (statusEl) { statusEl.textContent = 'Camera access denied. Allow camera access in your browser settings, then reload.'; statusEl.classList.add('bad'); }
+    return false;
+  }
+  PosingCamera.ready = true;
+  videoEl.srcObject = PosingCamera.stream;
+  await new Promise(function (resolve) { videoEl.onloadedmetadata = resolve; });
+  if (statusEl) { statusEl.textContent = ''; statusEl.classList.remove('bad', 'warn'); }
+  return true;
+}
+
+function stopCamera(videoEl) {
+  if (PosingCamera.stream) {
+    PosingCamera.stream.getTracks().forEach(function (t) { t.stop(); });
+    PosingCamera.stream = null;
+  }
+  if (videoEl) videoEl.srcObject = null;
+  PosingCamera.ready = false;
+  if (PosingCamera.cancelLoop) { PosingCamera.cancelLoop(); PosingCamera.cancelLoop = null; }
+}
+
+function startDetectionLoop(videoEl, onResult, intervalMs, isActiveFn) {
+  var lastRun = 0;
+  var cancelled = false;
+  function tick(nowMs) {
+    if (cancelled) return;
+    if (isActiveFn() && PosingCamera.ready && PosingCamera.landmarker && nowMs - lastRun >= intervalMs) {
+      lastRun = nowMs;
+      var result = PosingCamera.landmarker.detectForVideo(videoEl, performance.now());
+      var landmarks = (result.landmarks && result.landmarks.length) ? result.landmarks[0] : null;
+      onResult(landmarks, nowMs);
+    }
+    requestAnimationFrame(tick);
+  }
+  PosingCamera.cancelLoop = function () { cancelled = true; };
+  requestAnimationFrame(tick);
+}
+
+window.PosingCamera = PosingCamera;
+window.PosingCamera.initCamera = initCamera;
+window.PosingCamera.stopCamera = stopCamera;
+window.PosingCamera.startDetectionLoop = startDetectionLoop;
+window.dispatchEvent(new Event('posing-camera-module-ready'));
+</script>
+<script>
+(function () {
+  var POSE_SLUGS = Object.keys(window.FormCoachLogic.POSE_CONFIGS);
+  var activeSlug = POSE_SLUGS[0];
+  var holdTracker = window.FormCoachLogic.createHoldTracker();
+  var HOLD_TOLERANCE_DEG = 6;
+  var HOLD_DURATION_MS = 1500;
+  var frozen = false;
+  var isTabActive = false; // set true/false by the coach-tab-active/inactive postMessage handler below
+
+  async function fetchPoseCritique(imageBase64) {
+    var controller = new AbortController();
+    var timer = setTimeout(function () { controller.abort(); }, 25000);
+    try {
+      var token = await window.RowAuth.getAccessToken();
+      var res = await fetch('/api/vision-pose-critique', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify({ imageBase64: imageBase64, mediaType: 'image/jpeg' }),
+        signal: controller.signal,
+      });
+      if (!res.ok) return null;
+      var data = await res.json();
+      return (data && typeof data.critique === 'string') ? data : null;
+    } catch (err) {
+      console.warn('[posing] pose critique fetch failed:', err && err.message);
+      return null;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  var picker = document.getElementById('posePicker');
+  POSE_SLUGS.forEach(function (slug) {
+    var chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'fc-pose-chip' + (slug === activeSlug ? ' active' : '');
+    chip.textContent = window.FormCoachLogic.POSE_CONFIGS[slug].label;
+    chip.dataset.slug = slug;
+    chip.addEventListener('click', function () {
+      activeSlug = slug;
+      holdTracker = window.FormCoachLogic.createHoldTracker();
+      frozen = false;
+      document.querySelectorAll('.fc-pose-chip').forEach(function (c) { c.classList.toggle('active', c.dataset.slug === activeSlug); });
+      document.getElementById('posingResult').innerHTML = '';
+    });
+    picker.appendChild(chip);
+  });
+
+  var video = document.getElementById('posingVideo');
+  var statusEl = document.getElementById('posingStatus');
+  var ring = document.querySelector('#holdRing .fg');
+  var RING_CIRCUMFERENCE = 113;
+
+  function renderSymmetry(symmetry) {
+    if (!symmetry.length) return '<div class="mob-card-body">No side-to-side comparison for this pose — hold time confirmed above.</div>';
+    return symmetry.map(function (s) {
+      if (s.diffDeg === null) return '<div class="fc-symmetry-row"><span>' + s.joint + '</span><span>Not fully visible</span></div>';
+      var side = s.diffDeg > 0 ? 'left higher' : (s.diffDeg < 0 ? 'right higher' : 'even');
+      return '<div class="fc-symmetry-row"><span>' + s.joint + '</span><span>' + Math.abs(s.diffDeg) + '&deg; ' + side + '</span></div>';
+    }).join('');
+  }
+
+  var lastLandmarks = null;
+
+  function captureFreeze(holdMs) {
+    frozen = true;
+    var capturedSlug = activeSlug;
+    var canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext('2d').drawImage(video, 0, 0);
+    var symmetry = window.FormCoachLogic.computeSymmetry(lastLandmarks, capturedSlug);
+    document.getElementById('posingResult').innerHTML =
+      '<div class="fc-compare">' +
+        '<div><div class="fc-compare-label">You</div></div>' +
+        '<div><div class="fc-compare-label">Reference</div><img src="assets/mobility/' + capturedSlug + '.png" alt=""></div>' +
+      '</div>' +
+      '<div class="mob-card"><div class="mob-card-body"><strong>Held ' + (holdMs / 1000).toFixed(1) + 's</strong></div></div>' +
+      '<div class="mob-card">' + renderSymmetry(symmetry) + '</div>' +
+      '<div class="mob-card" id="poseCritiqueCard"><div class="mob-card-body">Getting AI critique&hellip;</div></div>' +
+      '<button class="fc-btn fc-btn-secondary" id="tryAgainBtn" type="button">Try Again</button>';
+    document.querySelector('.fc-compare > div:first-child').appendChild(canvas);
+    document.getElementById('tryAgainBtn').addEventListener('click', function () {
+      frozen = false;
+      holdTracker = window.FormCoachLogic.createHoldTracker();
+      document.getElementById('posingResult').innerHTML = '';
+    });
+    var imageBase64 = canvas.toDataURL('image/jpeg', 0.85).replace(/^data:image\/jpeg;base64,/, '');
+    fetchPoseCritique(imageBase64).then(function (result) {
+      var card = document.getElementById('poseCritiqueCard');
+      if (result) {
+        if (card) card.querySelector('.mob-card-body').textContent = result.pose ? (result.pose + ': ' + result.critique) : result.critique;
+        if (window.FormCoachHistory) window.FormCoachHistory.logSession('posing', { pose: capturedSlug, holdTimeMs: holdMs, symmetry: symmetry, poseCritique: result });
+      } else {
+        if (card) card.remove();
+        if (window.FormCoachHistory) window.FormCoachHistory.logSession('posing', { pose: capturedSlug, holdTimeMs: holdMs, symmetry: symmetry });
+      }
+    });
+  }
+
+  function startPosingCamera() {
+    window.PosingCamera.initCamera(video, statusEl).then(function (ok) {
+      if (!ok) return;
+      window.PosingCamera.startDetectionLoop(video, function (landmarks, nowMs) {
+        if (frozen) return;
+        lastLandmarks = landmarks;
+        if (!landmarks) {
+          statusEl.textContent = 'Step back so your full body is visible';
+          statusEl.classList.add('warn');
+          holdTracker = window.FormCoachLogic.createHoldTracker();
+          ring.style.strokeDashoffset = RING_CIRCUMFERENCE;
+          return;
+        }
+        statusEl.textContent = '';
+        statusEl.classList.remove('warn');
+        var tracked = window.FormCoachLogic.trackedAngles(landmarks, activeSlug);
+        var step = window.FormCoachLogic.updateHoldTracker(holdTracker, tracked.values, nowMs, HOLD_TOLERANCE_DEG, HOLD_DURATION_MS);
+        holdTracker = step.tracker;
+        var progress = Math.min(1, step.elapsedMs / HOLD_DURATION_MS);
+        ring.style.strokeDashoffset = String(RING_CIRCUMFERENCE * (1 - progress));
+        if (step.ready) captureFreeze(step.elapsedMs);
+      }, 120, function () { return isTabActive; });
+    });
+  }
+
+  // Cross-frame handshake with coach.html, replacing form-coach.html's
+  // same-page CustomEvent pair. Origin-checked (Codex review pattern from
+  // the earlier same-page split, re-applied here since this is now a real
+  // cross-frame boundary where an unchecked listener would act on a message
+  // from any embedding page, not just our own coach.html).
+  window.addEventListener('message', function (event) {
+    if (event.origin !== window.location.origin) return;
+    if (!event.data || typeof event.data !== 'object') return;
+    if (event.data.type === 'coach-tab-active') {
+      isTabActive = true;
+      startPosingCamera();
+    } else if (event.data.type === 'coach-tab-inactive') {
+      isTabActive = false;
+      window.PosingCamera.stopCamera(video);
+    }
+  });
+
+  window.addEventListener('posing-camera-module-ready', function () {
+    if (window.parent !== window) window.parent.postMessage({ type: 'coach-child-ready' }, window.location.origin);
   });
 })();
 </script>
