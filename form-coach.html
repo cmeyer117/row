@@ -229,85 +229,99 @@ import { PoseLandmarker, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@m
 // asked for full separation (2026-08-25) -- own camera, own model, own
 // data per mode, no shared state. Each mode gets its own state slot below.
 //
-// Camera init is lazy per mode (first call to initCamera(mode, ...) for
-// that mode, not both eagerly on page load) rather than requesting both
-// cameras up front: two concurrent getUserMedia calls to the front camera
-// on page load is a real reliability risk on some browsers/devices (camera
-// hardware can reject a second concurrent session), and since only one
-// mode's tab is ever visible at a time anyway, there was never a reason to
-// hold both streams open simultaneously. Each mode's own initPromise makes
-// repeat calls (e.g. switching back to an already-visited tab) idempotent.
+// Model load (landmarkerPromise) is cached forever per mode once started --
+// no reason to re-download the WASM/model on every tab revisit. The camera
+// STREAM is different: acquired fresh on each tab visit and explicitly torn
+// down (stopCamera) when switching away, rather than left running. Codex
+// review catch (2026-08-25): an earlier version left the outgoing stream
+// running when switching tabs (camera light stays on, RAF loop runs
+// forever) and had no serialization against a fast switch requesting both
+// cameras concurrently -- exactly the device-conflict risk this whole
+// change was meant to avoid. The tab-switcher below now calls stopCamera on
+// the outgoing mode BEFORE starting the incoming one, synchronously, so the
+// two getUserMedia calls can never be in flight at the same time.
 var FormCoachCamera = {
-  posing: { landmarker: null, stream: null, ready: false, error: null, initPromise: null },
-  lift: { landmarker: null, stream: null, ready: false, error: null, initPromise: null },
+  posing: { landmarker: null, landmarkerPromise: null, stream: null, ready: false, error: null, cancelLoop: null },
+  lift: { landmarker: null, landmarkerPromise: null, stream: null, ready: false, error: null, cancelLoop: null },
 };
 window.FormCoachCamera = FormCoachCamera;
 
-function doInit(mode, statusEl) {
+function loadLandmarker(mode, statusEl) {
   var slot = FormCoachCamera[mode];
-  return (async function () {
-    try {
-      var vision = await FilesetResolver.forVisionTasks(
-        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
-      );
-      slot.landmarker = await PoseLandmarker.createFromOptions(vision, {
-        baseOptions: {
-          modelAssetPath: "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task",
-          delegate: "GPU"
-        },
-        runningMode: "VIDEO",
-        numPoses: 1
-      });
-    } catch (err) {
-      slot.error = 'model-load-failed';
-      if (statusEl) { statusEl.textContent = 'Pose detection failed to load — check your connection and reload.'; statusEl.classList.add('bad'); }
-      return false;
-    }
-
-    try {
-      slot.stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
-    } catch (err) {
-      slot.error = 'camera-denied';
-      if (statusEl) { statusEl.textContent = 'Camera access denied. Allow camera access in your browser settings, then reload.'; statusEl.classList.add('bad'); }
-      return false;
-    }
-
-    slot.ready = true;
-    return true;
-  })();
+  if (!slot.landmarkerPromise) {
+    slot.landmarkerPromise = (async function () {
+      try {
+        var vision = await FilesetResolver.forVisionTasks(
+          "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
+        );
+        slot.landmarker = await PoseLandmarker.createFromOptions(vision, {
+          baseOptions: {
+            modelAssetPath: "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task",
+            delegate: "GPU"
+          },
+          runningMode: "VIDEO",
+          numPoses: 1
+        });
+        return true;
+      } catch (err) {
+        slot.error = 'model-load-failed';
+        if (statusEl) { statusEl.textContent = 'Pose detection failed to load — check your connection and reload.'; statusEl.classList.add('bad'); }
+        return false;
+      }
+    })();
+  }
+  return slot.landmarkerPromise;
 }
 
 async function initCamera(mode, videoEl, statusEl) {
   var slot = FormCoachCamera[mode];
-  if (!slot.initPromise) slot.initPromise = doInit(mode, statusEl);
-  var ok = await slot.initPromise;
-  if (!ok) {
-    if (statusEl) {
-      statusEl.textContent = slot.error === 'camera-denied'
-        ? 'Camera access denied. Allow camera access in your browser settings, then reload.'
-        : 'Pose detection failed to load — check your connection and reload.';
-      statusEl.classList.add('bad');
-    }
+  var modelOk = await loadLandmarker(mode, statusEl);
+  if (!modelOk) return false;
+
+  try {
+    slot.stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
+  } catch (err) {
+    slot.error = 'camera-denied';
+    if (statusEl) { statusEl.textContent = 'Camera access denied. Allow camera access in your browser settings, then reload.'; statusEl.classList.add('bad'); }
     return false;
   }
+
+  slot.ready = true;
   videoEl.srcObject = slot.stream;
   await new Promise(function (resolve) { videoEl.onloadedmetadata = resolve; });
   if (statusEl) { statusEl.textContent = ''; statusEl.classList.remove('bad', 'warn'); }
   return true;
 }
 
+// Stops this mode's camera stream and detection loop (called when
+// switching away from its tab). Deliberately does NOT discard the loaded
+// landmarker/model -- that stays cached so returning to this tab later
+// only re-acquires the camera, not a full model re-download.
+function stopCamera(mode, videoEl) {
+  var slot = FormCoachCamera[mode];
+  if (slot.stream) {
+    slot.stream.getTracks().forEach(function (t) { t.stop(); });
+    slot.stream = null;
+  }
+  if (videoEl) videoEl.srcObject = null;
+  slot.ready = false;
+  if (slot.cancelLoop) { slot.cancelLoop(); slot.cancelLoop = null; }
+}
+
 // Runs this mode's own pose landmarker against one video element on a
 // throttled interval and calls onResult(landmarks|null, timestampMs) each
 // time. landmarks is null when no person is detected in frame — callers
 // must handle that (show a "step back" message), not assume a result.
-// isActiveFn: detection work (and onResult) is skipped entirely while it
-// returns false -- each mode now has its own landmarker (no cross-mode
-// detectForVideo conflict to avoid), but there's still no reason to spend
-// battery/CPU running detection against a hidden tab.
+// isActiveFn: detection work (and onResult) is skipped while it returns
+// false, same as before -- but the loop itself is now also explicitly
+// cancellable via slot.cancelLoop (set here, invoked by stopCamera above)
+// rather than running forever once started.
 function startDetectionLoop(mode, videoEl, onResult, intervalMs, isActiveFn) {
   var slot = FormCoachCamera[mode];
   var lastRun = 0;
+  var cancelled = false;
   function tick(nowMs) {
+    if (cancelled) return;
     if (isActiveFn() && slot.ready && slot.landmarker && nowMs - lastRun >= intervalMs) {
       lastRun = nowMs;
       var result = slot.landmarker.detectForVideo(videoEl, performance.now());
@@ -316,10 +330,12 @@ function startDetectionLoop(mode, videoEl, onResult, intervalMs, isActiveFn) {
     }
     requestAnimationFrame(tick);
   }
+  slot.cancelLoop = function () { cancelled = true; };
   requestAnimationFrame(tick);
 }
 
 window.FormCoachCamera.initCamera = initCamera;
+window.FormCoachCamera.stopCamera = stopCamera;
 window.FormCoachCamera.startDetectionLoop = startDetectionLoop;
 // This module script is deferred (type="module" always is), so it runs
 // AFTER the plain <script> blocks below it in document order -- including
@@ -341,16 +357,29 @@ window.dispatchEvent(new Event('form-coach-camera-ready'));
 // LATER switches, after every section's listener is registered -- firing
 // it here too, before those listeners exist, would fire into the void.
 window.FormCoachActiveMode = 'posing';
+// video element per mode, keyed the same as FormCoachCamera's slots --
+// used here only to stop the outgoing mode's stream on switch (Codex
+// review catch, 2026-08-25: switching tabs used to leave the outgoing
+// camera running indefinitely and could race a fast switch into two
+// concurrent getUserMedia calls). Stopping happens synchronously, before
+// the incoming mode's own start logic runs (via the dispatched event
+// below), so the two acquisitions can never overlap.
+var FORM_COACH_VIDEO_IDS = { posing: 'posingVideo', lift: 'liftVideo' };
 (function () {
   var tabs = document.querySelectorAll('.mob-tab-btn');
   tabs.forEach(function (btn) {
     btn.addEventListener('click', function () {
+      var outgoing = window.FormCoachActiveMode;
+      var incoming = btn.dataset.section;
+      if (outgoing !== incoming && window.FormCoachCamera && window.FormCoachCamera.stopCamera) {
+        window.FormCoachCamera.stopCamera(outgoing, document.getElementById(FORM_COACH_VIDEO_IDS[outgoing]));
+      }
       tabs.forEach(function (b) { b.classList.remove('active'); });
       btn.classList.add('active');
       document.querySelectorAll('.mob-section').forEach(function (s) { s.classList.remove('active'); });
-      document.getElementById('section-' + btn.dataset.section).classList.add('active');
-      window.FormCoachActiveMode = btn.dataset.section;
-      window.dispatchEvent(new CustomEvent('form-coach-tab-active', { detail: { mode: btn.dataset.section } }));
+      document.getElementById('section-' + incoming).classList.add('active');
+      window.FormCoachActiveMode = incoming;
+      window.dispatchEvent(new CustomEvent('form-coach-tab-active', { detail: { mode: incoming } }));
     });
   });
 })();
@@ -465,10 +494,14 @@ window.FormCoachActiveMode = 'posing';
 
   var lastLandmarks = null;
 
-  var posingCameraStarted = false;
+  // No "started once" guard here (Codex review catch, 2026-08-25): every
+  // call is meant to genuinely restart, since the tab-switcher now stops
+  // this mode's camera on switch-away -- a revisit needs a fresh
+  // getUserMedia + a fresh detection loop, not a skip. The two listeners
+  // below are mutually exclusive per activation ('camera-ready' fires once
+  // ever on page load; 'tab-active' only fires on an actual later click),
+  // so there's no double-invocation risk to guard against either.
   function startPosingCamera() {
-    if (posingCameraStarted) return; // idempotent -- initCamera('posing', ...) is too, this just skips re-attaching the detection loop
-    posingCameraStarted = true;
     window.FormCoachCamera.initCamera('posing', video, statusEl).then(function (ok) {
       if (!ok) return;
       window.FormCoachCamera.startDetectionLoop('posing', video, function (landmarks, nowMs) {
@@ -496,9 +529,6 @@ window.FormCoachActiveMode = 'posing';
   // Coach (Carl's ask, 2026-08-25). Started once the camera module signals
   // ready AND posing is the visible tab -- covers both the page-load case
   // (posing is the markup's default-active tab) and later tab switches.
-  // The module's readiness event can fire before or after a later tab
-  // switch relative to this listener, so both handlers check the same
-  // condition; startPosingCamera()'s own flag makes a double-fire harmless.
   window.addEventListener('form-coach-camera-ready', function () {
     if (window.FormCoachActiveMode === 'posing') startPosingCamera();
   });
@@ -622,15 +652,13 @@ window.FormCoachActiveMode = 'posing';
     resultEl.innerHTML = '<div class="mob-card"><div class="mob-card-body"><strong>' + escape(exerciseName || 'Set') + '</strong> — ' + scored.length + ' reps, ' + formatSeconds(totalTut) + ' total TUT</div></div><div class="mob-card">' + rows + '</div>';
   }
 
-  var liftCameraTriggered = false;
+  // Own camera, own model, own data -- no longer shared with Posing Coach
+  // (Carl's ask, 2026-08-25). No "started once" guard (Codex review catch,
+  // same as the posing section above): the tab-switcher stops this mode's
+  // camera on switch-away, so every call here is meant to genuinely
+  // restart, and cameraStarted gets correctly re-set from each fresh
+  // initCamera() resolution below rather than needing its own reset.
   function startLiftCamera() {
-    if (liftCameraTriggered) return;
-    liftCameraTriggered = true;
-    // Own camera, own model, own data -- no longer shared with Posing
-    // Coach (Carl's ask, 2026-08-25). Lazy: only requested the first time
-    // this tab is actually visited, not eagerly on page load alongside
-    // posing's camera (two concurrent getUserMedia calls on load is a real
-    // reliability risk on some browsers/devices).
     window.FormCoachCamera.initCamera('lift', video, statusEl).then(function (ok) {
       cameraStarted = ok;
       if (!ok) return;
