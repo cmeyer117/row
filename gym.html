@@ -740,6 +740,8 @@ img, video, canvas, svg { max-width: 100%; }
 .po-hist-del:hover { color: var(--bad); }
 .po-hist-edit:hover { color: var(--text-1); }
 
+.po-mic-log-btn.listening { background: #ff4444 !important; color: #fff !important; }
+
 /* ----- Rest Timer ----- */
 .po-rest-timer {
   display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
@@ -2956,6 +2958,14 @@ img, video, canvas, svg { max-width: 100%; }
         </div>
       </div>
       <button class="po-btn-primary" id="logBtn">Log set</button>
+      <button class="po-mic-log-btn" id="voiceLogBtn" type="button" style="width:100%;margin-top:8px;padding:10px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:10px;color:#F4F1EA;font-size:13px;">🎤 Speak set</button>
+      <div class="po-voice-error" id="voiceLogError" style="display:none;margin-top:8px;padding:10px;background:rgba(255,255,255,0.04);border-radius:10px;font-size:12px;">
+        <div id="voiceLogErrorText" style="color:#B8B6B0;margin-bottom:6px;"></div>
+        <div style="display:flex;gap:8px;">
+          <button type="button" id="voiceLogRetry" style="flex:1;padding:8px;background:rgba(255,255,255,0.08);border:none;border-radius:8px;color:#F4F1EA;">Retry</button>
+          <button type="button" id="voiceLogEdit" style="flex:1;padding:8px;background:rgba(255,255,255,0.08);border:none;border-radius:8px;color:#F4F1EA;">Edit manually</button>
+        </div>
+      </div>
       <div class="po-log-receipt" id="logReceipt" style="display:none;font-size:12px;text-align:center;margin-top:6px;opacity:0.75"></div>
       <button class="po-undo-btn" id="undoBtn" type="button" style="display:none">↩ Undo last set</button>
     </div>
@@ -6508,6 +6518,78 @@ img, video, canvas, svg { max-width: 100%; }
     saveSet(ex, w, reps, entry);
   });
 
+  (function () {
+    var voiceBtn = $('voiceLogBtn');
+    var errorCard = $('voiceLogError');
+    var errorText = $('voiceLogErrorText');
+    var voiceController = null;
+
+    function hideError() { errorCard.style.display = 'none'; }
+
+    function showError(transcript) {
+      errorText.textContent = transcript
+        ? 'Didn\'t catch that clearly: "' + transcript + '"'
+        : 'Didn\'t catch that — try again.';
+      errorCard.style.display = 'block';
+    }
+
+    function startListening() {
+      hideError();
+      voiceBtn.classList.add('listening');
+      var sttPrompt = (window.__gym && window.__gym.getSttPrompt) ? window.__gym.getSttPrompt() : '';
+      voiceController = window.RowVoice.startCapture(function (transcript) {
+        voiceController = null;
+        voiceBtn.classList.remove('listening');
+        handleTranscript(transcript);
+      }, function () {
+        voiceController = null;
+        voiceBtn.classList.remove('listening');
+        showError('');
+      }, { sttPrompt: sttPrompt });
+    }
+
+    function handleTranscript(transcript) {
+      var ex = getCurrentEx();
+      if (!ex) { showError(transcript); return; }
+      var todaysExercises = getFiltered();
+      var allExercises = (state.exercises || []).concat(getAdhocExercises());
+      var parsed = window.GymVoiceLog.parseSetUtterance(transcript, todaysExercises, allExercises);
+      if (parsed.error) { showError(parsed.transcript); return; }
+      // Same guards the manual path applies before calling saveSet() -- the
+      // parser can't fully rule out a degenerate parse (e.g. "0" as the only
+      // number), so voice logging must reject it the same way a manual "0"
+      // entry already does, not silently log it.
+      if (!(parsed.reps > 0)) { showError(parsed.transcript); return; }
+      var targetEx = allExercises.find(function (e) { return e.id === parsed.exId; }) || ex;
+      if (!targetEx.bw && !(parsed.weight > 0)) { showError(parsed.transcript); return; }
+      // Codex catch (2026-08-26): if the spoken exercise differs from the
+      // one currently displayed, saveSet() still needs Undo, the plate
+      // picker, and the receipt to reflect the exercise actually logged --
+      // all of which read state.currentEx, not whatever ex was passed in.
+      // Switching it here mirrors the existing click-to-select-exercise
+      // pattern elsewhere in this file (state.currentEx = ex.id).
+      if (targetEx.id !== ex.id) state.currentEx = targetEx.id;
+      var entry = { weightBasis: 'totalLbs' };
+      saveSet(targetEx, parsed.weight, parsed.reps, entry);
+    }
+
+    voiceBtn.addEventListener('click', function () {
+      if (voiceController) { voiceController.stop(); return; }
+      startListening();
+    });
+    $('voiceLogRetry').addEventListener('click', function () {
+      hideError();
+      startListening();
+    });
+    $('voiceLogEdit').addEventListener('click', function () {
+      hideError();
+      // parseSetUtterance's error path only carries the raw transcript, not
+      // any partially-parsed numbers -- this just moves focus to the manual
+      // input so Carl can type the set directly instead of retrying voice.
+      $('weightInput').focus();
+    });
+  })();
+
   document.querySelectorAll('.po-rest-timer-adj').forEach(function(btn) {
     btn.addEventListener('click', function() {
       if (!restTimerInterval && restTimerRemainingSecs() <= 0) return;
@@ -7325,6 +7407,7 @@ img, video, canvas, svg { max-width: 100%; }
 </script>
 <script src="gym-weight-photos.js"></script>
 <script src="gym-weight-outlier-logic.js"></script>
+<script src="gym-voice-log.js"></script>
 <script src="gym-workout-events.js"></script>
 <script src="gym-milestone-logic.js"></script>
 <script src="gym-rx-phase-logic.js"></script>
