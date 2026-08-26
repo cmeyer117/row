@@ -67,6 +67,14 @@ html, body {
 .fc-status-banner.warn { color: var(--warn); }
 .fc-status-banner.bad { color: var(--bad); }
 .fc-info-stub { padding: 16px 18px; border: 1px dashed var(--border-strong); border-radius: 16px; color: var(--text-3); font-size: 13px; text-align: center; }
+.fc-cue-card { padding: 16px 18px; border: 1px solid var(--border); border-radius: 16px; background: rgba(255,255,255,0.025); }
+.fc-cue-title { font-size: 15px; font-weight: 700; color: var(--text-1); margin-bottom: 8px; }
+.fc-cue-section { font-size: 13px; color: var(--text-2); line-height: 1.5; margin-bottom: 10px; }
+.fc-cue-section:last-child { margin-bottom: 0; }
+.fc-cue-label { font-family: var(--font-mono); font-size: 10px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); margin-bottom: 3px; }
+.fc-cue-mistakes { margin: 0; padding-left: 16px; }
+.fc-cue-mistakes li { margin-bottom: 4px; }
+.fc-cue-variant-note { font-size: 13px; color: var(--text-2); line-height: 1.5; }
 .fc-rep-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
 .fc-rep-row:last-child { border-bottom: none; }
 .fc-rep-flag { font-size: 11px; padding: 3px 8px; border-radius: 999px; background: rgba(255,138,138,0.12); color: var(--bad); }
@@ -106,7 +114,7 @@ html, body {
   <div id="liftResult"></div>
 
   <div class="mob-divider"></div>
-  <div class="fc-info-stub">Form cues and technique breakdowns are coming here — planned separately.</div>
+  <div id="formCueArea" class="fc-info-stub">Type an exercise name above to see setup, execution, and common mistakes.</div>
 </div>
 
 <nav class="gym-tabbar">
@@ -126,6 +134,7 @@ html, body {
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="form-coach-logic.js"></script>
 <script src="benchmarks.js"></script>
+<script src="form-cues.js"></script>
 <script>
 // History logging — fire-and-forget capture of each completed session so
 // Carl can judge scoring accuracy across real sessions later. No read path,
@@ -271,6 +280,53 @@ window.dispatchEvent(new Event('lift-camera-module-ready'));
   var resultEl = document.getElementById('liftResult');
   var recording = false;
   var buffer = []; // [{ t, landmarks }]
+
+  // Form cues lookup (Coach tab split Part B, 2026-08-25) -- reuses
+  // FormCoachLogic.matchBenchmark's proven fuzzy-match scoring (same
+  // token-overlap algorithm benchmarks.js uses for scoring) against a
+  // flattened list of every form-cues.js key, rather than duplicating a
+  // second matching implementation.
+  var FORM_CUE_ENTRIES = Object.keys(window.FormCues.primaries)
+    .map(function (n) { return { names: [n], cueKey: n }; })
+    .concat(Object.keys(window.FormCues.variants).map(function (n) { return { names: [n], cueKey: n }; }));
+  var cueArea = document.getElementById('formCueArea');
+  var CUE_PLACEHOLDER = 'Type an exercise name above to see setup, execution, and common mistakes.';
+  var CUE_NO_MATCH = 'No form cues found for that name yet — check the spelling, or this exercise may not be in Row\'s catalog.';
+
+  function renderPrimaryCue(entry, headingOverride) {
+    var mistakesHtml = entry.mistakes.map(function (m) { return '<li>' + escape(m) + '</li>'; }).join('');
+    return '<div class="fc-cue-title">' + escape(headingOverride) + '</div>' +
+      '<div class="fc-cue-section"><div class="fc-cue-label">Setup</div>' + escape(entry.setup) + '</div>' +
+      '<div class="fc-cue-section"><div class="fc-cue-label">Execution</div>' + escape(entry.execution) + '</div>' +
+      '<div class="fc-cue-section"><div class="fc-cue-label">Common mistakes</div><ul class="fc-cue-mistakes">' + mistakesHtml + '</ul></div>' +
+      (entry.benchmarkNote ? '<div class="fc-cue-section"><div class="fc-cue-label">Camera target</div>' + escape(entry.benchmarkNote) + '</div>' : '');
+  }
+
+  function renderFormCues(exerciseName) {
+    var match = window.FormCoachLogic.matchBenchmark(exerciseName, FORM_CUE_ENTRIES);
+    if (!match) {
+      cueArea.className = 'fc-info-stub';
+      cueArea.innerHTML = (exerciseName || '').trim() ? CUE_NO_MATCH : CUE_PLACEHOLDER;
+      return;
+    }
+    var key = match.cueKey;
+    cueArea.className = 'fc-cue-card';
+    if (window.FormCues.primaries[key]) {
+      cueArea.innerHTML = renderPrimaryCue(window.FormCues.primaries[key], key);
+      return;
+    }
+    var variant = window.FormCues.variants[key];
+    var primaryEntry = window.FormCues.primaries[variant.primary];
+    cueArea.innerHTML =
+      '<div class="fc-cue-title">' + escape(key) + '</div>' +
+      '<div class="fc-cue-section fc-cue-variant-note"><div class="fc-cue-label">Variant of ' + escape(variant.primary) + '</div>' + escape(variant.note) + '</div>' +
+      '<div class="mob-divider"></div>' +
+      renderPrimaryCue(primaryEntry, 'Full form breakdown: ' + variant.primary);
+  }
+
+  document.getElementById('liftExerciseName').addEventListener('input', function (e) {
+    renderFormCues(e.target.value);
+  });
   var lastLandmarks = null;
   var cameraStarted = false;
   var isTabActive = false; // set true/false by the coach-tab-active/inactive postMessage handler below
