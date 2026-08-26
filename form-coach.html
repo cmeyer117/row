@@ -274,6 +274,12 @@ window.dispatchEvent(new Event('lift-camera-module-ready'));
   var lastLandmarks = null;
   var cameraStarted = false;
   var isTabActive = false; // set true/false by the coach-tab-active/inactive postMessage handler below
+  // Bumped on every activate/deactivate so a slow initCamera() that resolves
+  // after a rapid switch-away-and-back can tell it's stale and self-stop
+  // instead of resurrecting a camera on a tab that's no longer active
+  // (Codex catch, 2026-08-25 -- the async postMessage boundary means the
+  // old same-page synchronous stop-before-start ordering no longer holds).
+  var activationToken = 0;
   var LIFT_LANDMARK = window.FormCoachLogic.LANDMARK;
 
   async function fetchLiftCritique(exercise, reps) {
@@ -376,7 +382,15 @@ window.dispatchEvent(new Event('lift-camera-module-ready'));
   }
 
   function startLiftCamera() {
+    var myToken = activationToken;
     window.LiftCamera.initCamera(video, statusEl).then(function (ok) {
+      if (myToken !== activationToken) {
+        // A newer activate/deactivate happened while this was in flight --
+        // this acquisition is stale. Stop it immediately rather than
+        // resurrecting a camera on a tab that's no longer active.
+        if (ok) window.LiftCamera.stopCamera(video);
+        return;
+      }
       cameraStarted = ok;
       if (!ok) return;
       window.LiftCamera.startDetectionLoop(video, function (landmarks, nowMs) {
@@ -387,14 +401,18 @@ window.dispatchEvent(new Event('lift-camera-module-ready'));
   }
 
   // Cross-frame handshake with coach.html -- see posing.html's identical
-  // pattern for the full rationale (origin check, child-ready timing).
+  // pattern for the full rationale (origin AND source check, child-ready
+  // timing).
   window.addEventListener('message', function (event) {
     if (event.origin !== window.location.origin) return;
+    if (event.source !== window.parent) return;
     if (!event.data || typeof event.data !== 'object') return;
     if (event.data.type === 'coach-tab-active') {
+      activationToken++;
       isTabActive = true;
       startLiftCamera();
     } else if (event.data.type === 'coach-tab-inactive') {
+      activationToken++;
       isTabActive = false;
       window.LiftCamera.stopCamera(video);
     }

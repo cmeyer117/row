@@ -953,6 +953,12 @@ window.dispatchEvent(new Event('posing-camera-module-ready'));
   var HOLD_DURATION_MS = 1500;
   var frozen = false;
   var isTabActive = false; // set true/false by the coach-tab-active/inactive postMessage handler below
+  // Bumped on every activate/deactivate so a slow initCamera() that resolves
+  // after a rapid switch-away-and-back can tell it's stale and self-stop
+  // instead of resurrecting a camera on a tab that's no longer active
+  // (Codex catch, 2026-08-25 -- the async postMessage boundary means the
+  // old same-page synchronous stop-before-start ordering no longer holds).
+  var activationToken = 0;
 
   async function fetchPoseCritique(imageBase64) {
     var controller = new AbortController();
@@ -1046,7 +1052,15 @@ window.dispatchEvent(new Event('posing-camera-module-ready'));
   }
 
   function startPosingCamera() {
+    var myToken = activationToken;
     window.PosingCamera.initCamera(video, statusEl).then(function (ok) {
+      if (myToken !== activationToken) {
+        // A newer activate/deactivate happened while this was in flight --
+        // this acquisition is stale. Stop it immediately rather than
+        // resurrecting a camera on a tab that's no longer active.
+        if (ok) window.PosingCamera.stopCamera(video);
+        return;
+      }
       if (!ok) return;
       window.PosingCamera.startDetectionLoop(video, function (landmarks, nowMs) {
         if (frozen) return;
@@ -1071,17 +1085,19 @@ window.dispatchEvent(new Event('posing-camera-module-ready'));
   }
 
   // Cross-frame handshake with coach.html, replacing form-coach.html's
-  // same-page CustomEvent pair. Origin-checked (Codex review pattern from
-  // the earlier same-page split, re-applied here since this is now a real
-  // cross-frame boundary where an unchecked listener would act on a message
-  // from any embedding page, not just our own coach.html).
+  // same-page CustomEvent pair. Origin AND source checked (Codex review,
+  // 2026-08-25): origin alone would accept a message from any same-origin
+  // window, not just our actual parent frame.
   window.addEventListener('message', function (event) {
     if (event.origin !== window.location.origin) return;
+    if (event.source !== window.parent) return;
     if (!event.data || typeof event.data !== 'object') return;
     if (event.data.type === 'coach-tab-active') {
+      activationToken++;
       isTabActive = true;
       startPosingCamera();
     } else if (event.data.type === 'coach-tab-inactive') {
+      activationToken++;
       isTabActive = false;
       window.PosingCamera.stopCamera(video);
     }
