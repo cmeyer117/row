@@ -6425,32 +6425,12 @@ img, video, canvas, svg { max-width: 100%; }
   });
   // ─────────────────────────────────────────────────────────────
 
-  $('logBtn').addEventListener('click', () => {
-    const ex = getCurrentEx();
-    if (!ex) return;
-    const reps = parseInt($('repsRow').dataset.value, 10) || 0;
-    if (reps <= 0) { alert('Pick a rep count.'); return; }
-    let w = 0, entry = {};
-    if (ex.bw) {
-      w = 0;
-    } else if (plateMode) {
-      w = getPlateWeight();
-      if (w <= 0) { alert('Add at least one plate.'); return; }
-      const cfg = getPlateConfig();
-      entry.plates = null; // not the old single-plate format
-      entry.plateConfig = cfg;
-      // The plate picker collects plates PER SIDE (see platePickerSummary's "lb/side"),
-      // so `weight` here is per-side plate load — no bar, no ×2 — while lb-mode `weight`
-      // is total load. Stamp the basis so consumers never silently compare the two.
-      // `weight` deliberately stays raw as entered. The exercise's `loadType`
-      // resolves it to real load at read time via GymWorkoutEvents.totalLoad(),
-      // so a wrong loadType mis-displays but can never corrupt a logged set.
-      entry.weightBasis = 'platesPerSide';
-    } else {
-      w = parseFloat($('weightInput').value) || 0;
-      if (w <= 0) { alert('Enter a weight.'); return; }
-      entry.weightBasis = 'totalLbs';
-    }
+  // Extracted so both the manual Log button and voice-set-logger save
+  // through the exact same path -- PR classification, milestones, rest
+  // timer, receipt, and Undo all need to fire identically regardless of how
+  // weight/reps were captured.
+  function saveSet(ex, w, reps, entry) {
+    entry = entry || {};
     const dateKey = getChipDate('logDateInput');
     const isoDate = new Date(dateKey + 'T12:00:00').toISOString();
     const arr = state.logs[ex.id] || [];
@@ -6497,6 +6477,35 @@ img, video, canvas, svg { max-width: 100%; }
     btn.style.transition = 'transform 0.15s';
     btn.style.transform = 'scale(0.96)';
     setTimeout(() => { btn.style.transform = ''; }, 160);
+  }
+
+  $('logBtn').addEventListener('click', () => {
+    const ex = getCurrentEx();
+    if (!ex) return;
+    const reps = parseInt($('repsRow').dataset.value, 10) || 0;
+    if (reps <= 0) { alert('Pick a rep count.'); return; }
+    let w = 0, entry = {};
+    if (ex.bw) {
+      w = 0;
+    } else if (plateMode) {
+      w = getPlateWeight();
+      if (w <= 0) { alert('Add at least one plate.'); return; }
+      const cfg = getPlateConfig();
+      entry.plates = null; // not the old single-plate format
+      entry.plateConfig = cfg;
+      // The plate picker collects plates PER SIDE (see platePickerSummary's "lb/side"),
+      // so `weight` here is per-side plate load — no bar, no ×2 — while lb-mode `weight`
+      // is total load. Stamp the basis so consumers never silently compare the two.
+      // `weight` deliberately stays raw as entered. The exercise's `loadType`
+      // resolves it to real load at read time via GymWorkoutEvents.totalLoad(),
+      // so a wrong loadType mis-displays but can never corrupt a logged set.
+      entry.weightBasis = 'platesPerSide';
+    } else {
+      w = parseFloat($('weightInput').value) || 0;
+      if (w <= 0) { alert('Enter a weight.'); return; }
+      entry.weightBasis = 'totalLbs';
+    }
+    saveSet(ex, w, reps, entry);
   });
 
   document.querySelectorAll('.po-rest-timer-adj').forEach(function(btn) {
