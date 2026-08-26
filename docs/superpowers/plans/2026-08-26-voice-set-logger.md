@@ -397,12 +397,94 @@ git commit -m "refactor: extract saveSet() from the Log button handler"
 
 ---
 
+### Task 3.5: Reject ambiguous exercise matches (Codex catch, 2026-08-26)
+
+A luna-effort Codex review of this plan (before Task 4 was written) flagged that `matchExercise()`'s fixed 0.5 threshold picks a winner even when two candidates tie or nearly tie — e.g. "press" alone scores 0.5 against any two-word "___ Press" exercise, so a real program with multiple press variants on the same day could silently pick the wrong one. That violates the spec's own "never auto-logs a guess" principle just as much as a missed match would. Fix: require the best score to beat the second-best by a real margin; a tie or near-tie is `no-match`, not a coin flip.
+
+**Files:**
+- Modify: `gym-voice-log.js`
+- Modify: `gym-voice-log.test.js`
+
+- [ ] **Step 1: Write the failing test**
+
+Append to `gym-voice-log.test.js` (before `let failed = 0;`):
+
+```js
+{
+  // Both names are 2 significant words sharing only "press" -- each scores
+  // exactly 0.5 (the bare MATCH_THRESHOLD), so the old code's strict ">"
+  // comparison silently kept whichever candidate came first in the array.
+  const AMBIGUOUS = [
+    { id: 'ex_chest_press', name: 'Chest Press', day: 'push', bw: false },
+    { id: 'ex_shoulder_press', name: 'Shoulder Press', day: 'push', bw: false },
+  ];
+  const r = parseSetUtterance('press 135 for 8', AMBIGUOUS, AMBIGUOUS);
+  cases.push(['a word shared by two same-scoring candidates is ambiguous, not a silent pick', r.error === 'no-match']);
+}
+{
+  const r = parseSetUtterance('chest dip 245 for 8', TODAYS, EXERCISES);
+  cases.push(['a clear single-candidate match still wins (regression guard)', r.exId === 'ex_dip']);
+}
+```
+
+- [ ] **Step 2: Run to verify it fails**
+
+Run: `node gym-voice-log.test.js`
+Expected: `FAIL: a word shared by two same-scoring candidates is ambiguous, not a silent pick` (current code picks whichever candidate it iterated to first)
+
+- [ ] **Step 3: Add a margin requirement to `matchExercise()`**
+
+In `gym-voice-log.js`, replace the `matchExercise` function:
+
+```js
+  var MATCH_MARGIN = 0.15; // best score must beat the runner-up by this much, or it's ambiguous
+
+  function matchExercise(tokens, exercises) {
+    var transcriptSet = {};
+    tokens.forEach(function (w) { transcriptSet[w] = true; });
+    var best = null, bestScore = 0, secondScore = 0;
+    (exercises || []).forEach(function (ex) {
+      var words = significantWords(ex.name);
+      if (!words.length) return;
+      var matched = words.filter(function (w) { return transcriptSet[w]; }).length;
+      var score = matched / words.length;
+      if (score > bestScore) { secondScore = bestScore; bestScore = score; best = ex; }
+      else if (score > secondScore) { secondScore = score; }
+    });
+    if (bestScore < MATCH_THRESHOLD) return null;
+    if (bestScore - secondScore < MATCH_MARGIN) return null; // too close to call -- ambiguous, not a guess
+    return best;
+  }
+```
+
+- [ ] **Step 4: Run to verify it passes**
+
+Run: `node gym-voice-log.test.js`
+Expected: `gym-voice-log: all 15 cases pass`
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add gym-voice-log.js gym-voice-log.test.js
+git commit -m "fix: reject ambiguous exercise matches instead of picking silently"
+```
+
+---
+
 ### Task 4: Mic button, wiring, and Retry/Edit card
 
 **Files:**
-- Modify: `gym.html` (markup near `logBtn`/`undoBtn`, ~line 2957; script wiring near the `logBtn` handler from Task 3)
+- Modify: `gym.html` (markup near `logBtn`/`undoBtn`, ~line 2957; script includes ~line 7318; script wiring near the `logBtn` handler from Task 3)
 
-- [ ] **Step 1: Add the mic button and error card markup**
+- [ ] **Step 1: Load `gym-voice-log.js`**
+
+In `gym.html`, next to the other `gym-*-logic.js` includes (`gym.html:7318`), add:
+
+```html
+<script src="gym-voice-log.js"></script>
+```
+
+- [ ] **Step 2: Add the mic button and error card markup**
 
 In `gym.html`, immediately after `<button class="po-btn-primary" id="logBtn">Log set</button>` (~line 2957) and before the `logReceipt` div, add:
 
@@ -420,7 +502,7 @@ In `gym.html`, immediately after `<button class="po-btn-primary" id="logBtn">Log
       <button class="po-undo-btn" id="undoBtn" type="button" style="display:none">↩ Undo last set</button>
 ```
 
-- [ ] **Step 2: Add the CSS `.listening` state**
+- [ ] **Step 3: Add the CSS `.listening` state**
 
 Near the existing `.po-mic-log-btn` styling area (or anywhere in the `<style>` block, matching the file's convention of scattered feature-specific rules), add:
 
@@ -428,7 +510,7 @@ Near the existing `.po-mic-log-btn` styling area (or anywhere in the `<style>` b
 .po-mic-log-btn.listening { background: #ff4444 !important; color: #fff !important; }
 ```
 
-- [ ] **Step 3: Wire the mic button**
+- [ ] **Step 4: Wire the mic button**
 
 Immediately after the `saveSet`/`logBtn` block from Task 3, add:
 
@@ -470,7 +552,20 @@ Immediately after the `saveSet`/`logBtn` block from Task 3, add:
       var allExercises = (state.exercises || []).concat(getAdhocExercises());
       var parsed = window.GymVoiceLog.parseSetUtterance(transcript, todaysExercises, allExercises);
       if (parsed.error) { showError(parsed.transcript); return; }
-      var targetEx = (state.exercises || []).concat(getAdhocExercises()).find(function (e) { return e.id === parsed.exId; }) || ex;
+      // Same guards the manual path applies before calling saveSet() (Task
+      // 3's click handler) -- the parser can't fully rule out a degenerate
+      // parse (e.g. "0" as the only number), so voice logging must reject
+      // it the same way a manual "0" entry already does, not silently log it.
+      if (!(parsed.reps > 0)) { showError(parsed.transcript); return; }
+      var targetEx = allExercises.find(function (e) { return e.id === parsed.exId; }) || ex;
+      if (!targetEx.bw && !(parsed.weight > 0)) { showError(parsed.transcript); return; }
+      // Codex catch (2026-08-26): if the spoken exercise differs from the
+      // one currently displayed, saveSet() still needs Undo, the plate
+      // picker, and the receipt to reflect the exercise actually logged --
+      // all of which read state.currentEx, not whatever ex was passed in.
+      // Switching it here mirrors the existing click-to-select-exercise
+      // pattern elsewhere in this file (state.currentEx = ex.id).
+      if (targetEx.id !== ex.id) state.currentEx = targetEx.id;
       var entry = { weightBasis: 'totalLbs' };
       saveSet(targetEx, parsed.weight, parsed.reps, entry);
     }
@@ -485,11 +580,9 @@ Immediately after the `saveSet`/`logBtn` block from Task 3, add:
     });
     $('voiceLogEdit').addEventListener('click', function () {
       hideError();
-      // Numbers the parser DID find (if any) still pre-fill the manual
-      // inputs, so a partial mishear doesn't waste the whole utterance --
-      // parseSetUtterance's error path already carries the raw transcript,
-      // but not partial numbers, so this just focuses the manual input for
-      // Carl to type the correct values.
+      // parseSetUtterance's error path only carries the raw transcript, not
+      // any partially-parsed numbers -- this just moves focus to the manual
+      // input so Carl can type the set directly instead of retrying voice.
       $('weightInput').focus();
     });
   })();
@@ -497,16 +590,17 @@ Immediately after the `saveSet`/`logBtn` block from Task 3, add:
 
 Note: `targetEx` is looked up because `parsed.exId` may belong to an ad-hoc exercise not present in `getFiltered()`'s result if `getCurrentEx()`'s active exercise differs from the one actually spoken — using the parsed exercise's own object (not the currently-active one) is correct, since the whole point of voice logging is to log against whichever exercise was named, not whatever the UI happened to be showing.
 
-- [ ] **Step 4: Verify live in the browser**
+- [ ] **Step 5: Verify live in the browser**
 
 With the local dev server running:
 - Tap "🎤 Speak set" — confirm the button turns red ("listening").
-- Speak a clean utterance for an on-split exercise (e.g. "chest dip two forty five for eight") — confirm it logs via the same receipt/rest-timer/Undo path verified in Task 3.
+- Speak a clean utterance for an on-split exercise (e.g. "chest dip 245 for 8" — say the weight as digits, not spoken-out compound words like "two forty five"; the parser only handles digit weights plus small spoken-word rep counts, see `gym-voice-log.js`) — confirm it logs via the same receipt/rest-timer/Undo path verified in Task 3.
+- Speak a set for a **different** exercise than the one currently displayed — confirm the screen switches to show that exercise (via the `state.currentEx` update) and Undo correctly targets the just-logged set, not whatever was on screen before.
 - Tap the mic, speak something unparseable (e.g. just noise or an unlisted exercise) — confirm the Retry/Edit card appears with the raw transcript, and no set is logged.
 - Tap Retry — confirm it re-arms the mic. Tap Edit manually — confirm focus moves to the weight input.
 - Tap the mic button a second time mid-recording — confirm it stops the capture (matches the existing chat-bubble tap-to-stop behavior in `mini-vision-chat.js`).
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
 git add gym.html
