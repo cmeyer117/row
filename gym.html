@@ -2532,6 +2532,22 @@ img, video, canvas, svg { max-width: 100%; }
        letting a user tap ahead would desync it. -->
   <div class="week-strip" id="weekStrip"></div>
 
+  <!-- Proactive Memory Surfacing card -- populated by initSurfacedMemory()
+       below, from app_state key jarvis:surfaced_memory (written daily by
+       Jarvis's /scheduled/memory-surface job). Hidden by default; only shown
+       once real content passes the staleness/dismissal checks. See
+       docs/superpowers/specs/2026-08-26-local-semantic-memory-design.md. -->
+  <div id="surfaced-memory-card" style="display:none;margin:0 0 14px;padding:12px 14px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07);border-radius:14px;">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">
+      <div style="flex:1;min-width:0;">
+        <div id="smc-title" style="font-size:13px;font-weight:600;color:#F4F1EA;margin-bottom:4px;"></div>
+        <div id="smc-content" style="font-size:12px;line-height:1.45;color:#B8B6B0;white-space:pre-wrap;"></div>
+        <div id="smc-source" style="font-size:10px;color:#76746E;margin-top:6px;"></div>
+      </div>
+      <button id="smc-dismiss" type="button" aria-label="Dismiss" style="background:none;border:none;color:#76746E;font-size:18px;line-height:1;cursor:pointer;padding:0 2px;">×</button>
+    </div>
+  </div>
+
   <!-- Quick Log Bar (collapsed by default, opened via #quickLogToggle) -->
   <div class="po-quick-log-wrap" id="quickLogWrap">
     <div class="po-quick-log">
@@ -8099,6 +8115,97 @@ document.addEventListener('DOMContentLoaded', function () {
   window.__gymSeason = { renderBanner: renderBanner, loadSeason: loadSeason };
   renderBanner();
   document.addEventListener('visibilitychange', function () { if (!document.hidden) renderBanner(); });
+})();
+</script>
+
+<script>
+(function () {
+  'use strict';
+  var KEY = 'jarvis:surfaced_memory';
+  var MAX_AGE_MS = 48 * 60 * 60 * 1000;
+
+  function localDateKey(iso) {
+    // LOCAL date, not toISOString() -- an ISO slice is UTC, so any dismissal
+    // within the local-vs-UTC offset window (evenings in US timezones) keys
+    // to tomorrow's date and the card silently reappears.
+    var d = new Date(iso);
+    var m = String(d.getMonth() + 1).padStart(2, '0');
+    var day = String(d.getDate()).padStart(2, '0');
+    return d.getFullYear() + '-' + m + '-' + day;
+  }
+
+  function dismissKey(id, computedAt) {
+    // Date-scoped, NOT the bare id -- keying by id alone would suppress this
+    // memory permanently on this browser, including months later when it is
+    // legitimately selected again.
+    return 'smc-dismissed:' + id + ':' + localDateKey(computedAt);
+  }
+
+  // pcSupa is assigned inside gym.html's async pcInitCloudSync() IIFE, only
+  // after it awaits RowAuth.ensure() and resumes (gym.html:7894). Reading the
+  // getter once on DOMContentLoaded therefore races it and usually sees null,
+  // which would make this card silently never render -- indistinguishable
+  // from "no memory today" and so the worst possible failure here. gym.html
+  // documents an identical prior race at :7896. Poll with a bound instead.
+  function waitForPcSupa(timeoutMs) {
+    return new Promise(function (resolve) {
+      var deadline = Date.now() + timeoutMs;
+      (function poll() {
+        var supa = window.__gym && window.__gym.pcSupa;
+        if (supa) return resolve(supa);
+        if (Date.now() >= deadline) return resolve(null);
+        setTimeout(poll, 250);
+      })();
+    });
+  }
+
+  async function initSurfacedMemory() {
+    try {
+      // Must await: "already authenticated" is a timing assumption, not a
+      // guarantee, and the app_state RLS policy requires a real owner session.
+      if (window.RowAuth && window.RowAuth.ensure) await window.RowAuth.ensure();
+      var supa = await waitForPcSupa(15000);
+      if (!supa) return;
+
+      var res = await supa.from('app_state').select('data').eq('key', KEY).maybeSingle();
+      var payload = res && res.data && res.data.data;
+      if (!payload || !payload.memory || !payload.computedAt) return;
+
+      var age = Date.now() - new Date(payload.computedAt).getTime();
+      if (!(age >= 0) || age > MAX_AGE_MS) return; // NaN-safe: unparseable date drops out
+
+      var dk = dismissKey(payload.memory.id, payload.computedAt);
+      if (localStorage.getItem(dk)) return;
+
+      // textContent throughout, never innerHTML -- stored note content is
+      // user-controlled text and a real stored-XSS sink otherwise.
+      document.getElementById('smc-title').textContent = payload.memory.title || '';
+      document.getElementById('smc-content').textContent = payload.memory.content || '';
+      // Conditional on isPersonalInsight (surface-memory.ts) -- the corpus
+      // today is entirely imported vault knowledge, not personal distill
+      // output (spec rev 5, verified live: zero Personal Insight rows exist).
+      // Must not claim "your own log" for content that factually isn't yet.
+      var provenanceLabel = payload.memory.isPersonalInsight ? 'from your own log' : 'related to your training';
+      document.getElementById('smc-source').textContent = payload.memory.source
+        ? provenanceLabel + ', ' + payload.memory.source
+        : provenanceLabel;
+
+      var card = document.getElementById('surfaced-memory-card');
+      document.getElementById('smc-dismiss').addEventListener('click', function () {
+        try { localStorage.setItem(dk, '1'); } catch (e) {}
+        card.style.display = 'none';
+      });
+      card.style.display = '';
+    } catch (e) {
+      // Never degrade the training UI for a nice-to-have surface.
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initSurfacedMemory);
+  } else {
+    initSurfacedMemory();
+  }
 })();
 </script>
 
