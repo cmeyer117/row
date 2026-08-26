@@ -2940,6 +2940,7 @@ img, video, canvas, svg { max-width: 100%; }
         </div>
       </div>
       <button class="po-btn-primary" id="logBtn">Log set</button>
+      <div class="po-log-receipt" id="logReceipt" style="display:none;font-size:12px;text-align:center;margin-top:6px;opacity:0.75"></div>
       <button class="po-undo-btn" id="undoBtn" type="button" style="display:none">↩ Undo last set</button>
     </div>
 
@@ -6468,6 +6469,7 @@ img, video, canvas, svg { max-width: 100%; }
     if (weightInputDirtyForEx === ex.id) weightInputDirtyForEx = null;
     resetChipToToday('logDateChip', 'logDateInput');
     startRestTimer(ex, eventType, dateKey);
+    if (window.__gym && typeof window.__gym.pcArmReceipt === 'function') window.__gym.pcArmReceipt();
     saveState(); renderAll();
     // Strength changed → composition estimate may shift
     if (typeof wtRender === 'function') wtRender();
@@ -7434,6 +7436,9 @@ document.addEventListener('DOMContentLoaded', function () {
   // IIFE) can log a timing marker -- checking the po-coach-sync-debug trail
   // server-side after the next test instead of asking Carl to relay alerts.
   window.__gym.pcDebug = function (event, extra) { return pcDebug(event, extra); };
+  // Bridges pcArmReceipt (this IIFE) to the "Log set" handler (a separate,
+  // earlier IIFE) -- same cross-script-boundary pattern as pcDebug above.
+  window.__gym.pcArmReceipt = function () { return pcArmReceipt(); };
 
   // Fire-and-forget insert for the journal-reactive-prompts feature —
   // must never block or throw into the caller (set-logging is the primary
@@ -7472,6 +7477,34 @@ document.addEventListener('DOMContentLoaded', function () {
   // JSON of the last state we sent or received — used to ignore
   // realtime echoes of our own pushes so we don't infinite-loop.
   let pcLastSyncedJson = null;
+
+  // Set save-state receipt (#logReceipt) — armed by the "Log set" handler
+  // right after a set is written to localStorage, then updated as pcPushNow
+  // resolves. Only shows while armed, so unrelated pushes (a pull-triggered
+  // re-push, another tab's edit) don't pop a stale receipt back up.
+  let pcReceiptArmed = false;
+  function pcArmReceipt() {
+    // Local-only mode (no Supabase configured) never resolves a push --
+    // don't arm a receipt that would say "syncing…" forever.
+    if (SUPABASE_URL.indexOf('PASTE-') === 0 || SUPABASE_KEY.indexOf('PASTE-') === 0) return;
+    pcReceiptArmed = true;
+    const el = document.getElementById('logReceipt');
+    if (!el) return;
+    el.textContent = 'Logged locally · syncing…';
+    el.style.display = 'block';
+  }
+  function pcSetStatus(status) {
+    if (!pcReceiptArmed) return;
+    const el = document.getElementById('logReceipt');
+    if (!el) return;
+    if (status === 'synced') {
+      el.textContent = 'Synced';
+      pcReceiptArmed = false;
+      setTimeout(() => { if (!pcReceiptArmed) el.style.display = 'none'; }, 2000);
+    } else if (status === 'error') {
+      el.textContent = 'Not synced yet — will retry on your next edit';
+    }
+  }
 
   const _pcOrigSet = localStorage.setItem.bind(localStorage);
   const _pcOrigRemove = localStorage.removeItem.bind(localStorage);
@@ -7753,9 +7786,9 @@ document.addEventListener('DOMContentLoaded', function () {
           { key: APP_KEY, data: state, updated_at: new Date().toISOString() },
           { onConflict: 'key' }
         );
-      if (!error) { pcLastSyncedJson = json; pcDebug('push-success', { weightCount }); }
-      else pcDebug('push-returned-error', { msg: error.message, weightCount });
-    } catch (e) { pcDebug('push-threw', { msg: e && e.message, weightCount }); }
+      if (!error) { pcLastSyncedJson = json; pcDebug('push-success', { weightCount }); pcSetStatus('synced'); }
+      else { pcDebug('push-returned-error', { msg: error.message, weightCount }); pcSetStatus('error'); }
+    } catch (e) { pcDebug('push-threw', { msg: e && e.message, weightCount }); pcSetStatus('error'); }
   }
 
   function pcSchedulePush() {
