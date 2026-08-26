@@ -4772,9 +4772,19 @@ img, video, canvas, svg { max-width: 100%; }
     renderRx(); renderStats(); renderSparkline(); renderHistory();
     renderTodaysWorkout();
     renderPastWorkouts();
-    // Pre-fill weight input with last logged weight (or starting weight)
+    // Pre-fill weight input with last logged weight (or starting weight) --
+    // but never clobber a not-yet-logged manual adjustment (+/- taps or
+    // typing) for the exercise currently shown. renderAll() runs on every
+    // realtime sync echo (see pcApplyRemoteState's unconditional
+    // pcRerender() call), which used to silently reset the field back to
+    // the last SAVED weight mid-adjustment -- pcIsUserEditing()'s
+    // focus-based guard doesn't catch this because tapping a stepper
+    // button never focuses weightInput. Root-cause fix, not a timing hack:
+    // weightInputDirtyForEx is set by weightUpBtn/weightDownBtn/weightInput's
+    // 'input' listener and explicitly cleared by logBtn once that exercise's
+    // adjustment is actually saved.
     const ex = getCurrentEx();
-    if (ex && !ex.bw) {
+    if (ex && !ex.bw && weightInputDirtyForEx !== ex.id) {
       const logs = getLogs();
       const w = logs.length ? logs[logs.length - 1].weight : (ex.startWeight || 0);
       $('weightInput').value = w;
@@ -5611,16 +5621,28 @@ img, video, canvas, svg { max-width: 100%; }
     if (match) state.filterDay = match.id;
   })();
 
+  // Tracks a not-yet-logged manual weight adjustment for a specific
+  // exercise, so renderAll()'s prefill (which runs on every realtime sync
+  // echo, not just user actions) doesn't clobber it back to the last saved
+  // weight before the user taps "Log set". See renderAll()'s prefill block
+  // for the read side; logBtn's handler clears it once actually saved.
+  let weightInputDirtyForEx = null;
   // $('exSelect') removed — selection is now handled by workout list row clicks
   $('weightDownBtn').addEventListener('click', () => {
     const ex = getCurrentEx(); if (!ex || ex.bw) return;
     const w = parseFloat($('weightInput').value) || 0;
     $('weightInput').value = Math.max(0, w - (ex.step || 2.5));
+    weightInputDirtyForEx = ex.id;
   });
   $('weightUpBtn').addEventListener('click', () => {
     const ex = getCurrentEx(); if (!ex || ex.bw) return;
     const w = parseFloat($('weightInput').value) || 0;
     $('weightInput').value = w + (ex.step || 2.5);
+    weightInputDirtyForEx = ex.id;
+  });
+  $('weightInput').addEventListener('input', () => {
+    const ex = getCurrentEx(); if (!ex || ex.bw) return;
+    weightInputDirtyForEx = ex.id;
   });
   // Delegated click handler — reps row is regenerated per exercise via
   // renderRepsRow(), so we listen on the container rather than the
@@ -6443,6 +6465,7 @@ img, video, canvas, svg { max-width: 100%; }
       state.milestones = window.GymMilestoneLogic.recordMilestone(state.milestones, { eventType: eventType, exercise: ex.name, dateKey: dateKey });
     }
     if (plateMode) { plateCounts = {}; updatePlateUI(); }
+    if (weightInputDirtyForEx === ex.id) weightInputDirtyForEx = null;
     resetChipToToday('logDateChip', 'logDateInput');
     startRestTimer(ex, eventType, dateKey);
     saveState(); renderAll();
