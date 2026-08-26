@@ -15,6 +15,7 @@
   var WEIGHT_WORDS = { pound: true, pounds: true, lb: true, lbs: true };
   var STOPWORDS = { the: true, a: true, an: true, and: true };
   var MATCH_THRESHOLD = 0.5; // at least half an exercise's significant words must appear in the transcript
+  var MATCH_MARGIN = 0.15; // best score must beat the runner-up by this much, or it's ambiguous
 
   function tokenize(text) {
     return String(text || '').toLowerCase().replace(/[^a-z0-9.\s]/g, ' ').split(/\s+/).filter(Boolean);
@@ -30,15 +31,18 @@
   function matchExercise(tokens, exercises) {
     var transcriptSet = {};
     tokens.forEach(function (w) { transcriptSet[w] = true; });
-    var best = null, bestScore = 0;
+    var best = null, bestScore = 0, secondScore = 0;
     (exercises || []).forEach(function (ex) {
       var words = significantWords(ex.name);
       if (!words.length) return;
       var matched = words.filter(function (w) { return transcriptSet[w]; }).length;
       var score = matched / words.length;
-      if (score > bestScore) { bestScore = score; best = ex; }
+      if (score > bestScore) { secondScore = bestScore; bestScore = score; best = ex; }
+      else if (score > secondScore) { secondScore = score; }
     });
-    return bestScore >= MATCH_THRESHOLD ? best : null;
+    if (bestScore < MATCH_THRESHOLD) return null;
+    if (bestScore - secondScore < MATCH_MARGIN) return null; // too close to call -- ambiguous, not a guess
+    return best;
   }
 
   function extractNumbers(tokens) {

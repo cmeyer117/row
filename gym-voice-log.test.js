@@ -71,6 +71,21 @@ const cases = [];
   const r = parseSetUtterance('', TODAYS, EXERCISES);
   cases.push(['empty transcript -> no-match, never throws', r.error === 'no-match']);
 }
+{
+  // Both names are 2 significant words sharing only "press" -- each scores
+  // exactly 0.5 (the bare MATCH_THRESHOLD), so the old code's strict ">"
+  // comparison silently kept whichever candidate came first in the array.
+  const AMBIGUOUS = [
+    { id: 'ex_chest_press', name: 'Chest Press', day: 'push', bw: false },
+    { id: 'ex_shoulder_press', name: 'Shoulder Press', day: 'push', bw: false },
+  ];
+  const r = parseSetUtterance('press 135 for 8', AMBIGUOUS, AMBIGUOUS);
+  cases.push(['a word shared by two same-scoring candidates is ambiguous, not a silent pick', r.error === 'no-match']);
+}
+{
+  const r = parseSetUtterance('chest dip 245 for 8', TODAYS, EXERCISES);
+  cases.push(['a clear single-candidate match still wins (regression guard)', r.exId === 'ex_dip']);
+}
 
 let failed = 0;
 for (const [label, ok] of cases) {
