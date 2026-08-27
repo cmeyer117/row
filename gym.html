@@ -27,6 +27,24 @@
      the browser's local storage on each device.
      ============================================================= -->
 <script>
+// Intensifiers feature (2026-08-27) -- wording sourced from the vault's
+// "Intensifier Evidence Ranking" note. Deliberately states the "matches,
+// not exceeds, straight-set growth" caveat inline so the in-app reference
+// doesn't overstate what the research actually supports.
+const INTENSIFIER_TECHNIQUES = {
+  dropset: {
+    label: 'Drop set',
+    blurb: 'Same exercise, reduce the load and go again with no rest once you hit failure. Time-efficient -- matches straight-set growth, not extra growth.',
+  },
+  clusterset: {
+    label: 'Cluster set',
+    blurb: 'Same load, short (10-20s) intra-set rest breaks before continuing the set. Manages fatigue -- matches straight-set growth, not extra growth.',
+  },
+  superset: {
+    label: 'Superset',
+    blurb: 'Pair with a second exercise, little/no rest between them. Cuts session time -- matches straight-set growth for hypertrophy/strength.',
+  },
+};
 const CONFIG = {
   appTitle: "Progressive Overload Coach",
 
@@ -3407,6 +3425,10 @@ img, video, canvas, svg { max-width: 100%; }
       if (ex.isolation == null && seed.isolation != null) ex.isolation = seed.isolation;
     });
     s.logs = (s.logs && typeof s.logs === 'object') ? s.logs : {};
+    // Intensifiers feature (2026-08-27) -- per-exercise override of the
+    // seed-data `isolation` default. undefined means "no override, use the
+    // seed default"; explicit true/false always wins.
+    if (!s.intensifierEnabled || typeof s.intensifierEnabled !== 'object') s.intensifierEnabled = {};
     if (!s.sessions || typeof s.sessions !== 'object') s.sessions = {};
     if (!Array.isArray(s.milestones)) s.milestones = [];
     // One entry per day a check-in was submitted: { pain, recovery, pump },
@@ -3498,6 +3520,41 @@ img, video, canvas, svg { max-width: 100%; }
     if (!state.sessions[dk]) state.sessions[dk] = {};
     if (!state.sessions[dk][exId]) state.sessions[dk][exId] = { activeVariant: null };
     state.sessions[dk][exId].activeVariant = variant;
+  }
+
+  // Intensifiers feature (2026-08-27) -- state.intensifierEnabled[exId] is
+  // undefined by default (fall back to the seed's `isolation` tag); an
+  // explicit true/false is the user's manual override via the Rx-card
+  // toggle and always wins.
+  function intensifiersEnabledFor(ex) {
+    const override = state.intensifierEnabled[ex.id];
+    return typeof override === 'boolean' ? override : !!ex.isolation;
+  }
+  function setIntensifierEnabled(exId, enabled) {
+    state.intensifierEnabled[exId] = enabled;
+    if (!enabled) clearPendingTechnique(exId); // don't leave an armed technique the UI no longer shows a way to see/cancel
+  }
+  // A single global slot, NOT nested per-exercise, so there's exactly one
+  // place to check/clear regardless of which of this file's ~10
+  // `state.currentEx = ...` call sites triggered a switch. armedDate guards
+  // against a technique armed one day still reading as armed after a real
+  // calendar-day rollover (getActiveDate() moves at the app's 6am cutoff,
+  // not at a log-date-chip change -- that's a separate concept from "what
+  // day is it right now while I'm training").
+  function armPendingTechnique(exId, technique) {
+    const p = state.pendingIntensifier;
+    const same = p && p.exId === exId && p.technique === technique;
+    // Tapping the same chip again disarms it -- toggle, don't just set.
+    state.pendingIntensifier = same ? null : { exId: exId, technique: technique, armedDate: getActiveDate() };
+    saveState();
+  }
+  function getPendingTechnique(exId) {
+    const p = state.pendingIntensifier;
+    if (!p || p.exId !== exId || p.armedDate !== getActiveDate()) return null;
+    return p.technique;
+  }
+  function clearPendingTechnique(exId) {
+    if (state.pendingIntensifier && state.pendingIntensifier.exId === exId) state.pendingIntensifier = null;
   }
 
   function getTodaySets(exId) {
