@@ -86,16 +86,16 @@ const CONFIG = {
     { name: "Chest Dip",                           gym: "comm", day: "push", muscle: "Chest", loadType: 'plates', repMin: 8,  repMax: 12, step: 5,   startWeight: 0,   numSets: 2,
       setReps: [[8,10],[10,12]], restMin: 3, formTip: "Regardless of the variation chosen, leaning your upper body forward is the key to the chest-bias version.",
       subs: [{ name: "Dip Machine (Chest Bias)", stars: 5 }, { name: "Chest Dip (RG Variant)", stars: 5 }, { name: "Other Dip Variations", stars: 3 }] },
-    { name: "Incline Cable Pec Fly",               gym: "comm", day: "push", muscle: "Chest", loadType: 'total', repMin: 8,  repMax: 12, step: 5,   startWeight: 52.5,numSets: 2,
+    { name: "Incline Cable Pec Fly",               isolation: true, gym: "comm", day: "push", muscle: "Chest", loadType: 'total', repMin: 8,  repMax: 12, step: 5,   startWeight: 52.5,numSets: 2,
       setReps: [[8,10],[10,12]], restMin: 3,
       subs: [{ name: "Pec Dec Fly (Upper Chest Bias)", stars: 5 }, { name: "Incline Dumbbell Pec Fly", stars: 4 }] },
-    { name: "Dumbbell Lateral Raise",              gym: "comm", day: "push", muscle: "Shoulders", repMin: 8,  repMax: 16, step: 2.5, startWeight: 35,  numSets: 2,
+    { name: "Dumbbell Lateral Raise",              isolation: true, gym: "comm", day: "push", muscle: "Shoulders", repMin: 8,  repMax: 16, step: 2.5, startWeight: 35,  numSets: 2,
       setReps: [[8,12],[12,16]], restMin: 2.5,
       subs: [{ name: "Low Cable Lateral Raise", stars: 5 }, { name: "Seated Machine Lateral Raise", stars: 4 }, { name: "Standing Machine Lateral Raise", stars: 4 }] },
-    { name: "Cable Front Raise",                   gym: "comm", day: "push", muscle: "Shoulders", loadType: 'total', repMin: 8,  repMax: 16, step: 5,   startWeight: 30,  numSets: 2,
+    { name: "Cable Front Raise",                   isolation: true, gym: "comm", day: "push", muscle: "Shoulders", loadType: 'total', repMin: 8,  repMax: 16, step: 5,   startWeight: 30,  numSets: 2,
       setReps: [[8,12],[12,16]], restMin: 2.5,
       subs: [{ name: "Dumbbell Front Raise", stars: 4 }] },
-    { name: "Cable Triceps Overhead Extension",    gym: "comm", day: "push", muscle: "Triceps", loadType: 'total', repMin: 8,  repMax: 16, step: 5,   startWeight: 50,  numSets: 4,
+    { name: "Cable Triceps Overhead Extension",    isolation: true, gym: "comm", day: "push", muscle: "Triceps", loadType: 'total', repMin: 8,  repMax: 16, step: 5,   startWeight: 50,  numSets: 4,
       setReps: [[8,10],[10,12],[12,14],[14,16]], restMin: 2,
       subs: [{ name: "Dumbbell Overhead Extension", stars: 5 }, { name: "Machine Overhead Triceps Extension", stars: 5 }, { name: "Machine Triceps Extension", stars: 4 }] },
     // ── Pull ── Day 2: Pull
@@ -111,13 +111,13 @@ const CONFIG = {
     { name: "Machine Low Row",                     gym: "comm", day: "pull", muscle: "Back", loadType: 'perSide', repMin: 8,  repMax: 12, step: 5,   startWeight: 90,  numSets: 2,
       setReps: [[8,10],[10,12]], restMin: 3,
       subs: [{ name: "Cable Low Row", stars: 5 }, { name: "Single Arm Landmine Row", stars: 4 }] },
-    { name: "Cable Lat Pushdown/Pullover",         gym: "comm", day: "pull", muscle: "Back", loadType: 'total', repMin: 8,  repMax: 16, step: 5,   startWeight: 72.5,numSets: 2,
+    { name: "Cable Lat Pushdown/Pullover",         isolation: true, gym: "comm", day: "pull", muscle: "Back", loadType: 'total', repMin: 8,  repMax: 16, step: 5,   startWeight: 72.5,numSets: 2,
       setReps: [[8,12],[12,16]], restMin: 2.5,
       subs: [{ name: "Machine Lat Pullover", stars: 5 }, { name: "Dumbbell Lat Pullover", stars: 4 }] },
-    { name: "Cable Rear Delt Fly",                 gym: "comm", day: "pull", muscle: "Shoulders", loadType: 'total', repMin: 8,  repMax: 16, step: 5,   startWeight: 15,  numSets: 2,
+    { name: "Cable Rear Delt Fly",                 isolation: true, gym: "comm", day: "pull", muscle: "Shoulders", loadType: 'total', repMin: 8,  repMax: 16, step: 5,   startWeight: 15,  numSets: 2,
       setReps: [[8,12],[12,16]], restMin: 2.5,
       subs: [{ name: "Machine Rear Delt Fly", stars: 5 }, { name: "Dumbbell Rear Delt Fly", stars: 4 }] },
-    { name: "Seated Behind-the-Back Cable Curl",   gym: "comm", day: "pull", muscle: "Biceps", loadType: 'total', repMin: 8,  repMax: 16, step: 2.5, startWeight: 35,  numSets: 4,
+    { name: "Seated Behind-the-Back Cable Curl",   isolation: true, gym: "comm", day: "pull", muscle: "Biceps", loadType: 'total', repMin: 8,  repMax: 16, step: 2.5, startWeight: 35,  numSets: 4,
       setReps: [[8,10],[10,12],[12,14],[14,16]], restMin: 2,
       subs: [{ name: "Bayesian Cable Curl", stars: 5 }, { name: "Seated Incline Dumbbell Curl", stars: 4 }] },
     // ── Legs A ── Day 3: Legs [A]
@@ -127,16 +127,16 @@ const CONFIG = {
     { name: "Sissy Leg Press",                     gym: "comm", day: "legsA", muscle: "Quads", repMin: 8,  repMax: 12, step: 10,  startWeight: 540, numSets: 2,
       setReps: [[8,10],[10,12]], restMin: 3,
       subs: [{ name: "Hack Squat Sissy Squats", stars: 4 }, { name: "Sissy Squat on Sissy Stand", stars: 4 }, { name: "Leg Press Quad Bias", stars: 4 }] },
-    { name: "Seated Hamstrings Curl",              gym: "comm", day: "legsA", muscle: "Hamstrings", loadType: 'plates', repMin: 8,  repMax: 12, step: 5,   startWeight: 110, numSets: 2,
+    { name: "Seated Hamstrings Curl",              isolation: true, gym: "comm", day: "legsA", muscle: "Hamstrings", loadType: 'plates', repMin: 8,  repMax: 12, step: 5,   startWeight: 110, numSets: 2,
       setReps: [[8,10],[10,12]], restMin: 3,
       subs: [{ name: "Lying Hamstrings Curl", stars: 5 }, { name: "Glute Ham Raise", stars: 3 }] },
     { name: "Dumbbell B-Stance RDL",               gym: "comm", day: "legsA", muscle: "Hamstrings", repMin: 8,  repMax: 16, step: 5,   startWeight: 55,  numSets: 2,
       setReps: [[8,12],[12,16]], restMin: 2,
       subs: [{ name: "Cable Hip Extension Machine", stars: 6 }, { name: "Single Leg Hip Extension", stars: 5 }, { name: "V-Squat Good Morning", stars: 4 }, { name: "Barbell Good Morning", stars: 4 }] },
-    { name: "Hip Adduction Machine",               gym: "comm", day: "legsA", muscle: "Glutes", repMin: 8,  repMax: 16, step: 5,   startWeight: 90,  numSets: 2,
+    { name: "Hip Adduction Machine",               isolation: true, gym: "comm", day: "legsA", muscle: "Glutes", repMin: 8,  repMax: 16, step: 5,   startWeight: 90,  numSets: 2,
       setReps: [[8,12],[12,16]], restMin: 2.5,
       subs: [{ name: "Cable Hip Adduction", stars: 3 }] },
-    { name: "Standing Calf Raise",                 gym: "comm", day: "legsA", muscle: "Calves", repMin: 8,  repMax: 16, step: 5,   startWeight: 130, numSets: 4,
+    { name: "Standing Calf Raise",                 isolation: true, gym: "comm", day: "legsA", muscle: "Calves", repMin: 8,  repMax: 16, step: 5,   startWeight: 130, numSets: 4,
       setReps: [[8,10],[10,12],[12,14],[14,16]], restMin: 2,
       subs: [{ name: "Smith Machine Calf Raise", stars: 5 }] },
     // ── Upper ── Day 4: Upper Body
@@ -152,23 +152,23 @@ const CONFIG = {
     { name: "Neutral Grip Lat Pulldown",           gym: "comm", day: "upper", muscle: "Back", repMin: 4,  repMax: 8,  step: 5,   startWeight: 100, numSets: 2,
       setReps: [[4,6],[6,8]], restMin: 4, formTip: "Neutral grip bar lets the elbows tuck in close to the body to better target the lat musculature.",
       subs: [{ name: "Nautilus Lat Pulldown Machine", stars: 5 }, { name: "Single Arm Lat Pulldown", stars: 4 }] },
-    { name: "Low Cable Lateral Raise",             gym: "comm", day: "upper", muscle: "Shoulders", repMin: 8,  repMax: 16, step: 2.5, startWeight: 20,  numSets: 2,
+    { name: "Low Cable Lateral Raise",             isolation: true, gym: "comm", day: "upper", muscle: "Shoulders", repMin: 8,  repMax: 16, step: 2.5, startWeight: 20,  numSets: 2,
       setReps: [[8,12],[12,16]], restMin: 2.5,
       subs: [{ name: "Standing Machine Lateral Raise", stars: 4 }, { name: "Seated Machine Lateral Raise", stars: 4 }] },
-    { name: "Dumbbell Front Raise",                gym: "comm", day: "upper", muscle: "Shoulders", repMin: 8,  repMax: 16, step: 2.5, startWeight: 30,  numSets: 2,
+    { name: "Dumbbell Front Raise",                isolation: true, gym: "comm", day: "upper", muscle: "Shoulders", repMin: 8,  repMax: 16, step: 2.5, startWeight: 30,  numSets: 2,
       setReps: [[8,12],[12,16]], restMin: 2.5,
       subs: [{ name: "Cable Front Raise", stars: 4 }] },
-    { name: "Machine Preacher Curl",               gym: "comm", day: "upper", muscle: "Biceps", repMin: 8,  repMax: 16, step: 5,   startWeight: 110, numSets: 2,
+    { name: "Machine Preacher Curl",               isolation: true, gym: "comm", day: "upper", muscle: "Biceps", repMin: 8,  repMax: 16, step: 5,   startWeight: 110, numSets: 2,
       setReps: [[8,12],[12,16]], restMin: 2,
       subs: [{ name: "Barbell Preacher Curl", stars: 5 }, { name: "Standing Cable Curl", stars: 4 }] },
-    { name: "Cable Triceps Pushdown",              gym: "comm", day: "upper", muscle: "Triceps", repMin: 8,  repMax: 16, step: 5,   startWeight: 87.5,numSets: 2,
+    { name: "Cable Triceps Pushdown",              isolation: true, gym: "comm", day: "upper", muscle: "Triceps", repMin: 8,  repMax: 16, step: 5,   startWeight: 87.5,numSets: 2,
       setReps: [[8,12],[12,16]], restMin: 2,
       subs: [{ name: "Cable Elbow Supported Triceps Pushdown", stars: 5 }, { name: "Triceps Crossbody Extension", stars: 4 }] },
     // ── Legs B ── Day 5: Legs [B]
     { name: "Smith Machine RDL",                   gym: "comm", day: "legsB", muscle: "Hamstrings", repMin: 4,  repMax: 8,  step: 10,  startWeight: 225, numSets: 2,
       setReps: [[4,6],[6,8]], restMin: 4,
       subs: [{ name: "Barbell / Dumbbell / Trap Bar RDL", stars: 5 }, { name: "V-Squat Machine Good Morning", stars: 4 }, { name: "Arsenal Posterior Chain Developer", stars: 6 }] },
-    { name: "Lying Hamstrings Curl",               gym: "comm", day: "legsB", muscle: "Hamstrings", repMin: 8,  repMax: 12, step: 5,   startWeight: 140, numSets: 2,
+    { name: "Lying Hamstrings Curl",               isolation: true, gym: "comm", day: "legsB", muscle: "Hamstrings", repMin: 8,  repMax: 12, step: 5,   startWeight: 140, numSets: 2,
       setReps: [[8,10],[10,12]], restMin: 3,
       subs: [{ name: "Seated Hamstrings Curl", stars: 4 }, { name: "Glute Ham Raise", stars: 3 }] },
     { name: "Cybex Leg Press",                     gym: "comm", day: "legsB", muscle: "Quads", repMin: 8,  repMax: 12, step: 10,  startWeight: 405, numSets: 2,
@@ -177,10 +177,10 @@ const CONFIG = {
     { name: "Dumbbell Heel Elevated Lunge",        gym: "comm", day: "legsB", muscle: "Quads", repMin: 8,  repMax: 16, step: 5,   startWeight: 40,  numSets: 2,
       setReps: [[8,12],[12,16]], restMin: 2,
       subs: [{ name: "Dumbbell Split Squat", stars: 5 }, { name: "Smith Machine Split Squat", stars: 4 }, { name: "DB/BB Walking Lunge", stars: 4 }] },
-    { name: "Leg Extension",                       gym: "comm", day: "legsB", muscle: "Quads", repMin: 8,  repMax: 16, step: 5,   startWeight: 220, numSets: 2,
+    { name: "Leg Extension",                       isolation: true, gym: "comm", day: "legsB", muscle: "Quads", repMin: 8,  repMax: 16, step: 5,   startWeight: 220, numSets: 2,
       setReps: [[8,12],[12,16]], restMin: 2.5,
       subs: [{ name: "Sissy Squat", stars: 2 }] },
-    { name: "Seated Calf Raise",                   gym: "comm", day: "legsB", muscle: "Calves", repMin: 8,  repMax: 16, step: 5,   startWeight: 180, numSets: 4,
+    { name: "Seated Calf Raise",                   isolation: true, gym: "comm", day: "legsB", muscle: "Calves", repMin: 8,  repMax: 16, step: 5,   startWeight: 180, numSets: 4,
       setReps: [[8,10],[10,12],[12,14],[14,16]], restMin: 2,
       subs: [{ name: "Bent Knee Calf Press on Leg Press", stars: 4 }] }
   ]
@@ -3400,6 +3400,11 @@ img, video, canvas, svg { max-width: 100%; }
       if (!ex.setReps && seed.setReps) ex.setReps = seed.setReps;
       if (ex.restMin == null && seed.restMin != null) ex.restMin = seed.restMin;
       if (!ex.formTip && seed.formTip) ex.formTip = seed.formTip;
+      // Intensifiers feature (2026-08-27) -- isolation is a new seed field;
+      // without this backfill, anyone with existing localStorage state would
+      // never see it since `ex` comes from their persisted array, not a
+      // fresh buildDefaultExercises() call.
+      if (ex.isolation == null && seed.isolation != null) ex.isolation = seed.isolation;
     });
     s.logs = (s.logs && typeof s.logs === 'object') ? s.logs : {};
     if (!s.sessions || typeof s.sessions !== 'object') s.sessions = {};
