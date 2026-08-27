@@ -4,7 +4,7 @@
 
 **Goal:** Add drop-set/cluster-set/superset reference info and tap-to-log tracking to gym.html's per-exercise Rx card, gated by a per-exercise toggle (defaulted from an `isolation` tag on single-joint exercises).
 
-**Architecture:** Extend the existing seed-exercise data (`CONFIG.defaultExercises`) with a new `isolation` field, backfilled the same way `formTip`/`setReps` already are in `normalize()`. Add a new persisted `state.intensifierEnabled` map for per-exercise overrides. Add a `pendingTechnique` field to the existing per-day `state.sessions[dk][exId]` bucket (same object `activeVariant` already lives in) so it auto-clears on day change for free. Extend `renderRx()` to render the new row and `saveSet()` to consume `pendingTechnique` into the logged entry.
+**Architecture:** Extend the existing seed-exercise data (`CONFIG.defaultExercises`) with a new `isolation` field, backfilled the same way `formTip`/`setReps` already are in `normalize()`. Add a new persisted `state.intensifierEnabled` map for per-exercise overrides. Add a single global (not per-exercise-nested) `state.pendingIntensifier` slot carrying its own exercise id and armed-date, checked on read against the current exercise/date — revised mid-implementation after a Codex review found the original per-day-session-bucket design didn't actually clear on exercise switch (see Task 3's revision note). Extend `renderRx()` to render the new row (and lazily clear a stale pending technique when it detects the displayed exercise changed) and `saveSet()` to consume `pendingIntensifier` into the logged entry.
 
 **Tech Stack:** Vanilla JS, inline in `gym.html` (Row's existing pattern — no build step, no framework, no test framework for this file).
 
@@ -196,56 +196,39 @@ git commit -m "feat(intensifiers): add technique reference data and per-exercise
 **Files:**
 - Modify: `gym.html:3486-3496` (same area as Task 2, extends the session-state pattern)
 
-- [ ] **Step 1: Add arm/get/clear functions for the per-day pending technique**
+> **Revised 2026-08-27 after a Codex review caught two real bugs in the original per-day-session-bucket design:** (1) `state.currentEx` is assigned directly in ~10 places across this file, not just via `setSessionVariant` — a per-exercise-nested pending slot never got cleared on most of those switches, so arming a technique on exercise A, switching to B, then switching back to A later the same day would silently re-arm on A. (2) The original design's day-scoping relied on `getActiveDate()`, which is the device's real current date — not the same thing as the log-date chip (`getChipDate('logDateInput')`) used to backdate a logged set, so the plan's own verification step (change the date chip, expect the arm to clear) would never actually pass. Fixed below with a single global slot (not nested per-exercise) that carries its own exercise id and armed-date, checked on read, plus a render-time lazy clear that catches every exercise switch through one function instead of ~10 call sites.
+
+- [ ] **Step 1: Add arm/get/clear functions for the pending technique**
 
 Immediately after the `setIntensifierEnabled` function added in Task 2, add:
 
 ```js
-  // Intensifiers feature (2026-08-27) -- pendingTechnique lives in the same
-  // per-day, per-exercise session bucket as activeVariant, so it clears
-  // automatically on day change (state.sessions is keyed by date) without
-  // any extra cleanup code needed for that case.
+  // Intensifiers feature (2026-08-27) -- a single global slot, NOT nested
+  // per-exercise, so there's exactly one place to check/clear regardless of
+  // which of this file's ~10 `state.currentEx = ...` call sites triggered a
+  // switch. armedDate guards against a technique armed one day still
+  // reading as armed after a real calendar-day rollover (getActiveDate()
+  // moves at the app's 6am cutoff, not at a log-date-chip change -- this is
+  // deliberately NOT tied to the backdating chip, which is a separate
+  // concept from "what day is it right now while I'm training").
   function armPendingTechnique(exId, technique) {
-    const dk = getActiveDate();
-    if (!state.sessions[dk]) state.sessions[dk] = {};
-    if (!state.sessions[dk][exId]) state.sessions[dk][exId] = { activeVariant: null };
+    const p = state.pendingIntensifier;
+    const same = p && p.exId === exId && p.technique === technique;
     // Tapping the same chip again disarms it -- toggle, don't just set.
-    state.sessions[dk][exId].pendingTechnique =
-      state.sessions[dk][exId].pendingTechnique === technique ? null : technique;
+    state.pendingIntensifier = same ? null : { exId: exId, technique: technique, armedDate: getActiveDate() };
     saveState();
   }
   function getPendingTechnique(exId) {
-    return getSession(exId).pendingTechnique || null;
+    const p = state.pendingIntensifier;
+    if (!p || p.exId !== exId || p.armedDate !== getActiveDate()) return null;
+    return p.technique;
   }
   function clearPendingTechnique(exId) {
-    const dk = getActiveDate();
-    if (state.sessions[dk] && state.sessions[dk][exId]) {
-      state.sessions[dk][exId].pendingTechnique = null;
-    }
+    if (state.pendingIntensifier && state.pendingIntensifier.exId === exId) state.pendingIntensifier = null;
   }
 ```
 
-- [ ] **Step 2: Update `getSession`'s default object to include `pendingTechnique`**
-
-Find (this is the same function from Task 2's Step 3, now getting one more field in its fallback object):
-
-```js
-  function getSession(exId) {
-    const dk = getActiveDate();
-    return (state.sessions[dk] || {})[exId] || { activeVariant: null };
-  }
-```
-
-Replace with:
-
-```js
-  function getSession(exId) {
-    const dk = getActiveDate();
-    return (state.sessions[dk] || {})[exId] || { activeVariant: null, pendingTechnique: null };
-  }
-```
-
-- [ ] **Step 3: Commit**
+- [ ] **Step 2: Commit**
 
 ```bash
 cd /c/Users/gregm/row
@@ -261,9 +244,26 @@ git commit -m "feat(intensifiers): add pending-technique arm/get/clear functions
 - Modify: `gym.html:4549-4586` (`renderRx()`)
 - Modify: `gym.html` (CSS block near line 685, add new styles after `.po-rx-reason`)
 
-- [ ] **Step 1: Write the row-rendering function**
+- [ ] **Step 1: Add a module-level tracker and the switch-clearing check**
+
+`state.currentEx` is assigned directly in ~10 places in this file (search confirms this — not just through one setter), so hooking every call site individually would be fragile. Instead, detect the switch centrally inside `renderRx()`, which `renderAll()` already calls after every one of those assignments.
 
 Immediately before `function renderRx() {` (~line 4549), add:
+
+```js
+  // Intensifiers feature (2026-08-27) -- transient (not persisted -- resets
+  // on reload, which is fine, see the plan's Task 3 revision note for why
+  // that's an acceptable edge case). Tracks which exercise the Rx card was
+  // last showing, so a switch to a DIFFERENT exercise clears that OLD
+  // exercise's armed technique -- catches every one of this file's ~10
+  // `state.currentEx = ...` sites through this one function instead of
+  // needing to hook each of them individually.
+  let lastRxExId = null;
+```
+
+- [ ] **Step 2: Write the row-rendering function**
+
+Immediately before `function renderRx() {` (~line 4549, after the `lastRxExId` declaration from Step 1), add:
 
 ```js
   // Intensifiers feature (2026-08-27) -- renders the enable toggle + the
@@ -288,9 +288,32 @@ Immediately before `function renderRx() {` (~line 4549), add:
   }
 ```
 
-- [ ] **Step 2: Call it from both `renderRx()` branches**
+- [ ] **Step 3: Wire the switch-detection and call the row function from both `renderRx()` branches**
 
-Find (~line 4556):
+Find the top of `renderRx()` (~line 4550-4552):
+
+```js
+  function renderRx() {
+    const wrap = $('rxWrap');
+    const ex = getCurrentEx();
+```
+
+Replace with:
+
+```js
+  function renderRx() {
+    const wrap = $('rxWrap');
+    const ex = getCurrentEx();
+    // Intensifiers feature (2026-08-27) -- clear the PREVIOUS exercise's
+    // armed technique the moment we detect the current exercise changed
+    // (including a change to "no exercise selected", not just exercise-to-
+    // exercise -- otherwise A -> no-selection -> B would never clear A).
+    const curExId = ex ? ex.id : null;
+    if (lastRxExId && lastRxExId !== curExId) clearPendingTechnique(lastRxExId);
+    lastRxExId = curExId;
+```
+
+Then find (~line 4556):
 
 ```js
     const liftLabNote = liftLabInfo(ex);
@@ -321,7 +344,7 @@ Then find the two `wrap.innerHTML = ...` lines (~4565 and ~4585) and append `int
     wrap.innerHTML = '<div class="po-rx-card po-rx-' + rx.type + ' po-rx-tappable" ' + tapAttrs + '><div class="po-rx-label">' + escape(displayName) + '</div><div class="po-rx-headline">' + head + '</div><span class="po-rx-tag ' + rx.type + '">' + rx.tag + '</span><p class="po-rx-reason">' + rx.reason + ' Tap to log it.</p>' + pumpNote + mesoNote + closeoutNote + liftLabNote + intensifierNote + '</div>';
 ```
 
-- [ ] **Step 3: Add CSS**
+- [ ] **Step 4: Add CSS**
 
 Find the existing `.po-rx-reason { ... }` block (~line 685-687):
 
@@ -353,7 +376,7 @@ Add immediately after it:
 .intensifier-blurb { margin: 8px 0 0; font-size: 11px; line-height: 1.5; color: var(--text-3); }
 ```
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
 cd /c/Users/gregm/row
@@ -489,9 +512,9 @@ Tap "Drop set" -- confirm the blurb text appears and the chip shows the `armed` 
 
 Arm "Cluster set", log a set (enter a weight/rep and tap Log). Open the browser devtools console and run `JSON.parse(localStorage.getItem('po_coach_v1')).logs['<that-exercise-id>']` -- confirm the most recent entry has `"technique":"clusterset"`. Log a second set with nothing armed -- confirm that entry has no `technique` field.
 
-- [ ] **Step 5: Verify day-change clears the pending technique**
+- [ ] **Step 5: Verify switching exercises clears the pending technique**
 
-Arm a technique on an exercise, then change the logged date to a different day (via the date chip) without logging a set. Switch back or check the Rx card -- confirm the chip is no longer shown as armed (since `pendingTechnique` lives in the now-different day's session bucket).
+Arm a technique on exercise A, switch to a different exercise B (via the workout list, not the date chip -- the log-date chip backdates a logged set and is a separate concept from which exercise is currently selected), then switch back to A. Confirm A's chip is no longer shown as armed -- this is the bug the Codex review caught in the original per-day-session-bucket design (see Task 3's revision note), so this check specifically exercises that fix.
 
 - [ ] **Step 6: Verify the toggle persists across reload**
 
