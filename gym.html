@@ -1995,6 +1995,24 @@ img, video, canvas, svg { max-width: 100%; }
   background: rgba(255,255,255,0.04);
 }
 
+.wl-note-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-3);
+  font-family: var(--font-mono);
+  font-size: 10px; font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 5px 9px; border-radius: 6px;
+  cursor: pointer; white-space: nowrap;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.wl-note-btn:hover {
+  color: var(--text-1);
+  border-color: rgba(255,255,255,0.25);
+  background: rgba(255,255,255,0.04);
+}
+
 /* Add exercise button */
 .wl-add-btn {
   width: 100%; margin-top: 8px;
@@ -4244,6 +4262,20 @@ img, video, canvas, svg { max-width: 100%; }
         altEl.textContent = 'Alt';
       }
       row.appendChild(altEl);
+
+      const sessNote = ((state.sessions[getActiveDate()] || {})[ex.id] || {}).note;
+      if (sessNote) {
+        const noteEl = document.createElement('button');
+        noteEl.type = 'button';
+        noteEl.className = 'wl-note-btn';
+        noteEl.textContent = '📝';
+        noteEl.title = 'View note';
+        noteEl.addEventListener('click', e => {
+          e.stopPropagation();
+          alert(sessNote);
+        });
+        row.appendChild(noteEl);
+      }
 
       row.addEventListener('click', () => {
         state.currentEx = ex.id;
