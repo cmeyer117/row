@@ -747,6 +747,35 @@ async function renderReadinessPanel() {
         now: nowRef,
       });
 
+      // Feed the gym coach -- see docs/superpowers/specs/
+      // 2026-08-27-training-trajectory-coach-integration-design.md.
+      // Best-effort: never blocks the findingsHtml render below. Skips
+      // the write on an empty result -- an empty week doesn't mean
+      // "nothing is wrong forever," it means nothing crossed a
+      // threshold on this particular visit; overwriting a real prior
+      // finding with an empty one on every routine re-visit would lose
+      // signal between when it was flagged and a genuinely clean week.
+      if (findings.length > 0) {
+        try {
+          const token = await window.RowAuth.getAccessToken();
+          await fetch(window.SUPABASE_CONFIG.URL + '/rest/v1/app_state', {
+            method: 'POST',
+            headers: {
+              apikey: window.SUPABASE_CONFIG.KEY,
+              Authorization: 'Bearer ' + token,
+              'Content-Type': 'application/json',
+              Prefer: 'resolution=merge-duplicates,return=minimal',
+            },
+            body: JSON.stringify({
+              key: 'row:training_trajectory',
+              data: { findings: findings, computedAt: new Date().toISOString() },
+            }),
+          });
+        } catch (e) {
+          console.warn('[training-trajectory] failed to write for the gym coach:', e);
+        }
+      }
+
       if (findings.length) {
         findingsHtml = `<p style="color:var(--text-3);font-size:11px;text-transform:uppercase;letter-spacing:0.05em;margin:12px 0 4px;">Pattern findings</p>` +
           findings.map(f => `<div style="padding:4px 0;font-size:12px;">
