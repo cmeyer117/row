@@ -5616,6 +5616,7 @@ img, video, canvas, svg { max-width: 100%; }
   // the same quickLog() text parser everything else uses — data attributes
   // set by renderRx() carry the values, so no re-computation happens here.
   $('rxWrap').addEventListener('click', function(e) {
+    if (e.target.closest('.intensifier-row')) return; // handled by the listener below, not tap-to-log
     const card = e.target.closest('.po-rx-tappable');
     if (!card) return;
     const ex = getCurrentEx();
@@ -5630,6 +5631,26 @@ img, video, canvas, svg { max-width: 100%; }
       : ex.name + ' ' + card.getAttribute('data-tap-weight') + '×' + reps;
     const result = quickLog(raw, getActiveDate());
     if (!result.ok) { console.warn('[ghost-tap]', result.msg); }
+  });
+
+  // Intensifiers feature (2026-08-27)
+  $('rxWrap').addEventListener('click', function(e) {
+    const toggle = e.target.closest('.intensifier-toggle');
+    if (toggle) {
+      const exId = toggle.getAttribute('data-ex-id');
+      const nowEnabled = toggle.getAttribute('data-enabled') !== 'true';
+      setIntensifierEnabled(exId, nowEnabled);
+      saveState();
+      renderRx();
+      return;
+    }
+    const chip = e.target.closest('.intensifier-chip');
+    if (chip) {
+      const ex = getCurrentEx();
+      if (!ex) return;
+      armPendingTechnique(ex.id, chip.getAttribute('data-technique'));
+      renderRx();
+    }
   });
 
   (function initCheckinModal() {
