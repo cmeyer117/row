@@ -703,6 +703,23 @@ img, video, canvas, svg { max-width: 100%; }
 .po-rx-reason {
   margin: 0; font-size: 13px; line-height: 1.5; color: var(--text-2);
 }
+/* Intensifiers feature (2026-08-27) */
+.intensifier-row { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
+.intensifier-toggle {
+  display: inline-block; padding: 4px 10px; border-radius: 999px;
+  font-size: 10px; font-weight: 700; letter-spacing: 0.04em;
+  background: rgba(255,255,255,0.06); color: var(--text-3);
+  border: 1px solid var(--border); cursor: pointer;
+}
+.intensifier-toggle.on { background: rgba(110,231,183,0.14); color: var(--good); border-color: rgba(110,231,183,0.3); }
+.intensifier-chips { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+.intensifier-chip {
+  padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 600;
+  background: rgba(255,255,255,0.05); color: var(--text-2);
+  border: 1px solid var(--border); cursor: pointer;
+}
+.intensifier-chip.armed { background: rgba(110,231,183,0.14); color: var(--good); border-color: rgba(110,231,183,0.3); }
+.intensifier-blurb { margin: 8px 0 0; font-size: 11px; line-height: 1.5; color: var(--text-3); }
 .po-rx-empty {
   font-size: 13px; color: var(--text-3); padding: 16px 0; text-align: center;
 }
@@ -4608,14 +4625,49 @@ img, video, canvas, svg { max-width: 100%; }
     const tip = ex.formTip ? '<p class="po-rx-reason" style="opacity:0.55;font-size:11px;">' + escape(ex.formTip) + '</p>' : '';
     return line + tip;
   }
+  // Intensifiers feature (2026-08-27) -- transient (not persisted -- resets
+  // on reload, which is fine, an armed technique surviving a reload for the
+  // exercise it was armed on is acceptable "still pending" behavior).
+  // Tracks which exercise the Rx card was last showing, so a switch to a
+  // DIFFERENT exercise clears that OLD exercise's armed technique --
+  // catches every one of this file's ~10 `state.currentEx = ...` sites
+  // through this one function instead of needing to hook each individually.
+  let lastRxExId = null;
+  // Renders the enable toggle + the 3 technique chips. The toggle itself
+  // always renders (so it can be turned on); the chips/blurb only render
+  // once intensifiers are enabled for this exercise.
+  function intensifierRow(ex) {
+    const enabled = intensifiersEnabledFor(ex);
+    const toggleLabel = enabled ? 'Intensifiers on' : 'Enable intensifiers';
+    const toggle = '<button type="button" class="intensifier-toggle' + (enabled ? ' on' : '') + '" data-ex-id="' + ex.id + '" data-enabled="' + enabled + '">' + toggleLabel + '</button>';
+    if (!enabled) return '<div class="intensifier-row">' + toggle + '</div>';
+    const pending = getPendingTechnique(ex.id);
+    const chips = Object.keys(INTENSIFIER_TECHNIQUES).map(function (key) {
+      const t = INTENSIFIER_TECHNIQUES[key];
+      const armed = pending === key;
+      return '<button type="button" class="intensifier-chip' + (armed ? ' armed' : '') + '" data-technique="' + key + '">' + t.label + '</button>';
+    }).join('');
+    const blurb = pending
+      ? '<p class="intensifier-blurb">' + escape(INTENSIFIER_TECHNIQUES[pending].blurb) + '</p>'
+      : '';
+    return '<div class="intensifier-row">' + toggle + '<div class="intensifier-chips">' + chips + '</div>' + blurb + '</div>';
+  }
   function renderRx() {
     const wrap = $('rxWrap');
     const ex = getCurrentEx();
+    // Intensifiers feature (2026-08-27) -- clear the PREVIOUS exercise's
+    // armed technique the moment we detect the current exercise changed
+    // (including a change to "no exercise selected", not just exercise-to-
+    // exercise -- otherwise A -> no-selection -> B would never clear A).
+    const curExId = ex ? ex.id : null;
+    if (lastRxExId && lastRxExId !== curExId) clearPendingTechnique(lastRxExId);
+    lastRxExId = curExId;
     if (!ex) { wrap.innerHTML = '<div class="po-rx-empty">Pick a gym and day above.</div>'; return; }
     const logs = getLogs();
     const rx = getRx(ex, logs);
     const displayName = getSession(ex.id).activeVariant || ex.name;
     const liftLabNote = liftLabInfo(ex);
+    const intensifierNote = intensifierRow(ex);
     if (!rx) {
       const sw = ex.startWeight, sr = ex.repMin;
       const head = ex.bw
@@ -4624,7 +4676,7 @@ img, video, canvas, svg { max-width: 100%; }
       const reason = ex.bw
         ? 'Aim for ' + ex.repMin + '-' + ex.repMax + ' clean reps. Once you hit ' + ex.repMax + '+, push for more.'
         : 'Hit ' + ex.repMin + '-' + ex.repMax + ' reps. Once logged, the coach will start prescribing.';
-      wrap.innerHTML = '<div class="po-rx-card po-rx-tappable" data-tap-reps="' + sr + '"' + (ex.bw ? ' data-tap-bw="1"' : ' data-tap-weight="' + (sw || 0) + '"') + '><div class="po-rx-label">' + escape(displayName) + ' · starting point</div><div class="po-rx-headline">' + head + '</div><span class="po-rx-tag hold">Start here</span><p class="po-rx-reason">' + reason + ' Tap to log it.</p>' + liftLabNote + '</div>';
+      wrap.innerHTML = '<div class="po-rx-card po-rx-tappable" data-tap-reps="' + sr + '"' + (ex.bw ? ' data-tap-bw="1"' : ' data-tap-weight="' + (sw || 0) + '"') + '><div class="po-rx-label">' + escape(displayName) + ' · starting point</div><div class="po-rx-headline">' + head + '</div><span class="po-rx-tag hold">Start here</span><p class="po-rx-reason">' + reason + ' Tap to log it.</p>' + liftLabNote + intensifierNote + '</div>';
       return;
     }
     const head = rx.bw
@@ -4644,7 +4696,7 @@ img, video, canvas, svg { max-width: 100%; }
     const closeoutNote = rx.closeoutAdvisory
       ? '<p class="po-rx-reason" style="opacity:0.7;font-size:11px;">' + escape(rx.closeoutAdvisory) + '</p>'
       : '';
-    wrap.innerHTML = '<div class="po-rx-card po-rx-' + rx.type + ' po-rx-tappable" ' + tapAttrs + '><div class="po-rx-label">' + escape(displayName) + '</div><div class="po-rx-headline">' + head + '</div><span class="po-rx-tag ' + rx.type + '">' + rx.tag + '</span><p class="po-rx-reason">' + rx.reason + ' Tap to log it.</p>' + pumpNote + mesoNote + closeoutNote + liftLabNote + '</div>';
+    wrap.innerHTML = '<div class="po-rx-card po-rx-' + rx.type + ' po-rx-tappable" ' + tapAttrs + '><div class="po-rx-label">' + escape(displayName) + '</div><div class="po-rx-headline">' + head + '</div><span class="po-rx-tag ' + rx.type + '">' + rx.tag + '</span><p class="po-rx-reason">' + rx.reason + ' Tap to log it.</p>' + pumpNote + mesoNote + closeoutNote + liftLabNote + intensifierNote + '</div>';
   }
   function renderStats() {
     const ex = getCurrentEx();
