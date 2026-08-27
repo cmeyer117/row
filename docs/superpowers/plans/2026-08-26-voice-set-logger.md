@@ -609,6 +609,18 @@ git commit -m "feat: hands-free voice set logging on the gym Log tab"
 
 ---
 
+## Post-implementation fixes (luna Codex review of the final diff, 2026-08-26)
+
+A second luna-effort Codex pass, run over the completed diff before pushing (not just the plan, which the first pass already reviewed), caught 3 more issues in `gym-voice-log.js`, all fixed and covered by new test cases in the same file:
+
+1. **A number embedded in the exercise's own name competed with the spoken weight/reps.** Confirmed against real data — "45° Sled Leg Press" (`gym.html:176`, a real sub-variant in Carl's program) — saying "45 sled leg press 225 for 8" parsed as weight 45 / reps 225 instead of 225/8. Fixed with `stripExerciseNameNumbers()`, which drops any number from the candidate list whose value matches a number tokenized from the matched exercise's own name.
+2. **Today's-split and full-catalog matching were two separate, isolated searches**, so a single weak today's-split candidate could clear the ambiguity-margin check by default (no runner-up existed in its own smaller list) even when a much better full-catalog match existed and never got the chance to compete. Fixed by merging both lists into one deduped pool for a single `matchExercise()` pass, with same-day membership only breaking an exact score tie — a real cross-list ambiguity is now correctly rejected instead of silently resolved toward the same-day exercise.
+3. **A malformed/null entry in the exercise list crashed the whole parse** at `ex.name` instead of being skipped. Fixed by guarding the pool-building step.
+
+All 18 cases in `gym-voice-log.test.js` pass; the full repo suite (55/55) passes.
+
+---
+
 ## Follow-on work (not this plan)
 
 - **Per-set RIR storage** and **gym-noise reliability tuning** — see the spec's own Follow-on Work section. Both are explicitly Carl's next step once this ships, using real gym-floor use (and the Retry/Edit card's failure signal) to know what's actually worth tuning.

@@ -86,6 +86,34 @@ const cases = [];
   const r = parseSetUtterance('chest dip 245 for 8', TODAYS, EXERCISES);
   cases.push(['a clear single-candidate match still wins (regression guard)', r.exId === 'ex_dip']);
 }
+{
+  // Codex catch (2026-08-26), confirmed against a real exercise in Carl's
+  // own program ("45° Sled Leg Press", gym.html:176 sub-variant): a number
+  // embedded in the exercise's OWN name must not compete with the spoken
+  // weight/reps for a role.
+  const NUMBERED = [{ id: 'ex_45sled', name: '45 Sled Leg Press', day: 'push', bw: false }];
+  const r = parseSetUtterance('45 sled leg press 225 for 8', NUMBERED, NUMBERED);
+  cases.push(['a number inside the exercise\'s own name is not mistaken for weight/reps', r.exId === 'ex_45sled' && r.weight === 225 && r.reps === 8]);
+}
+{
+  // Codex catch (2026-08-26): matching today's list and the full list as
+  // two SEPARATE searches let a weak, single-candidate today's match (no
+  // runner-up to compare against) beat a much better full-catalog match
+  // that never got the chance to compete. Merging into one combined pool
+  // means the margin check runs across all real candidates, not just
+  // whichever list happened to be checked first.
+  const TODAY_ONLY = [{ id: 'ex_press', name: 'Press', day: 'push', bw: false }];
+  const FULL = TODAY_ONLY.concat([{ id: 'ex_overhead_press', name: 'Overhead Press', day: 'pull', bw: false }]);
+  const r = parseSetUtterance('overhead press 135 for 8', TODAY_ONLY, FULL);
+  cases.push(['a generic today\'s-split name no longer silently beats a more specific full-catalog name', r.exId !== 'ex_press']);
+}
+{
+  // Codex catch (2026-08-26): a malformed/null array element (possible from
+  // legacy or hand-edited localStorage data) must not crash the whole parse.
+  const WITH_NULL = [null, { id: 'ex_dip', name: 'Chest Dip', day: 'push', bw: false }];
+  const r = parseSetUtterance('chest dip 245 for 8', WITH_NULL, WITH_NULL);
+  cases.push(['a null entry in the exercise list is skipped, not thrown on', r.exId === 'ex_dip']);
+}
 
 let failed = 0;
 for (const [label, ok] of cases) {

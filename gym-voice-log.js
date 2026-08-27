@@ -28,17 +28,42 @@
   // Picks the exercise whose name shares the highest fraction of its
   // significant words with the transcript -- e.g. "flat chest press" matches
   // "Smith Machine Flat Chest Press" (3/5 words) above threshold.
-  function matchExercise(tokens, exercises) {
+  //
+  // todaysExercises and allExercises are merged into ONE candidate pool
+  // (deduped by id) rather than searched as two separate attempts. Codex
+  // catch (2026-08-26): searching today's list alone let a single weak
+  // candidate (no runner-up to compare against in that smaller list) clear
+  // the margin check by default, even when a much better match existed in
+  // the full catalog that never got the chance to compete. A same-day
+  // exercise still wins ties (it's the more likely thing Carl is doing),
+  // but a real ambiguity between a same-day and a full-catalog candidate is
+  // now correctly rejected rather than silently resolved in the same-day
+  // exercise's favor.
+  function matchExercise(tokens, todaysExercises, allExercises) {
     var transcriptSet = {};
     tokens.forEach(function (w) { transcriptSet[w] = true; });
+    var todayIds = {};
+    (todaysExercises || []).forEach(function (ex) { if (ex) todayIds[ex.id] = true; });
+    var seen = {};
+    var pool = [];
+    (todaysExercises || []).concat(allExercises || []).forEach(function (ex) {
+      if (!ex || seen[ex.id]) return;
+      seen[ex.id] = true;
+      pool.push(ex);
+    });
     var best = null, bestScore = 0, secondScore = 0;
-    (exercises || []).forEach(function (ex) {
+    pool.forEach(function (ex) {
       var words = significantWords(ex.name);
       if (!words.length) return;
       var matched = words.filter(function (w) { return transcriptSet[w]; }).length;
       var score = matched / words.length;
-      if (score > bestScore) { secondScore = bestScore; bestScore = score; best = ex; }
-      else if (score > secondScore) { secondScore = score; }
+      var tieBreakToToday = score === bestScore && best && todayIds[ex.id] && !todayIds[best.id];
+      if (score > bestScore || tieBreakToToday) {
+        if (score > bestScore) secondScore = bestScore;
+        bestScore = score; best = ex;
+      } else if (score > secondScore) {
+        secondScore = score;
+      }
     });
     if (bestScore < MATCH_THRESHOLD) return null;
     if (bestScore - secondScore < MATCH_MARGIN) return null; // too close to call -- ambiguous, not a guess
@@ -97,12 +122,29 @@
     return { weight: weight, reps: reps };
   }
 
+  // A number that's part of the exercise's OWN name (e.g. "45 Sled Leg
+  // Press", a real sub-variant in Carl's program) must not compete with the
+  // spoken weight/reps for a role -- Codex catch (2026-08-26), confirmed
+  // against real exercise data. Filtering by matching numeric value is a
+  // rare-but-acceptable trade-off over full positional alignment: it would
+  // only misfire if Carl's actual spoken weight or reps happened to equal a
+  // number embedded in the exercise's own name, which he can route around
+  // by rephrasing (e.g. saying "225" instead of a coincidentally-45 value).
+  function stripExerciseNameNumbers(numbers, ex) {
+    var nameNumbers = {};
+    tokenize(ex.name).forEach(function (t) {
+      if (/^\d+(\.\d+)?$/.test(t)) nameNumbers[parseFloat(t)] = true;
+    });
+    if (!Object.keys(nameNumbers).length) return numbers;
+    return numbers.filter(function (n) { return !nameNumbers[n.value]; });
+  }
+
   function parseSetUtterance(transcript, todaysExercises, allExercises) {
     var tokens = tokenize(transcript);
-    var ex = matchExercise(tokens, todaysExercises) || matchExercise(tokens, allExercises);
+    var ex = matchExercise(tokens, todaysExercises, allExercises);
     if (!ex) return { error: 'no-match', transcript: transcript || '' };
 
-    var numbers = stripRirNumber(extractNumbers(tokens), tokens);
+    var numbers = stripRirNumber(stripExerciseNameNumbers(extractNumbers(tokens), ex), tokens);
 
     if (ex.bw) {
       var roles = assignRoles(numbers, tokens);
