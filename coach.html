@@ -80,9 +80,15 @@ main {
 
 <script>
 (function () {
+  // gym.html's Coach nav tab passes the workout's currently-active exercise
+  // (getCurrentEx()'s name/activeVariant) as ?exercise=... so Form Coach
+  // opens pre-filled instead of Carl re-typing the same name he's already
+  // logging sets against in gym.html.
+  var exerciseParam = new URLSearchParams(window.location.search).get('exercise');
+
   var FRAMES = {
     posing: { src: 'posing.html', el: document.getElementById('iframePosing'), wrap: document.getElementById('tabWrapPosing'), loaded: true, ready: false, pendingActive: true },
-    form: { src: 'form-coach.html', el: document.getElementById('iframeForm'), wrap: document.getElementById('tabWrapForm'), loaded: false, ready: false, pendingActive: false },
+    form: { src: 'form-coach.html' + (exerciseParam ? '?exercise=' + encodeURIComponent(exerciseParam) : ''), el: document.getElementById('iframeForm'), wrap: document.getElementById('tabWrapForm'), loaded: false, ready: false, pendingActive: false },
   };
   var activeTab = 'posing';
 
@@ -134,6 +140,8 @@ main {
   document.querySelectorAll('.coach-tab-btn').forEach(function (btn) {
     btn.addEventListener('click', function () { activateTab(btn.dataset.tab); });
   });
+
+  if (exerciseParam) activateTab('form');
 })();
 </script>
 

@@ -327,6 +327,17 @@ window.dispatchEvent(new Event('lift-camera-module-ready'));
   document.getElementById('liftExerciseName').addEventListener('input', function (e) {
     renderFormCues(e.target.value);
   });
+  // gym.html's Coach tab passes the workout's currently-active exercise as
+  // ?exercise=... (via coach.html, which appends it to this iframe's src) --
+  // pre-fill instead of leaving Carl to re-type a name he's already logging
+  // sets against in gym.html.
+  (function prefillFromActiveExercise() {
+    var exerciseParam = new URLSearchParams(window.location.search).get('exercise');
+    if (!exerciseParam) return;
+    var input = document.getElementById('liftExerciseName');
+    input.value = exerciseParam;
+    renderFormCues(exerciseParam);
+  })();
   var lastLandmarks = null;
   var cameraStarted = false;
   var isTabActive = false; // set true/false by the coach-tab-active/inactive postMessage handler below
