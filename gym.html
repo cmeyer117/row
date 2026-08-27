@@ -6617,6 +6617,14 @@ img, video, canvas, svg { max-width: 100%; }
   // weight/reps were captured.
   function saveSet(ex, w, reps, entry) {
     entry = entry || {};
+    // Intensifiers feature (2026-08-27) -- consumes whatever technique was
+    // armed via the Rx-card chips for THIS exercise, then clears it so it
+    // only ever attaches to the one set it was armed for.
+    const pendingTechnique = getPendingTechnique(ex.id);
+    if (pendingTechnique) {
+      entry.technique = pendingTechnique;
+      clearPendingTechnique(ex.id);
+    }
     const dateKey = getChipDate('logDateInput');
     const isoDate = new Date(dateKey + 'T12:00:00').toISOString();
     const arr = state.logs[ex.id] || [];
