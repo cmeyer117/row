@@ -758,7 +758,7 @@ async function renderReadinessPanel() {
       if (findings.length > 0) {
         try {
           const token = await window.RowAuth.getAccessToken();
-          await fetch(window.SUPABASE_CONFIG.URL + '/rest/v1/app_state', {
+          const trajectoryRes = await fetch(window.SUPABASE_CONFIG.URL + '/rest/v1/app_state', {
             method: 'POST',
             headers: {
               apikey: window.SUPABASE_CONFIG.KEY,
@@ -771,6 +771,13 @@ async function renderReadinessPanel() {
               data: { findings: findings, computedAt: new Date().toISOString() },
             }),
           });
+          // Codex review, 2026-08-27: fetch() only rejects on a network
+          // failure, not an HTTP error status -- an unchecked response
+          // silently treats a 401/403/409/5xx as success, and the page
+          // proceeds as if the coach actually received the finding.
+          if (!trajectoryRes.ok) {
+            console.warn('[training-trajectory] write rejected (' + trajectoryRes.status + ') -- the gym coach did not receive this week\'s findings');
+          }
         } catch (e) {
           console.warn('[training-trajectory] failed to write for the gym coach:', e);
         }
