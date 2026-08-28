@@ -2876,6 +2876,7 @@ img, video, canvas, svg { max-width: 100%; }
 
     <!-- WORKOUT LIST -->
     <div class="wl-section">
+      <div id="trajectoryAdvisory" style="display:none;background:var(--surface-2,#1a1a1a);border:1px solid var(--border,#333);border-radius:8px;padding:10px 12px;margin-bottom:10px;font-size:13px;color:var(--text-2,#ccc);"></div>
       <div id="wlList" class="wl-list"></div>
       <div class="wl-adhoc-form" id="wlAdhocForm">
         <input type="text" class="wl-adhoc-input" id="wlAdhocInput" placeholder="Exercise name…" autocomplete="off">
@@ -3344,6 +3345,7 @@ img, video, canvas, svg { max-width: 100%; }
 <script src="voice-helpers.js"></script>
 <script src="stt-prompt-logic.js"></script>
 <script src="gym-workout-closeout-logic.js"></script>
+<script src="training-trajectory-advisory.js"></script>
 <script>
 // ── Seed: bodyweight history (Apr 17 – Jun 10 2026) ──────────────────────────
 // Merges historical entries with existing data — never overwrites a date the
@@ -8122,6 +8124,36 @@ document.addEventListener('DOMContentLoaded', function () {
   // a long-open tab's realtime subscription can silently die (iOS suspends
   // it) with no error, so without a re-pull on wake it just keeps showing
   // whatever was true at its last real page load, forever.
+  // Surfaces weekly-review.html's training-trajectory findings in-session --
+  // see docs/superpowers/specs/2026-08-27-training-trajectory-coach-integration-design.md
+  // for the write side. Read-only, independent app_state key from the main
+  // Row sync (APP_KEY) above; a failure here never blocks it.
+  async function loadTrajectoryAdvisory() {
+    if (!pcSupa || !window.TrainingTrajectoryAdvisory) return;
+    try {
+      const { data, error } = await pcSupa
+        .from('app_state').select('data').eq('key', 'row:training_trajectory').maybeSingle();
+      if (error || !data || !data.data) return;
+      const allLogs = Object.keys(state.logs || {}).reduce(function (acc, exId) {
+        return acc.concat(state.logs[exId] || []);
+      }, []);
+      const text = window.TrainingTrajectoryAdvisory.getPendingTrajectoryAdvisory({
+        trajectory: data.data,
+        allLogs: allLogs,
+      });
+      const el = document.getElementById('trajectoryAdvisory');
+      if (!el) return;
+      if (text) {
+        el.textContent = 'This week: ' + text;
+        el.style.display = '';
+      } else {
+        el.style.display = 'none';
+      }
+    } catch (e) {
+      // best-effort -- the banner just doesn't show, main app is unaffected
+    }
+  }
+
   async function pcPullRemote(opts) {
     if (!pcSupa) return;
     // fix (2026-08-12, Codex-caught): the "no-change-since-last-sync" skip
@@ -8226,6 +8258,7 @@ document.addEventListener('DOMContentLoaded', function () {
       pcAccessToken = session ? session.access_token : null;
     });
     await pcPullRemote();
+    loadTrajectoryAdvisory(); // best-effort, independent app_state key -- never blocks the main sync above
     pcSupa.channel('app_state_' + APP_KEY)
       .on('postgres_changes', {
         event: '*',
