@@ -1,0 +1,8 @@
+# CI/dev-only files — keep them out of the public deployment.
+# NOTE: patches/ must stay deployed (postinstall patch-package runs at build).
+# NOTE: vault-training-index.json must stay deployed (runtime-fetched by
+#       weekly-review.html / training-context-selector.js).
+docs
+scripts
+*.selfcheck.cjs
+*.test.js
