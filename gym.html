@@ -2029,6 +2029,13 @@ img, video, canvas, svg { max-width: 100%; }
   border-color: rgba(255,255,255,0.25);
   background: rgba(255,255,255,0.04);
 }
+.wl-alt-btn--flagged {
+  border-color: var(--warn);
+  color: var(--warn);
+}
+.wl-alt-btn--flagged:hover {
+  background: rgba(255,255,255,0.04);
+}
 
 .wl-note-btn {
   background: transparent;
@@ -4344,8 +4351,11 @@ img, video, canvas, svg { max-width: 100%; }
       const altEl = document.createElement('button');
       altEl.type = 'button';
       if (hasSubs && !isAdhoc) {
-        altEl.className = 'wl-alt-btn';
-        altEl.textContent = 'Alt';
+        altEl.className = flaggedJoint ? 'wl-alt-btn wl-alt-btn--flagged' : 'wl-alt-btn';
+        altEl.textContent = flaggedJoint ? 'Alt ⚠' : 'Alt';
+        if (flaggedJoint) {
+          altEl.title = flaggedJoint + ' flagged — 2+ times in the last 7 days';
+        }
         altEl.addEventListener('click', e => {
           e.stopPropagation();
           openSubPicker(ex.id);
