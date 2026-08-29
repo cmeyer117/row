@@ -3950,6 +3950,26 @@ img, video, canvas, svg { max-width: 100%; }
     return ['shoulder', 'elbow', 'knee'].some(function (j) { return jointPainCountInWindow(j, 7) >= 2; });
   }
 
+  // Maps each exercise's `muscle` field to the joint(s) it stresses, so a
+  // flagged joint (jointPainCountInWindow above) can be connected to which
+  // exercises on today's list might warrant a substitution. Deliberately
+  // does NOT cover every muscle value in the catalog -- Glutes (Hip
+  // Extension, Hip Adduction) and Calves (Calf Raise) exercises here are
+  // hip- and ankle-dominant respectively, and anyJointFlagged only ever
+  // tracks shoulder/elbow/knee. Mapping either to a tracked joint would be
+  // a false positive, not a real signal -- confirmed against the real
+  // exercise names in defaultExercises, not guessed. See
+  // docs/superpowers/specs/2026-08-29-joint-aware-substitution-nudge-design.md.
+  const MUSCLE_TO_JOINTS = {
+    Chest: ['shoulder', 'elbow'],
+    Shoulders: ['shoulder'],
+    Triceps: ['elbow'],
+    Back: ['shoulder', 'elbow'],
+    Biceps: ['elbow'],
+    Quads: ['knee'],
+    Hamstrings: ['knee'],
+  };
+
   // ============================================================
   // ============================================================
   // WARMUP DATA (sourced from vault: Pre-Workout Warm-Up + Joint Care Protocol)
