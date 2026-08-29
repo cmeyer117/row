@@ -4461,6 +4461,37 @@ img, video, canvas, svg { max-width: 100%; }
   function saveAdhocExercise() {
     const name = document.getElementById('wlAdhocInput').value.trim();
     if (!name) return;
+    if (state.viewMode === 'bonus') {
+      // Bonus templates reference exercises BY NAME into the permanent
+      // catalog (state.exercises), not session-scoped ad-hoc entries -- see
+      // GymBonusTemplatesLogic.resolveTemplateExercises, which only ever
+      // looks at state.exercises. The old code below (state.sessions[dk][id])
+      // created a temporary, day-tagged entry that a bonus template could
+      // never find, silently stranding it under whatever real plan day
+      // state.filterDay was last pointed at. `day` on the new exercise is
+      // otherwise irrelevant here -- resolveTemplateExercises filters by gym
+      // only, never by day.
+      const tmpl = state.bonusTemplates.find(t => t.id === state.filterBonusTemplateId);
+      if (!tmpl) return;
+      const ex = {
+        id: uid(), name,
+        gym: state.filterGym, day: state.filterDay,
+        repMin: 8, repMax: 12, numSets: 2,
+        step: 2.5, startWeight: 0, bw: false,
+        subs: [], activeVariant: null
+      };
+      state.exercises.push(ex);
+      state.bonusTemplates = window.GymBonusTemplatesLogic.addExerciseToTemplate(state.bonusTemplates, tmpl.id, name);
+      state.currentEx = ex.id;
+      saveState();
+      closeAdhocForm();
+      renderAll();
+      setTimeout(() => {
+        const formEl = document.getElementById('logFormWrap');
+        if (formEl) formEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 50);
+      return;
+    }
     const dk = getActiveDate();
     if (!state.sessions[dk]) state.sessions[dk] = {};
     const id = 'adhoc_' + Date.now() + '_' + Math.random().toString(36).slice(2, 5);
@@ -5632,8 +5663,28 @@ img, video, canvas, svg { max-width: 100%; }
       ? ex.name + ' ' + reps
       : ex.name + ' ' + card.getAttribute('data-tap-weight') + '×' + reps;
     const result = quickLog(raw, getActiveDate());
-    if (!result.ok) { console.warn('[ghost-tap]', result.msg); }
+    if (!result.ok) { console.warn('[ghost-tap]', result.msg); return; }
+    ghostTapReceipt(result.msg);
   });
+
+  // Ghost-tap is a single tap with no confirmation step -- easy to trigger
+  // by accident (e.g. a stray tap on the Rx card underneath an open chat
+  // overlay, the exact scenario that produced a real mis-logged set,
+  // 2026-08-29). A clear, longer-lived receipt naming exactly what got
+  // logged and pointing at the existing Undo button closes that gap
+  // without a confirmation dialog, which would add friction to every
+  // intentional tap for the sake of the rare accidental one. Reuses
+  // #logReceipt (normally armed by pcArmReceipt for sync status) rather
+  // than a new UI element.
+  let _ghostTapReceiptTimer = null;
+  function ghostTapReceipt(msg) {
+    const el = document.getElementById('logReceipt');
+    if (!el) return;
+    el.textContent = msg + ' — tap ↩ Undo below if that was a mistake';
+    el.style.display = 'block';
+    clearTimeout(_ghostTapReceiptTimer);
+    _ghostTapReceiptTimer = setTimeout(() => { el.style.display = 'none'; }, 4000);
+  }
 
   // Intensifiers feature (2026-08-27)
   $('rxWrap').addEventListener('click', function(e) {
