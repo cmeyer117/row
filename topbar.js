@@ -212,6 +212,9 @@ body.topbar-modal-open { overflow: hidden; touch-action: none; }
         p.endsWith('coach.html') || p.endsWith('/coach') || p.endsWith('form-coach.html') || p.endsWith('posing.html')) return 'fitness';
     if (p.endsWith('main.html') || p.endsWith('/main')) return 'main';
     if (p.endsWith('index.html') || p === '/' || p.endsWith('/row/')) return '';
+    // Cross-domain read, not a domain -- no bottom tab should claim it. Without
+    // this, the `return 'main'` catch-all below falsely highlights Goals.
+    if (p.endsWith('state-of-me.html') || p.endsWith('/state-of-me')) return '';
     return 'main';
   }
 
