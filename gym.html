@@ -4310,6 +4310,8 @@ img, video, canvas, svg { max-width: 100%; }
       const isDone   = setsDone >= numSets;
       const isActive = state.currentEx === ex.id;
       const hasSubs  = Array.isArray(ex.subs) && ex.subs.length > 0;
+      const joints = MUSCLE_TO_JOINTS[ex.muscle] || [];
+      const flaggedJoint = joints.find(function (j) { return jointPainCountInWindow(j, 7) >= 2; });
 
       const row = document.createElement('div');
       row.className = 'wl-row' +
