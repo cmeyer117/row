@@ -178,6 +178,9 @@ body.topbar-modal-open { overflow: hidden; touch-action: none; }
   <a href="weekly-review.html" class="topbar-review-btn" id="topbarReview" aria-label="Weekly Review">
     <span class="topbar-review-icon">🗓️</span>
   </a>
+  <a href="state-of-me.html" class="topbar-review-btn" id="topbarStateOfMe" aria-label="State of Me">
+    <span class="topbar-review-icon">📈</span>
+  </a>
 </header>`;
 
   const bottombarHtml = `
