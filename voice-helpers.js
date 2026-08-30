@@ -175,7 +175,15 @@ window.RowVoice = (function () {
     var stream = null;
     var maxTimer = null;
 
-    navigator.mediaDevices.getUserMedia({ audio: true }).then(function (s) {
+    // Browser default audio processing is tuned for human-perceived call
+    // clarity, not STT accuracy -- known to distort speech fighting
+    // non-stationary noise (gym music, weight clangs, exactly this app's own
+    // use case). Kept in sync with Vision's own useCodexVoice.ts fix,
+    // 2026-08-29 (real mishears found live at the gym: "shoulder and arms"
+    // -> "short-in-arms").
+    navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+    }).then(function (s) {
       if (cancelled) { s.getTracks().forEach(function (t) { t.stop(); }); return; }
       stream = s;
       // fix (2026-08-11): letting MediaRecorder pick its own default codec
