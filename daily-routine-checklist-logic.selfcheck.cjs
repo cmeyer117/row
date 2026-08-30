@@ -59,10 +59,12 @@ const morningStateNoReads = L.buildChecklistState(L.MORNING_ITEMS, {}, {}, '2026
 assertEqual(morningStateNoReads.find(function (i) { return i.id === 'devotional'; }).unknown, true, 'live item with no read entry at all is unknown, not false');
 assertEqual(morningStateNoReads.find(function (i) { return i.id === 'devotional'; }).checked, false, 'unknown live item defaults checked to false');
 
-const eveningState = L.buildChecklistState(L.EVENING_ITEMS, { melatonin: true }, { journal: { 'vessel:journal': [{ id: 'j1', date: '2026-08-09' }] } }, '2026-08-09');
+const eveningState = L.buildChecklistState(L.EVENING_ITEMS, { melatonin: true, screens_off: true }, { journal: { 'vessel:journal': [{ id: 'j1', date: '2026-08-09' }] } }, '2026-08-09');
 assertEqual(eveningState.find(function (i) { return i.id === 'melatonin'; }).checked, true, 'evening melatonin checkbox reflects saved true');
 assertEqual(eveningState.find(function (i) { return i.id === 'journal'; }).checked, true, 'evening journal live item true');
-assertEqual(eveningState.length, 5, 'evening item list has 5 items');
+assertEqual(eveningState.find(function (i) { return i.id === 'screens_off'; }).checked, true, 'evening screens_off checkbox reflects saved true');
+assertEqual(eveningState.find(function (i) { return i.id === 'no_late_training'; }).checked, false, 'unsaved no_late_training checkbox defaults to false');
+assertEqual(eveningState.length, 7, 'evening item list has 7 items (5 original + screens_off + no_late_training)');
 assertEqual(L.MORNING_ITEMS.length, 5, 'morning item list has 5 items');
 
 console.log('All daily-routine-checklist-logic tests passed.');

@@ -14,6 +14,8 @@
     { id: 'cool_room', label: 'Cool room temperature', kind: 'checkbox' },
     { id: 'casein_snack', label: 'Casein snack (cottage cheese/Greek yogurt)', kind: 'checkbox' },
     { id: 'melatonin', label: '1mg melatonin', kind: 'checkbox' },
+    { id: 'screens_off', label: 'Phone/screens away 60-90 min before bed', kind: 'checkbox' },
+    { id: 'no_late_training', label: 'No training within 2-3 hrs of bed', kind: 'checkbox' },
     { id: 'journal', label: 'Journal today', kind: 'live', vesselKey: 'journal' },
   ];
 
