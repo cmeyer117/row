@@ -535,6 +535,14 @@ window.dispatchEvent(new Event('lift-camera-module-ready'));
     // floor (still getting set up), range is still ~0, and freezing a
     // zero threshold would disable the jitter filter for the rest of the
     // recording (found in review before push).
+    //
+    // KNOWN LIMITATION (Codex review, 2026-08-30): this only guards
+    // exactly-zero range. A slow-tempo first rep (long controlled
+    // eccentric/concentric) could still have a small-but-nonzero,
+    // unrepresentative range at the 4s floor, freezing too tight a
+    // threshold. Not fixed here -- narrower than the bug already found
+    // and fixed this session, accepted as a documented limitation rather
+    // than a 4th round of changes to this function tonight.
     if (liveMinAmplitude === null) {
       if (primary.range <= 0) return;
       liveMinAmplitude = primary.range * 0.15;
