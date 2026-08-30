@@ -197,6 +197,52 @@
     };
   }
 
+  // Chronic per-muscle volume mismatch. Unlike detectVolumePhaseSignal (a
+  // blunt whole-body total), this walks one muscle's own weekly
+  // classification and flags it stuck under MEV or at/above MRV for 3+
+  // consecutive trailing COMPLETED weeks -- a persistent imbalance
+  // invisible in the whole-body total (one muscle's deficit can hide
+  // behind another's surplus). One-off weeks are excluded on purpose:
+  // classifyMuscleVolume() already surfaces those in real time via
+  // volumeAdvisory() on the exercise itself; this is for the pattern that
+  // survives across weeks.
+  //
+  // muscle: e.g. 'Chest'. labels: this muscle's classifyMuscleVolume()
+  // label ('under'|'mav'|'mrv') for each trailing COMPLETED week, oldest
+  // first (never the current in-progress week -- enforced by the caller in
+  // weekly-review.html). band: that muscle's { mev, mrv } from
+  // GymVolumeLogic.MUSCLE_BANDS (for the observation text's numbers) --
+  // plain data, not a live handle to the other module, so this file stays
+  // dependency-free. observedWeeks: how many of the windowed weeks had ANY
+  // real logged session (any exercise) -- distinguishes "genuine
+  // multi-week signal" from "brand-new user, mostly zero-padded history."
+  // Confidence tracks this, not run length -- a run spanning the full
+  // window is MORE evidence, not less (Codex review, 2026-08-29).
+  function detectChronicMuscleVolume(muscle, labels, band, observedWeeks) {
+    if (!labels.length || !band) return null;
+    if (observedWeeks < 3) return null; // not enough real training history to call anything "chronic"
+    const last = labels[labels.length - 1];
+    if (last !== 'under' && last !== 'mrv') return null;
+    let run = 0;
+    for (let i = labels.length - 1; i >= 0 && labels[i] === last; i--) run++;
+    if (run < 3) return null;
+
+    const isUnder = last === 'under';
+    return {
+      type: isUnder ? 'chronic-muscle-under' : 'chronic-muscle-over',
+      muscle: muscle,
+      severity: run >= 4 ? 'medium' : 'low',
+      observation: `${muscle} has been ${isUnder
+        ? `under MEV (${band.mev} sets/wk) for ${run} straight completed weeks -- persistently under-trained.`
+        : `at or above MRV (${band.mrv} sets/wk) for ${run} straight completed weeks -- worth assessing fatigue, performance, and whether this is an intentional specialization block.`}`,
+      evidenceWindow: { start: `trailing ${run} completed weeks`, end: 'most recent completed week' },
+      confidence: observedWeeks >= 5 ? 'medium' : 'low',
+      reviewQuestion: isUnder
+        ? `Is ${muscle} deliberately deprioritized right now, or worth adding a set to this week?`
+        : `Is the extra ${muscle} volume intentional (a specialization block), or worth pulling back?`,
+    };
+  }
+
   // sleepEntries: array of { date, hours }. now: Date. performanceStalled:
   // boolean the caller passes in (typically "did detectStalledExercise fire
   // for anything this week") -- a sleep deviation alone is never enough,
@@ -262,6 +308,7 @@
     detectStalledExercise: detectStalledExercise,
     detectMissedSessionTrend: detectMissedSessionTrend,
     detectVolumePhaseSignal: detectVolumePhaseSignal,
+    detectChronicMuscleVolume: detectChronicMuscleVolume,
     detectRecoverySignal: detectRecoverySignal,
     runInsightEngine: runInsightEngine,
   };

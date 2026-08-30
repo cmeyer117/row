@@ -187,6 +187,56 @@ assertEqual(E.detectVolumePhaseSignal({ weeklySets: [20, 21, 19], phase: 'growth
 }
 assertEqual(E.detectRecoverySignal({ sleepEntries: [{ date: '2026-08-19', hours: 4 }], now: NOW, performanceStalled: true }), null, 'a single night is never enough data -- no finding');
 
+// --- chronic per-muscle volume mismatch ---
+{
+  const band = { mev: 8, mrv: 22 };
+
+  assertEqual(
+    E.detectChronicMuscleVolume('Chest', ['mav', 'mav', 'mav', 'under', 'under', 'under'], band, 2),
+    null,
+    'a qualifying 3-week run is suppressed when fewer than 3 weeks have any real training history'
+  );
+
+  assertEqual(
+    E.detectChronicMuscleVolume('Chest', ['mav', 'mav', 'mav', 'mav', 'under', 'under'], band, 6),
+    null,
+    'a 2-week run is too short to call chronic, even with plenty of real history'
+  );
+
+  {
+    const f = E.detectChronicMuscleVolume('Chest', ['mav', 'mav', 'mav', 'under', 'under', 'under'], band, 6);
+    assert(f, 'a real 3-week under-MEV run should fire');
+    assertEqual(f.type, 'chronic-muscle-under', 'chronic-muscle-under finding type');
+    assertEqual(f.muscle, 'Chest', 'finding carries the muscle name');
+    assertEqual(f.severity, 'low', 'exactly 3 weeks is low severity');
+  }
+
+  {
+    const f = E.detectChronicMuscleVolume('Chest', ['mav', 'mav', 'under', 'under', 'under', 'under'], band, 6);
+    assert(f, 'a real 4-week under-MEV run should fire');
+    assertEqual(f.severity, 'medium', '4+ weeks escalates to medium severity');
+  }
+
+  {
+    const f = E.detectChronicMuscleVolume('Back', ['mav', 'mav', 'mav', 'mrv', 'mrv', 'mrv'], band, 6);
+    assert(f, 'a real 3-week at/above-MRV run should fire');
+    assertEqual(f.type, 'chronic-muscle-over', 'chronic-muscle-over finding type');
+  }
+
+  assertEqual(
+    E.detectChronicMuscleVolume('Chest', ['under', 'under', 'under', 'mav'], band, 4),
+    null,
+    'the streak must be current -- an under-run that ended is not a chronic mismatch today'
+  );
+
+  {
+    const highCoverage = E.detectChronicMuscleVolume('Chest', ['mav', 'mav', 'mav', 'under', 'under', 'under'], band, 6);
+    assertEqual(highCoverage.confidence, 'medium', 'observedWeeks >= 5 -> medium confidence');
+    const lowCoverage = E.detectChronicMuscleVolume('Chest', ['mav', 'mav', 'mav', 'under', 'under', 'under'], band, 3);
+    assertEqual(lowCoverage.confidence, 'low', 'observedWeeks 3-4 -> low confidence, even with the same 3-week run');
+  }
+}
+
 // --- orchestrator: never throws on thin/partial input ---
 assertEqual(E.runInsightEngine({}).length, 0, 'runInsightEngine on empty input returns no findings, does not throw');
 
