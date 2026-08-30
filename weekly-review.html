@@ -747,6 +747,34 @@ async function renderReadinessPanel() {
         now: nowRef,
       });
 
+      // Per-muscle chronic volume mismatch -- see docs/superpowers/specs/
+      // 2026-08-29-chronic-muscle-volume-mismatch-design.md. Uses 6
+      // COMPLETED weeks (excludes the current in-progress week -- a run
+      // must never be started or broken by a week that isn't over yet).
+      const oneWeekMs = 7 * 24 * 60 * 60 * 1000;
+      const lastCompleteMonday = new Date(thisMonday.getTime() - oneWeekMs);
+      const musclesToCheck = Object.keys(window.GymVolumeLogic.MUSCLE_BANDS);
+      const weeklyCountsByMuscle = {};
+      musclesToCheck.forEach(m => { weeklyCountsByMuscle[m] = []; });
+      let observedWeeks = 0;
+      for (let w = 5; w >= 0; w--) {
+        const wkMonday = new Date(lastCompleteMonday); wkMonday.setUTCDate(lastCompleteMonday.getUTCDate() - w * 7);
+        const wkSunday = new Date(wkMonday); wkSunday.setUTCDate(wkMonday.getUTCDate() + 6);
+        const mKey = wkMonday.toISOString().slice(0, 10), sKey = wkSunday.toISOString().slice(0, 10);
+        if (sessionDates.some(d => d >= mKey && d <= sKey)) observedWeeks++;
+        const counts = window.GymVolumeLogic.weeklySetsByMuscle(gymState.exercises || [], gymState.logs || {}, wkMonday);
+        musclesToCheck.forEach(m => { weeklyCountsByMuscle[m].push(counts[m] || 0); });
+      }
+      const chronicFindings = musclesToCheck.map(m => {
+        const labels = weeklyCountsByMuscle[m].map(c => {
+          const band = window.GymVolumeLogic.classifyMuscleVolume(m, c, phase);
+          return band ? band.label : null;
+        });
+        const band = window.GymVolumeLogic.MUSCLE_BANDS[m];
+        return window.TrainingInsightEngine.detectChronicMuscleVolume(m, labels, band, observedWeeks);
+      }).filter(Boolean);
+      findings.push(...chronicFindings);
+
       // Feed the gym coach -- see docs/superpowers/specs/
       // 2026-08-27-training-trajectory-coach-integration-design.md.
       // Best-effort: never blocks the findingsHtml render below. Skips
