@@ -1,8 +1,10 @@
 # Chronic Muscle-Volume Mismatch Detection — Design
 
 **Date:** 2026-08-29
-**Status:** Approved
+**Status:** Approved (revised post-Codex review — see "Revision note" below)
 **Owner:** Row (`C:\Users\gregm\row`)
+
+**Revision note:** a Codex review of this spec (`Codex Outputs/2026-08-29-chronic-muscle-volume-spec-review.md`) caught two real bugs in the first draft, both fixed below: (1) the original 6-week window included the current in-progress week, which could false-positive or falsely break a run before the week was even over; (2) the original confidence field (`run < labels.length`) had the logic backwards — a run that fills the whole window is *more* evidence, not less. Confidence is now tied to real observed-week coverage instead. A third finding (add a first-class "deprioritized/maintenance" suppression mechanism) was deliberately not applied — that's a real feature, not a bug fix, and out of scope for this pass; the existing `reviewQuestion` field already asks rather than asserts.
 
 ## Problem
 
@@ -32,12 +34,19 @@ Add one new finding type, `detectChronicMuscleVolume()`, to `training-insight-en
 // pattern that survives across weeks.
 //
 // muscle: e.g. 'Chest'. labels: this muscle's classifyMuscleVolume() label
-// ('under'|'mav'|'mrv') for each trailing week, oldest first. band: that
-// muscle's { mev, mrv } from GymVolumeLogic.MUSCLE_BANDS (for the
-// observation text's numbers) -- plain data, not a live handle to the
-// other module, so this file stays dependency-free.
-function detectChronicMuscleVolume(muscle, labels, band) {
+// ('under'|'mav'|'mrv') for each trailing COMPLETED week, oldest first
+// (never the current in-progress week -- see the weekly-review.html section
+// below). band: that muscle's { mev, mrv } from GymVolumeLogic.MUSCLE_BANDS
+// (for the observation text's numbers) -- plain data, not a live handle to
+// the other module, so this file stays dependency-free. observedWeeks: how
+// many of the windowed weeks had ANY real logged session (any exercise) --
+// distinguishes "genuine multi-week signal" from "brand-new user, mostly
+// zero-padded history." Caught by Codex review, 2026-08-29: confidence must
+// track real data coverage, not run length -- a run spanning the full
+// window is MORE evidence, not less.
+function detectChronicMuscleVolume(muscle, labels, band, observedWeeks) {
   if (!labels.length || !band) return null;
+  if (observedWeeks < 3) return null; // not enough real training history to call anything "chronic"
   const last = labels[labels.length - 1];
   if (last !== 'under' && last !== 'mrv') return null;
   let run = 0;
@@ -49,9 +58,11 @@ function detectChronicMuscleVolume(muscle, labels, band) {
     type: isUnder ? 'chronic-muscle-under' : 'chronic-muscle-over',
     muscle: muscle,
     severity: run >= 4 ? 'medium' : 'low',
-    observation: `${muscle} has been ${isUnder ? `under MEV (${band.mev} sets/wk)` : `at or above MRV (${band.mrv} sets/wk)`} for ${run} straight weeks -- persistently ${isUnder ? 'under-trained' : 'over-trained (likely fatigue, not more growth)'}.`,
-    evidenceWindow: { start: `trailing ${run} weeks`, end: 'most recent week' },
-    confidence: labels.length >= 6 ? 'medium' : 'low',
+    observation: `${muscle} has been ${isUnder
+      ? `under MEV (${band.mev} sets/wk) for ${run} straight completed weeks -- persistently under-trained.`
+      : `at or above MRV (${band.mrv} sets/wk) for ${run} straight completed weeks -- worth assessing fatigue, performance, and whether this is an intentional specialization block.`}`,
+    evidenceWindow: { start: `trailing ${run} completed weeks`, end: 'most recent completed week' },
+    confidence: observedWeeks >= 5 ? 'medium' : 'low',
     reviewQuestion: isUnder
       ? `Is ${muscle} deliberately deprioritized right now, or worth adding a set to this week?`
       : `Is the extra ${muscle} volume intentional (a specialization block), or worth pulling back?`,
@@ -65,14 +76,20 @@ Exported from the `api` object alongside the other detectors. **Not** added to `
 
 **File:** `weekly-review.html`, in the same `try` block as the existing `runInsightEngine()` call (~line 708-748), immediately after the existing `weeklySets` total-per-week loop.
 
-Build a parallel per-muscle version of that same loop:
+Build a parallel per-muscle version of that same loop — **using 6 completed weeks, not the current in-progress one** (Codex catch: the original draft's window started at `thisMonday`, the CURRENT week, so checking on a Monday or Tuesday could see a near-zero count for a week that isn't over yet, either falsely starting an "under" run or falsely breaking a real "mrv" run):
 
 ```javascript
+const oneWeekMs = 7 * 24 * 60 * 60 * 1000;
+const lastCompleteMonday = new Date(thisMonday.getTime() - oneWeekMs); // most recent fully-elapsed week
 const musclesToCheck = Object.keys(window.GymVolumeLogic.MUSCLE_BANDS);
 const weeklyCountsByMuscle = {};
 musclesToCheck.forEach(m => { weeklyCountsByMuscle[m] = []; });
+let observedWeeks = 0;
 for (let w = 5; w >= 0; w--) {
-  const wkMonday = new Date(thisMonday); wkMonday.setUTCDate(thisMonday.getUTCDate() - w * 7);
+  const wkMonday = new Date(lastCompleteMonday); wkMonday.setUTCDate(lastCompleteMonday.getUTCDate() - w * 7);
+  const wkSunday = new Date(wkMonday); wkSunday.setUTCDate(wkMonday.getUTCDate() + 6);
+  const mKey = wkMonday.toISOString().slice(0, 10), sKey = wkSunday.toISOString().slice(0, 10);
+  if (sessionDates.some(d => d >= mKey && d <= sKey)) observedWeeks++;
   const counts = window.GymVolumeLogic.weeklySetsByMuscle(gymState.exercises || [], gymState.logs || {}, wkMonday);
   musclesToCheck.forEach(m => { weeklyCountsByMuscle[m].push(counts[m] || 0); });
 }
@@ -82,10 +99,12 @@ const chronicFindings = musclesToCheck.map(m => {
     return band ? band.label : null;
   });
   const band = window.GymVolumeLogic.MUSCLE_BANDS[m];
-  return window.TrainingInsightEngine.detectChronicMuscleVolume(m, labels, band);
+  return window.TrainingInsightEngine.detectChronicMuscleVolume(m, labels, band, observedWeeks);
 }).filter(Boolean);
 findings.push(...chronicFindings);
 ```
+
+`sessionDates` is already computed earlier in this same block (line 725: `Array.from(new Set(allEntries.map(...)))`) — reused here, not recomputed, to determine `observedWeeks`.
 
 Placed **after** `const findings = window.TrainingInsightEngine.runInsightEngine({...})` and **before** the `if (findings.length > 0)` write block — so the new findings ride the exact same write to `row:training_trajectory` with zero changes to that block, and zero changes on the Vision/`gym.ts` side (it already reads `findings[]` generically by shape, per the 2026-08-27 spec).
 
@@ -97,9 +116,11 @@ Placed **after** `const findings = window.TrainingInsightEngine.runInsightEngine
 
 ### Edge cases
 
-- **New muscle group / no exercises tagged for it**: `weeklySetsByMuscle()` already returns 0 for every `MUSCLE_BANDS` key even with zero logged sets (confirmed in its own doc comment) — a muscle with real zero volume for 3+ weeks correctly flags as `chronic-muscle-under`. This is accurate, not a false positive: if nothing in the current routine trains a muscle (directly or via `EXERCISE_MUSCLE_CONTRIBUTIONS`'s secondary-mover weighting), that's exactly the kind of gap a real coach would flag.
-- **Phase change mid-window**: `classifyMuscleVolume()`'s `label` (under/mav/mrv) depends only on the raw MEV/MRV band, not on `phase` (phase only affects the separate `target`/`belowTarget` fields, unused here) — so a phase change mid-window doesn't retroactively reclassify old weeks or create a phantom run. Confirmed by reading `classifyMuscleVolume()`'s implementation.
-- **Fewer than 6 weeks of real history**: the loop always produces exactly 6 entries (padding early weeks with 0 for muscles with no logs yet, same as the existing whole-body `weeklySets` loop does today) — a brand-new user could see a spurious 6-week-old "chronic under" for every muscle. Mitigated by `confidence: labels.length >= 6 ? 'medium' : 'low'` already existing in the design above, but since the loop is hardcoded to 6 the confidence field can never actually be `'low'` via that check. **Fix folded in**: confidence instead reflects whether the *flagged run itself* has room to have been shorter than the full window — i.e., use `confidence: run < labels.length ? 'medium' : 'low'`, so a run spanning the entire available window (no visibility into whether it started earlier or is a brand-new user) is marked lower-confidence than a run that demonstrably started partway through real data.
+- **New muscle group / no exercises tagged for it**: `weeklySetsByMuscle()` already returns 0 for every `MUSCLE_BANDS` key even with zero logged sets (confirmed in its own doc comment) — a muscle with real zero volume for 3+ weeks flags as `chronic-muscle-under`, gated on `observedWeeks >= 3` (real training history exists, this muscle specifically just isn't in it). Zero volume isn't automatically a mistake — it could be deliberate deprioritization, maintenance, or an injury constraint (Codex review, 2026-08-29) — which is exactly why `reviewQuestion` asks rather than asserts, and why no suppression mechanism is being built for it here (see "Out of scope").
+- **Phase change mid-window**: `classifyMuscleVolume()`'s `label` (under/mav/mrv) depends only on the raw MEV/MRV band, not on `phase` (phase only affects the separate `target`/`belowTarget` fields, unused here) — so a phase change mid-window doesn't retroactively reclassify old weeks or create a phantom run. Confirmed by reading `classifyMuscleVolume()`'s implementation, and independently confirmed by Codex review.
+- **New user / thin history**: the loop always produces exactly 6 label entries (zero-padding weeks before Row was in use), which could otherwise let a brand-new user's first partial week look like a 6-week "chronic" pattern. Fixed with the `observedWeeks < 3` gate (real logged-session weeks, not zero-padding) — a muscle can't be flagged as chronic until there's real multi-week training history behind the window at all, independent of which specific muscle is under/over.
+- **Current in-progress week**: fixed by windowing on 6 *completed* weeks (`lastCompleteMonday` above) — a run can never be started or broken by a week that hasn't finished yet.
+- **Deleted/renamed exercises retroactively zero out historical muscle counts**: `weeklySetsByMuscle()` maps logs through the *current* `gymState.exercises` list, so a log for an exercise that's since been deleted or renamed silently drops out of that week's muscle count (confirmed in `gym-volume-logic.js:123-134`, flagged by Codex review). This is an existing, inherited limitation of `weeklySetsByMuscle()` itself — already true today for every other caller (the Progress tab, `volumeAdvisory`) — not something this pass introduces or needs to solve. Accepted as a known limitation, same posture as this codebase's other documented-not-fixed edge cases (e.g. the DST case in `localDateKey`, accepted tonight in a separate build).
 
 ### Out of scope (this pass)
 
@@ -110,11 +131,15 @@ Placed **after** `const findings = window.TrainingInsightEngine.runInsightEngine
 ## Testing
 
 **`training-insight-engine.selfcheck.cjs`**: extend with `detectChronicMuscleVolume()` cases —
-- 2 consecutive "under" weeks → `null` (run too short)
-- exactly 3 consecutive "under" weeks → fires, `severity: 'low'`
-- 4+ consecutive "under" weeks → fires, `severity: 'medium'`
-- 3 consecutive "mrv" weeks → fires as `chronic-muscle-over`
+- `observedWeeks < 3` with an otherwise-qualifying 3-week "under" run → `null` (not enough real training history)
+- `observedWeeks >= 3`, 2 consecutive "under" weeks → `null` (run too short)
+- `observedWeeks >= 3`, exactly 3 consecutive "under" weeks → fires, `severity: 'low'`
+- `observedWeeks >= 3`, 4+ consecutive "under" weeks → fires, `severity: 'medium'`
+- `observedWeeks >= 3`, 3 consecutive "mrv" weeks → fires as `chronic-muscle-over`
 - most recent week is "mav" (even after a prior "under" run) → `null` (broken streak, matches trailing-run-only semantics)
-- run length equals full label array length → `confidence: 'low'`; a run shorter than the array → `confidence: 'medium'` (given `labels.length >= 6`)
+- `observedWeeks >= 5` → `confidence: 'medium'`; `observedWeeks` 3-4 → `confidence: 'low'` (independent of run length — a run spanning the full window is never penalized for it)
 
-**`weekly-review.html`**: no existing test harness for this file (matches this session's other Row builds — verification is manual tracing + a local static-server browser check). Trace: seed `gymState.logs` with 3+ weeks of a single muscle's sets below its `MUSCLE_BANDS` MEV, confirm a `chronic-muscle-under` finding appears in the `findings` array passed to the `app_state` write, alongside (not replacing) any `detectVolumePhaseSignal`/`detectStalledExercise` findings already firing.
+**`weekly-review.html`**: no existing test harness for this file (matches this session's other Row builds — verification is manual tracing + a local static-server browser check). Trace:
+- Seed `gymState.logs` with 3+ **completed** weeks of a single muscle's sets below its `MUSCLE_BANDS` MEV, real sessions logged each week — confirm a `chronic-muscle-under` finding appears in the `findings` array passed to the `app_state` write, alongside (not replacing) any `detectVolumePhaseSignal`/`detectStalledExercise` findings already firing.
+- Seed the same scenario but with only 1-2 weeks of real logged sessions (rest zero-padded, simulating a new user) — confirm no `chronic-muscle-*` finding fires despite the label run being long enough.
+- Confirm the window excludes today's in-progress week: seed a near-empty current week for a muscle otherwise well within MAV for the prior 6 completed weeks — confirm no false "under" run starts.
