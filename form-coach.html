@@ -536,15 +536,22 @@ window.dispatchEvent(new Event('lift-camera-module-ready'));
     // zero threshold would disable the jitter filter for the rest of the
     // recording (found in review before push).
     //
-    // KNOWN LIMITATION (Codex review, 2026-08-30): this only guards
-    // exactly-zero range. A slow-tempo first rep (long controlled
-    // eccentric/concentric) could still have a small-but-nonzero,
-    // unrepresentative range at the 4s floor, freezing too tight a
-    // threshold. Not fixed here -- narrower than the bug already found
-    // and fixed this session, accepted as a documented limitation rather
-    // than a 4th round of changes to this function tonight.
+    // FIXED (Codex review, 2026-08-30): `range > 0` alone isn't a "real
+    // movement" guard -- ordinary MediaPipe landmark jitter while just
+    // standing still (not yet moving) is also nonzero, and would freeze
+    // an unusably tiny threshold that then reads jitter as real reps for
+    // the rest of the recording. Require a range large enough that it
+    // can't plausibly be jitter: angle-degree signals (a real matched
+    // benchmark) need real joint ROM to exceed jitter -- 10 degrees is
+    // well above typical landmark-jitter-driven angle noise (a few
+    // degrees) and well below any real tracked exercise's rep ROM
+    // (tens of degrees minimum). Y-position fallback signals are
+    // normalized 0-1 (fraction of frame height) -- 0.03 (3% of frame
+    // height) is well above typical sub-1% landmark jitter and well
+    // below any real rep's movement range.
     if (liveMinAmplitude === null) {
-      if (primary.range <= 0) return;
+      var MIN_REAL_RANGE = primary.usedBenchmark ? 10 : 0.03;
+      if (primary.range < MIN_REAL_RANGE) return;
       liveMinAmplitude = primary.range * 0.15;
     }
     var stabilitySamples = buildStabilitySamples(buffer);
