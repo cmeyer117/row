@@ -8,6 +8,8 @@
 
 **Tech Stack:** Plain browser JS (no framework, no build step). No test framework for this file — verification is a standalone Node script using `vm` (same technique this session's other Row builds used) plus a live browser trace with a real camera.
 
+**Post-execution note:** Task 1's verification step (exactly as planned below) caught a real bug in the code shown here — `minAmplitude` recomputed fresh every tick let the jitter-filter threshold drift and retroactively reinterpret earlier rep boundaries, and `romFlag`/`tempoFlag`/`stabilityFlag` turned out to be relative-to-set-average values that are inherently provisional mid-set. What actually shipped (`row@e04322f`) differs from the code blocks below: `minAmplitude` freezes once per recording after a ~4s calibration floor, the most recent rep is always held back, and live rendering shows only the absolute fields (tempo, depth) via a new `renderLiveResult()`, never the set-relative quality flags. See the spec's own Revision note (`docs/superpowers/specs/2026-08-30-live-form-coach-feedback-design.md`) for the full root-cause writeup. This plan's steps are left as originally written below — a record of what was planned, not what ultimately shipped.
+
 ---
 
 ## Spec reference
