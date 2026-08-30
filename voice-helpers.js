@@ -181,6 +181,12 @@ window.RowVoice = (function () {
     // use case). Kept in sync with Vision's own useCodexVoice.ts fix,
     // 2026-08-29 (real mishears found live at the gym: "shoulder and arms"
     // -> "short-in-arms").
+    //
+    // With echo cancellation off, the mic can pick up this app's own TTS
+    // playback (unlockAudio's own audio element, or morning-brief) if it's
+    // still playing when recording starts. Stop it first. Found in Codex
+    // review, 2026-08-29 (Vision/Jarvis equivalent).
+    document.querySelectorAll('audio').forEach(function (a) { if (!a.paused) a.pause(); });
     navigator.mediaDevices.getUserMedia({
       audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
     }).then(function (s) {
