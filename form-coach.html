@@ -280,6 +280,8 @@ window.dispatchEvent(new Event('lift-camera-module-ready'));
   var resultEl = document.getElementById('liftResult');
   var recording = false;
   var buffer = []; // [{ t, landmarks }]
+  var recordingExerciseName = ''; // read at record-start, used by both the live-scoring interval and the stop branch
+  var liveScoreInterval = null;
 
   // Form cues lookup (Coach tab split Part B, 2026-08-25) -- reuses
   // FormCoachLogic.matchBenchmark's proven fuzzy-match scoring (same
@@ -489,6 +491,21 @@ window.dispatchEvent(new Event('lift-camera-module-ready'));
     if (window.parent !== window) window.parent.postMessage({ type: 'coach-child-ready' }, window.location.origin);
   });
 
+  function liveScoreTick() {
+    if (buffer.length < 10) return; // same floor as the stop-branch's own "too short" guard
+    var matchedBenchmark = window.FormCoachLogic.matchBenchmark(recordingExerciseName, window.EXERCISE_BENCHMARKS);
+    var primary = buildPrimarySignal(buffer, matchedBenchmark);
+    var stabilitySamples = buildStabilitySamples(buffer);
+    var minAmplitude = primary.range * 0.15;
+    var scored = window.FormCoachLogic.scoreSet(primary.samples, stabilitySamples, minAmplitude, primary.usedBenchmark ? matchedBenchmark : null);
+    // Skip rendering on zero reps -- renderResult([]) shows "No clear reps
+    // detected... through the whole set," worded for the END of a set. That
+    // message would be misleading shown 1.5s into the first rep, before
+    // anything has actually gone wrong. Leave resultEl as its cleared state
+    // (from record-start below) until a real rep completes.
+    if (scored.length) renderResult(scored, recordingExerciseName);
+  }
+
   recordBtn.addEventListener('click', function () {
     if (!cameraStarted) return;
     if (!recording) {
@@ -497,7 +514,11 @@ window.dispatchEvent(new Event('lift-camera-module-ready'));
       resultEl.innerHTML = '';
       recordBtn.textContent = 'Stop Recording';
       recordBtn.className = 'fc-btn fc-btn-secondary';
+      recordingExerciseName = document.getElementById('liftExerciseName').value.trim();
+      liveScoreInterval = setInterval(liveScoreTick, 1500);
     } else {
+      clearInterval(liveScoreInterval);
+      liveScoreInterval = null;
       recording = false;
       recordBtn.textContent = 'Record Set';
       recordBtn.className = 'fc-btn fc-btn-primary';
@@ -505,7 +526,7 @@ window.dispatchEvent(new Event('lift-camera-module-ready'));
         resultEl.innerHTML = '<div class="mob-card"><div class="mob-card-body">Recording too short — try a longer set.</div></div>';
         return;
       }
-      var exerciseName = document.getElementById('liftExerciseName').value.trim();
+      var exerciseName = recordingExerciseName;
       var matchedBenchmark = window.FormCoachLogic.matchBenchmark(exerciseName, window.EXERCISE_BENCHMARKS);
       var primary = buildPrimarySignal(buffer, matchedBenchmark);
       var stabilitySamples = buildStabilitySamples(buffer);
