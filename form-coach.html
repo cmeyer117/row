@@ -530,7 +530,15 @@ window.dispatchEvent(new Event('lift-camera-module-ready'));
     // first draft) let the threshold drift as the buffer grew, which
     // could retroactively reinterpret earlier extrema, not just the most
     // recent rep. Reset to null at record-start (see recordBtn handler).
-    if (liveMinAmplitude === null) liveMinAmplitude = primary.range * 0.15;
+    // Only freeze once real movement has been observed -- if Carl clicks
+    // Record but hasn't started the first rep within the calibration
+    // floor (still getting set up), range is still ~0, and freezing a
+    // zero threshold would disable the jitter filter for the rest of the
+    // recording (found in review before push).
+    if (liveMinAmplitude === null) {
+      if (primary.range <= 0) return;
+      liveMinAmplitude = primary.range * 0.15;
+    }
     var stabilitySamples = buildStabilitySamples(buffer);
     var fullScored = window.FormCoachLogic.scoreSet(primary.samples, stabilitySamples, liveMinAmplitude, primary.usedBenchmark ? matchedBenchmark : null);
     // Hold back the most recent rep -- findExtrema's trailing extremum is
