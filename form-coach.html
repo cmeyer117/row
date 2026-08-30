@@ -282,6 +282,7 @@ window.dispatchEvent(new Event('lift-camera-module-ready'));
   var buffer = []; // [{ t, landmarks }]
   var recordingExerciseName = ''; // read at record-start, used by both the live-scoring interval and the stop branch
   var liveScoreInterval = null;
+  var liveMinAmplitude = null; // frozen once calibrated, reset per recording -- see liveScoreTick
 
   // Form cues lookup (Coach tab split Part B, 2026-08-25) -- reuses
   // FormCoachLogic.matchBenchmark's proven fuzzy-match scoring (same
@@ -491,19 +492,54 @@ window.dispatchEvent(new Event('lift-camera-module-ready'));
     if (window.parent !== window) window.parent.postMessage({ type: 'coach-child-ready' }, window.location.origin);
   });
 
+  // Live-only render: a stripped-down version of renderResult() that omits
+  // romFlag/tempoFlag/stabilityFlag (and the romPct/tempoRatio/avgJitter
+  // fields they're derived from). Found during TDD verification (Node
+  // trace, 2026-08-30): those fields are computed relative to the AVERAGE
+  // across every rep scoreReps()/scoreStability() are given -- i.e.
+  // relative to the whole set's own average, which is a moving target
+  // until the set actually ends. Showing them live would mean a rep's
+  // "Short ROM"/"Rushed"/"Unstable" verdict could flip after being shown,
+  // as later reps shift the average. rom/durationMs/eccentricMs/
+  // concentricMs/depthDeg/depthMet are NOT relative to other reps (raw
+  // values, or absolute vs. a fixed benchmark target) and stay stable once
+  // liveMinAmplitude is frozen -- confirmed stable via the Node trace
+  // across multiple seeded-noise runs. The relative flags remain exactly
+  // as they are today, shown only in renderResult() at Stop.
+  function renderLiveResult(scored, exerciseName) {
+    var rows = scored.map(function (r) {
+      var tempoStr = formatSeconds(r.eccentricMs) + ' down / ' + formatSeconds(r.concentricMs) + ' up';
+      var depthStr = ('depthMet' in r) ? (' — ' + r.depthDeg + '°/target ' + r.targetDeg + '° ' + (r.depthMet ? '✓' : '✗')) : '';
+      return '<div class="fc-rep-row"><span>Rep ' + r.index + ' — ' + tempoStr + depthStr + '</span></div>';
+    }).join('');
+    var totalTut = window.FormCoachLogic.totalTutMs(scored);
+    resultEl.innerHTML = '<div class="mob-card"><div class="mob-card-body"><strong>' + escape(exerciseName || 'Set') + '</strong> — ' + scored.length + ' rep' + (scored.length === 1 ? '' : 's') + ' so far, ' + formatSeconds(totalTut) + ' TUT</div></div><div class="mob-card">' + rows + '<div class="fc-rep-row"><span style="color:var(--text-3);font-size:12px;">Full ROM/tempo/stability flags appear when you stop the set.</span></div></div>';
+  }
+
   function liveScoreTick() {
-    if (buffer.length < 10) return; // same floor as the stop-branch's own "too short" guard
+    // Wait for real calibration data before scoring at all -- an early
+    // buffer's own observed range badly underestimates the true rep
+    // range, which would freeze too-small a jitter-filter threshold
+    // (found via Node trace: freezing from a 10-frame/1s sample still
+    // produced unstable rep boundaries). ~4s at the 100ms detection
+    // interval gives the range time to converge first.
+    if (buffer.length < 40) return;
     var matchedBenchmark = window.FormCoachLogic.matchBenchmark(recordingExerciseName, window.EXERCISE_BENCHMARKS);
     var primary = buildPrimarySignal(buffer, matchedBenchmark);
+    // Freeze once, per recording -- recomputing every tick (this file's
+    // first draft) let the threshold drift as the buffer grew, which
+    // could retroactively reinterpret earlier extrema, not just the most
+    // recent rep. Reset to null at record-start (see recordBtn handler).
+    if (liveMinAmplitude === null) liveMinAmplitude = primary.range * 0.15;
     var stabilitySamples = buildStabilitySamples(buffer);
-    var minAmplitude = primary.range * 0.15;
-    var scored = window.FormCoachLogic.scoreSet(primary.samples, stabilitySamples, minAmplitude, primary.usedBenchmark ? matchedBenchmark : null);
-    // Skip rendering on zero reps -- renderResult([]) shows "No clear reps
-    // detected... through the whole set," worded for the END of a set. That
-    // message would be misleading shown 1.5s into the first rep, before
-    // anything has actually gone wrong. Leave resultEl as its cleared state
-    // (from record-start below) until a real rep completes.
-    if (scored.length) renderResult(scored, recordingExerciseName);
+    var fullScored = window.FormCoachLogic.scoreSet(primary.samples, stabilitySamples, liveMinAmplitude, primary.usedBenchmark ? matchedBenchmark : null);
+    // Hold back the most recent rep -- findExtrema's trailing extremum is
+    // always "whatever's most extreme when the buffer ran out," not a
+    // confirmed reversal, so the last-formed rep's end boundary can still
+    // shift once more frames arrive. Every earlier rep was confirmed by a
+    // real amplitude-reversal and is provably stable (Node trace).
+    var confirmed = fullScored.slice(0, -1);
+    if (confirmed.length) renderLiveResult(confirmed, recordingExerciseName);
   }
 
   recordBtn.addEventListener('click', function () {
@@ -515,6 +551,7 @@ window.dispatchEvent(new Event('lift-camera-module-ready'));
       recordBtn.textContent = 'Stop Recording';
       recordBtn.className = 'fc-btn fc-btn-secondary';
       recordingExerciseName = document.getElementById('liftExerciseName').value.trim();
+      liveMinAmplitude = null; // recalibrate fresh for this recording
       liveScoreInterval = setInterval(liveScoreTick, 1500);
     } else {
       clearInterval(liveScoreInterval);
