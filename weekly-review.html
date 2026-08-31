@@ -278,6 +278,44 @@ async function computeScorecard(decision) {
   return { volumeRows, cardioCount, posingCount, cardioRx, posingRx, weekLabel: monday + ' to ' + sunday };
 }
 
+// Filters TrainingInsightEngine findings down to the ones relevant to this
+// decision's own subject matter -- pure metadata matching, no new
+// heuristics. See docs/superpowers/specs/
+// 2026-08-31-decision-closeout-insight-evidence-design.md.
+const WHOLE_TRAINING_FINDING_TYPES = ['missed-session-trend', 'volume-phase-mismatch', 'recovery-signal'];
+function matchInsightFindings(decision, findings) {
+  const details = (decision && decision.details) || {};
+  const muscleGroups = details.muscle_groups || {};
+  const anchorLiftNames = (Array.isArray(details.anchor_lifts) ? details.anchor_lifts : [])
+    .map(a => (a && a.lift ? a.lift.toLowerCase() : null))
+    .filter(Boolean);
+  return (findings || []).filter(f => {
+    if (WHOLE_TRAINING_FINDING_TYPES.indexOf(f.type) !== -1) return true;
+    if (f.muscle) return Object.prototype.hasOwnProperty.call(muscleGroups, f.muscle);
+    if (f.exercise) return anchorLiftNames.indexOf(f.exercise.toLowerCase()) !== -1;
+    return false;
+  });
+}
+
+// Builds the measured-evidence list for a due decision's closeout: same
+// review-week derivation computeScorecard() uses (decision.created_at + 7
+// days, eastern-adjusted), engine anchored to that week's Sunday (not live
+// "now") so a late closeout reflects what was true at the end of the
+// governed week, then filtered to what's actually relevant to this
+// decision via matchInsightFindings. See docs/superpowers/specs/
+// 2026-08-31-decision-closeout-insight-evidence-design.md.
+async function computeCloseoutEvidence(decision) {
+  const scoreWeekRef = easternCalendarDate(new Date(decision.created_at));
+  scoreWeekRef.setUTCDate(scoreWeekRef.getUTCDate() + 7);
+  const { sunday } = weekWindow(scoreWeekRef);
+  const nowRef = new Date(sunday + 'T00:00:00.000Z');
+
+  const [gymState, health] = await Promise.all([fetchGymState(), fetchAppStateKey('health')]);
+  const phase = gymState.season && gymState.season.phase;
+  const built = buildInsightFindings(gymState, health, phase, nowRef);
+  return matchInsightFindings(decision, built.findings);
+}
+
 const VERDICT_BADGE = {
   matched: `<span style="color:var(--good);">✓ matched</span>`,
   partly_matched: `<span style="color:var(--warn);">~ partly matched</span>`,
@@ -317,6 +355,22 @@ function renderScorecard(scorecard) {
       ${rxRowHtml('Posing', scorecard.posingCount, scorecard.posingRx)}
       <p style="color:var(--text-3);font-size:11px;margin:8px 0 0;">Anchor-lift and pain calls still need your own read — pick a verdict for each below.</p>
     </div>`;
+}
+
+// Flat list of a closeout's measured evidence -- each finding's own
+// `observation` already names its muscle/exercise, so no per-row weaving
+// into the scorecard (Codex review, 2026-08-31: also surfaces
+// evidenceWindow so trailing-window findings that span more than the one
+// review week don't read as "caused solely by this week").
+function renderMeasuredEvidenceHtml(findings) {
+  if (!findings.length) return '';
+  return `<div style="margin:8px 0;">
+    <p style="color:var(--text-3);font-size:11px;text-transform:uppercase;letter-spacing:0.05em;margin:0 0 4px;">Measured evidence</p>
+    ${findings.map(f => `<div style="padding:4px 0;font-size:12px;">
+      <span style="color:var(--text-1);">${f.observation}</span>
+      <span style="color:var(--text-3);"> (${f.confidence} confidence, ${f.evidenceWindow.start} – ${f.evidenceWindow.end})</span>
+    </div>`).join('')}
+  </div>`;
 }
 
 // Normalizes anchor_lifts/pain_flags into a uniform {key, label, legacy}
@@ -377,6 +431,14 @@ async function renderCloseout(decision) {
     scorecardHtml = `<p style="color:var(--warn);font-size:13px;margin-bottom:12px;">Couldn't load follow-through data (connection issue) — pick a verdict from memory.</p>`;
   }
 
+  let evidenceBlockHtml = '';
+  try {
+    const evidence = await computeCloseoutEvidence(decision);
+    evidenceBlockHtml = renderMeasuredEvidenceHtml(evidence);
+  } catch (err) {
+    console.error('computeCloseoutEvidence failed:', err);
+  }
+
   const anchorItems = normalizeAnchorLifts(decision.details && decision.details.anchor_lifts);
   const painItems = normalizePainFlags(decision.details && decision.details.pain_flags);
 
@@ -385,6 +447,7 @@ async function renderCloseout(decision) {
       <p style="color:var(--text-2);font-size:13px;">Close out last week's decision before starting a new one:</p>
       <p style="color:var(--text-1);font-size:14px;margin:8px 0;">${decision.decision_text}</p>
       ${scorecardHtml}
+      ${evidenceBlockHtml}
       ${manualVerdictRowsHtml('Anchor lifts', anchorItems)}
       ${manualVerdictRowsHtml('Pain / recovery', painItems)}
       <p style="color:var(--text-3);font-size:11px;text-transform:uppercase;letter-spacing:0.05em;margin:12px 0 4px;">Coach's response this week (optional)</p>
@@ -553,6 +616,97 @@ async function renderNewDecisionForm() {
 const RECOVERY_SCORE = { low: 1, med: 2, high: 3 };
 const TREND_ARROW = { up: '↑', down: '↓', flat: '→' };
 
+// Builds TrainingInsightEngine findings (base engine + per-muscle chronic
+// volume) from gymState/health, anchored to nowRef. Shared by
+// renderReadinessPanel (nowRef = live "now") and computeCloseoutEvidence
+// (nowRef = the decision's review-week Sunday) so this windowing logic
+// lives in exactly one place.
+//
+// detectStalledExercise has no `now` awareness of its own -- it just walks
+// whatever exposures it's handed, treating the last one as "latest". Every
+// other detector already bounds its own trailing windows against `now`
+// internally (sessionsInWindow/hoursInWindow both cap at `now`, and the
+// weeklySets/chronic-muscle loops here are built from explicit week
+// windows anchored to nowRef), so filtering exposures to date <= nowRef
+// before they reach the engine is the one cutoff this function needs to
+// apply itself (Codex review, 2026-08-31) -- otherwise a closeout run with
+// a past nowRef could leak exposures logged after the review week into
+// that week's "measured evidence".
+function buildInsightFindings(gymState, health, phase, nowRef) {
+  if (!(window.TrainingInsightEngine && window.GymWorkoutEvents)) {
+    return { findings: [], exposuresByName: {}, sessionDates: [], weeklySets: [] };
+  }
+  const nowKey = nowRef.toISOString().slice(0, 10);
+  const exercisesById = {};
+  (gymState.exercises || []).forEach(ex => { exercisesById[ex.id] = ex; });
+  const exposuresByName = {};
+  Object.keys(gymState.logs || {}).forEach(exId => {
+    const ex = exercisesById[exId];
+    if (!ex) return;
+    const entries = (gymState.logs[exId] || []).map(l => ({
+      date: (l.date || '').slice(0, 10),
+      load: ex.bw ? l.reps : window.GymWorkoutEvents.totalLoad(l, ex),
+      reps: l.reps,
+      variantTag: l.variant || null,
+    })).filter(e => e.date && e.date <= nowKey && e.load != null);
+    if (entries.length) exposuresByName[ex.name] = entries;
+  });
+  const allEntries = Object.values(gymState.logs || {}).flat();
+  const sessionDates = Array.from(new Set(allEntries.map(l => (l.date || '').slice(0, 10)).filter(Boolean)));
+
+  // Trailing 6 calendar weeks (Mon-Sun, UTC) of total logged sets.
+  const dow = nowRef.getUTCDay() === 0 ? 7 : nowRef.getUTCDay(); // Mon=1..Sun=7
+  const thisMonday = new Date(nowRef); thisMonday.setUTCDate(nowRef.getUTCDate() - (dow - 1));
+  const weeklySets = [];
+  for (let w = 5; w >= 0; w--) {
+    const wkMonday = new Date(thisMonday); wkMonday.setUTCDate(thisMonday.getUTCDate() - w * 7);
+    const wkSunday = new Date(wkMonday); wkSunday.setUTCDate(wkMonday.getUTCDate() + 6);
+    const mKey = wkMonday.toISOString().slice(0, 10), sKey = wkSunday.toISOString().slice(0, 10);
+    weeklySets.push(allEntries.filter(l => { const d = (l.date || '').slice(0, 10); return d >= mKey && d <= sKey; }).length);
+  }
+
+  const allSleepEntries = ((health && health['health:sleep']) || []).filter(e => e && e.date && e.hours != null);
+
+  const findings = window.TrainingInsightEngine.runInsightEngine({
+    exercises: exposuresByName,
+    sessionDates: sessionDates,
+    weeklySets: weeklySets,
+    phase: phase,
+    sleepEntries: allSleepEntries,
+    now: nowRef,
+  });
+
+  // Per-muscle chronic volume mismatch -- see docs/superpowers/specs/
+  // 2026-08-29-chronic-muscle-volume-mismatch-design.md. Uses 6
+  // COMPLETED weeks (excludes the current in-progress week -- a run
+  // must never be started or broken by a week that isn't over yet).
+  const oneWeekMs = 7 * 24 * 60 * 60 * 1000;
+  const lastCompleteMonday = new Date(thisMonday.getTime() - oneWeekMs);
+  const musclesToCheck = Object.keys(window.GymVolumeLogic.MUSCLE_BANDS);
+  const weeklyCountsByMuscle = {};
+  musclesToCheck.forEach(m => { weeklyCountsByMuscle[m] = []; });
+  let observedWeeks = 0;
+  for (let w = 5; w >= 0; w--) {
+    const wkMonday = new Date(lastCompleteMonday); wkMonday.setUTCDate(lastCompleteMonday.getUTCDate() - w * 7);
+    const wkSunday = new Date(wkMonday); wkSunday.setUTCDate(wkMonday.getUTCDate() + 6);
+    const mKey = wkMonday.toISOString().slice(0, 10), sKey = wkSunday.toISOString().slice(0, 10);
+    if (sessionDates.some(d => d >= mKey && d <= sKey)) observedWeeks++;
+    const counts = window.GymVolumeLogic.weeklySetsByMuscle(gymState.exercises || [], gymState.logs || {}, wkMonday);
+    musclesToCheck.forEach(m => { weeklyCountsByMuscle[m].push(counts[m] || 0); });
+  }
+  const chronicFindings = musclesToCheck.map(m => {
+    const labels = weeklyCountsByMuscle[m].map(c => {
+      const band = window.GymVolumeLogic.classifyMuscleVolume(m, c, phase);
+      return band ? band.label : null;
+    });
+    const band = window.GymVolumeLogic.MUSCLE_BANDS[m];
+    return window.TrainingInsightEngine.detectChronicMuscleVolume(m, labels, band, observedWeeks);
+  }).filter(Boolean);
+  findings.push(...chronicFindings);
+
+  return { findings, exposuresByName, sessionDates, weeklySets };
+}
+
 async function renderReadinessPanel() {
   const el = document.getElementById('readinessSection');
   const [gymState, existingDecision] = await Promise.all([
@@ -707,73 +861,12 @@ async function renderReadinessPanel() {
   let weeklyPacketMarkdown = '';
   try {
     if (window.TrainingInsightEngine && window.GymWorkoutEvents && window.WeeklyCoachPacket) {
-      const exercisesById = {};
-      (gymState.exercises || []).forEach(ex => { exercisesById[ex.id] = ex; });
-      const exposuresByName = {};
-      Object.keys(gymState.logs || {}).forEach(exId => {
-        const ex = exercisesById[exId];
-        if (!ex) return;
-        const entries = (gymState.logs[exId] || []).map(l => ({
-          date: (l.date || '').slice(0, 10),
-          load: ex.bw ? l.reps : window.GymWorkoutEvents.totalLoad(l, ex),
-          reps: l.reps,
-          variantTag: l.variant || null,
-        })).filter(e => e.date && e.load != null);
-        if (entries.length) exposuresByName[ex.name] = entries;
-      });
-      const allEntries = Object.values(gymState.logs || {}).flat();
-      const sessionDates = Array.from(new Set(allEntries.map(l => (l.date || '').slice(0, 10)).filter(Boolean)));
-
-      // Trailing 6 calendar weeks (Mon-Sun, UTC) of total logged sets.
       const nowRef = new Date();
-      const dow = nowRef.getUTCDay() === 0 ? 7 : nowRef.getUTCDay(); // Mon=1..Sun=7
-      const thisMonday = new Date(nowRef); thisMonday.setUTCDate(nowRef.getUTCDate() - (dow - 1));
-      const weeklySets = [];
-      for (let w = 5; w >= 0; w--) {
-        const wkMonday = new Date(thisMonday); wkMonday.setUTCDate(thisMonday.getUTCDate() - w * 7);
-        const wkSunday = new Date(wkMonday); wkSunday.setUTCDate(wkMonday.getUTCDate() + 6);
-        const mKey = wkMonday.toISOString().slice(0, 10), sKey = wkSunday.toISOString().slice(0, 10);
-        weeklySets.push(allEntries.filter(l => { const d = (l.date || '').slice(0, 10); return d >= mKey && d <= sKey; }).length);
-      }
-
-      const allSleepEntries = ((health && health['health:sleep']) || []).filter(e => e && e.date && e.hours != null);
-
-      const findings = window.TrainingInsightEngine.runInsightEngine({
-        exercises: exposuresByName,
-        sessionDates: sessionDates,
-        weeklySets: weeklySets,
-        phase: phase,
-        sleepEntries: allSleepEntries,
-        now: nowRef,
-      });
-
-      // Per-muscle chronic volume mismatch -- see docs/superpowers/specs/
-      // 2026-08-29-chronic-muscle-volume-mismatch-design.md. Uses 6
-      // COMPLETED weeks (excludes the current in-progress week -- a run
-      // must never be started or broken by a week that isn't over yet).
-      const oneWeekMs = 7 * 24 * 60 * 60 * 1000;
-      const lastCompleteMonday = new Date(thisMonday.getTime() - oneWeekMs);
-      const musclesToCheck = Object.keys(window.GymVolumeLogic.MUSCLE_BANDS);
-      const weeklyCountsByMuscle = {};
-      musclesToCheck.forEach(m => { weeklyCountsByMuscle[m] = []; });
-      let observedWeeks = 0;
-      for (let w = 5; w >= 0; w--) {
-        const wkMonday = new Date(lastCompleteMonday); wkMonday.setUTCDate(lastCompleteMonday.getUTCDate() - w * 7);
-        const wkSunday = new Date(wkMonday); wkSunday.setUTCDate(wkMonday.getUTCDate() + 6);
-        const mKey = wkMonday.toISOString().slice(0, 10), sKey = wkSunday.toISOString().slice(0, 10);
-        if (sessionDates.some(d => d >= mKey && d <= sKey)) observedWeeks++;
-        const counts = window.GymVolumeLogic.weeklySetsByMuscle(gymState.exercises || [], gymState.logs || {}, wkMonday);
-        musclesToCheck.forEach(m => { weeklyCountsByMuscle[m].push(counts[m] || 0); });
-      }
-      const chronicFindings = musclesToCheck.map(m => {
-        const labels = weeklyCountsByMuscle[m].map(c => {
-          const band = window.GymVolumeLogic.classifyMuscleVolume(m, c, phase);
-          return band ? band.label : null;
-        });
-        const band = window.GymVolumeLogic.MUSCLE_BANDS[m];
-        return window.TrainingInsightEngine.detectChronicMuscleVolume(m, labels, band, observedWeeks);
-      }).filter(Boolean);
-      findings.push(...chronicFindings);
+      const built = buildInsightFindings(gymState, health, phase, nowRef);
+      const findings = built.findings;
+      const exposuresByName = built.exposuresByName;
+      const sessionDates = built.sessionDates;
+      const weeklySets = built.weeklySets;
 
       // Feed the gym coach -- see docs/superpowers/specs/
       // 2026-08-27-training-trajectory-coach-integration-design.md.
