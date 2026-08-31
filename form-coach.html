@@ -283,6 +283,7 @@ window.dispatchEvent(new Event('lift-camera-module-ready'));
   var recordingExerciseName = ''; // read at record-start, used by both the live-scoring interval and the stop branch
   var liveScoreInterval = null;
   var liveMinAmplitude = null; // frozen once calibrated, reset per recording -- see liveScoreTick
+  var liveCalPrev = null; // previous tick's { range, usedBenchmark } while calibrating, reset per recording
 
   // Form cues lookup (Coach tab split Part B, 2026-08-25) -- reuses
   // FormCoachLogic.matchBenchmark's proven fuzzy-match scoring (same
@@ -536,23 +537,16 @@ window.dispatchEvent(new Event('lift-camera-module-ready'));
     // zero threshold would disable the jitter filter for the rest of the
     // recording (found in review before push).
     //
-    // FIXED (Codex review, 2026-08-30): `range > 0` alone isn't a "real
-    // movement" guard -- ordinary MediaPipe landmark jitter while just
-    // standing still (not yet moving) is also nonzero, and would freeze
-    // an unusably tiny threshold that then reads jitter as real reps for
-    // the rest of the recording. Require a range large enough that it
-    // can't plausibly be jitter: angle-degree signals (a real matched
-    // benchmark) need real joint ROM to exceed jitter -- 10 degrees is
-    // well above typical landmark-jitter-driven angle noise (a few
-    // degrees) and well below any real tracked exercise's rep ROM
-    // (tens of degrees minimum). Y-position fallback signals are
-    // normalized 0-1 (fraction of frame height) -- 0.03 (3% of frame
-    // height) is well above typical sub-1% landmark jitter and well
-    // below any real rep's movement range.
+    // The freeze decision (real-movement floor + growth-plateau guard
+    // against a slow first rep freezing a partial-rep range) lives in
+    // FormCoachLogic.liveCalibrationThreshold so the selfcheck covers it.
+    // prevRange only carries over when the signal type didn't switch
+    // between ticks (angle degrees vs normalized Y aren't comparable).
     if (liveMinAmplitude === null) {
-      var MIN_REAL_RANGE = primary.usedBenchmark ? 10 : 0.03;
-      if (primary.range < MIN_REAL_RANGE) return;
-      liveMinAmplitude = primary.range * 0.15;
+      var prevRange = (liveCalPrev && liveCalPrev.usedBenchmark === primary.usedBenchmark) ? liveCalPrev.range : null;
+      liveMinAmplitude = window.FormCoachLogic.liveCalibrationThreshold(primary.range, primary.usedBenchmark, prevRange);
+      liveCalPrev = { range: primary.range, usedBenchmark: primary.usedBenchmark };
+      if (liveMinAmplitude === null) return;
     }
     var stabilitySamples = buildStabilitySamples(buffer);
     var fullScored = window.FormCoachLogic.scoreSet(primary.samples, stabilitySamples, liveMinAmplitude, primary.usedBenchmark ? matchedBenchmark : null);
@@ -575,6 +569,7 @@ window.dispatchEvent(new Event('lift-camera-module-ready'));
       recordBtn.className = 'fc-btn fc-btn-secondary';
       recordingExerciseName = document.getElementById('liftExerciseName').value.trim();
       liveMinAmplitude = null; // recalibrate fresh for this recording
+      liveCalPrev = null;
       liveScoreInterval = setInterval(liveScoreTick, 1500);
     } else {
       clearInterval(liveScoreInterval);

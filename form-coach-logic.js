@@ -437,6 +437,28 @@
   // result (computeSymmetry's or scoreSet's output) rather than reshaping
   // it, so this stays a thin adapter, not a second source of truth for
   // field names. nowIso is injectable for testing; defaults to real time.
+  // Decide whether to freeze the live jitter-filter threshold this tick.
+  // Returns range * 0.15, or null to keep waiting. Two guards:
+  // - real-movement floor (10deg angle / 0.03 normalized-Y): landmark
+  //   jitter alone can't clear it, so a still lifter never freezes.
+  // - growth plateau: the recording buffer is cumulative, so range only
+  //   grows; while a slow first rep's eccentric is still underway, range
+  //   grows tens of degrees per 1.5s tick. Freezing then would lock in a
+  //   partial-rep range and an unrepresentatively tight threshold (the
+  //   2026-08-30 documented limitation). Wait until growth since the
+  //   previous tick falls under a jitter-scale epsilon — i.e. the rep hit
+  //   its turnaround — before trusting the range. prevRange is null on
+  //   the first eligible tick (or after a signal-type switch), which also
+  //   waits: a single snapshot can't prove the range has plateaued.
+  function liveCalibrationThreshold(range, usedBenchmark, prevRange) {
+    var minRealRange = usedBenchmark ? 10 : 0.03;
+    if (range < minRealRange) return null;
+    var maxTickGrowth = usedBenchmark ? 2 : 0.006;
+    if (prevRange === null || prevRange === undefined) return null;
+    if (range - prevRange > maxTickGrowth) return null;
+    return range * 0.15;
+  }
+
   function buildHistoryRecord(type, data, nowIso) {
     var timestamp = nowIso || new Date().toISOString();
     if (type === 'posing') {
@@ -470,6 +492,7 @@
     scoreStability: scoreStability,
     scoreSet: scoreSet,
     scoreDepth: scoreDepth,
+    liveCalibrationThreshold: liveCalibrationThreshold,
     buildHistoryRecord: buildHistoryRecord
   };
   if (typeof window !== 'undefined') window.FormCoachLogic = api;

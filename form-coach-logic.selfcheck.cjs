@@ -370,4 +370,27 @@ assertEqual(FCL.buildHistoryRecord('bogus', {}), null, 'buildHistoryRecord: an u
 var autoStamped = FCL.buildHistoryRecord('posing', { pose: 'side-chest', holdTimeMs: 1500, symmetry: [] });
 assertEqual(typeof autoStamped.timestamp, 'string', 'buildHistoryRecord: timestamp defaults to a real ISO string when not injected');
 
+// liveCalibrationThreshold(range, usedBenchmark, prevRange) — decides
+// whether to freeze the live jitter-filter threshold this tick (returns
+// range * 0.15) or keep waiting (returns null). Buffer is cumulative so
+// range is non-decreasing across ticks; prevRange is last tick's range
+// (null on the first eligible tick).
+
+// Below the real-movement floor (10deg for angle signals) — never freeze.
+assertEqual(FCL.liveCalibrationThreshold(4, true, 4), null, 'liveCalibrationThreshold: sub-floor angle range (jitter) never freezes');
+assertEqual(FCL.liveCalibrationThreshold(0.01, false, 0.01), null, 'liveCalibrationThreshold: sub-floor Y range (jitter) never freezes');
+
+// Above the floor but still growing fast between ticks = mid-rep on a
+// slow eccentric — keep waiting instead of freezing a partial-rep range.
+assertEqual(FCL.liveCalibrationThreshold(25, true, 12), null, 'liveCalibrationThreshold: angle range still growing mid-rep does not freeze');
+assertEqual(FCL.liveCalibrationThreshold(0.12, false, 0.06), null, 'liveCalibrationThreshold: Y range still growing mid-rep does not freeze');
+
+// Above the floor with no prior tick to compare against — wait one tick
+// rather than trust a possibly-mid-rep snapshot.
+assertEqual(FCL.liveCalibrationThreshold(25, true, null), null, 'liveCalibrationThreshold: first eligible tick waits for a growth comparison');
+
+// Above the floor and plateaued (turnaround reached) — freeze at 15%.
+assertClose(FCL.liveCalibrationThreshold(90, true, 89), 13.5, 0.001, 'liveCalibrationThreshold: plateaued angle range freezes at 15%');
+assertClose(FCL.liveCalibrationThreshold(0.4, false, 0.398), 0.06, 0.0001, 'liveCalibrationThreshold: plateaued Y range freezes at 15%');
+
 console.log('form-coach-logic.selfcheck.cjs: all assertions passed');
