@@ -67,6 +67,19 @@ html, body {
 }
 
 /* ── Section tabs (top of page) ── */
+.mob-done-row {
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 16px;
+}
+.mob-done-btn {
+  padding: 10px 18px; border-radius: 10px;
+  font-size: 14px; font-weight: 600; font-family: inherit;
+  color: var(--text-1); background: rgba(110,231,183,0.10);
+  border: 1px solid rgba(110,231,183,0.30); cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.mob-done-btn:disabled { opacity: 0.5; cursor: default; }
+.mob-done-status { font-size: 13px; color: var(--text-3); }
 .mob-tabs {
   display: flex; gap: 6px; margin-bottom: 20px;
   overflow-x: auto; scrollbar-width: none;
@@ -285,6 +298,11 @@ html, body {
       <h1 class="mob-title">Mobility</h1>
       <div class="mob-subtitle">Joint care · warm-up · daily protocol</div>
     </div>
+  </div>
+
+  <div class="mob-done-row">
+    <button class="mob-done-btn" id="mobDoneBtn" type="button">Mark Today's Mobility Done ✓</button>
+    <span class="mob-done-status" id="mobDoneStatus"></span>
   </div>
 
   <!-- Top section tabs -->
@@ -1121,6 +1139,67 @@ html, body {
   legend.innerHTML = JOINTS.map(function (j) {
     return '<span style="color:' + j.color + '">● ' + j.label + '</span>';
   }).join('');
+})();
+</script>
+<script>
+(function () {
+  // ponytail: naive read-modify-write on the shared 'health' app_state row,
+  // not merge-aware like sync.js's mergeObjects (health.html's own
+  // initCloudSync instance uses that for its live two-way sync). Fine for
+  // one low-frequency button click; upgrade to a real initCloudSync
+  // instance here if this page ever needs live multi-tab sync too.
+  var STRETCH_KEY = 'health:stretching';
+
+  function getSupa() {
+    if (!window.supabase || !window.SUPABASE_CONFIG) return null;
+    return window.supabase.createClient(window.SUPABASE_CONFIG.URL, window.SUPABASE_CONFIG.KEY);
+  }
+
+  function todayKey() {
+    var d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+
+  var btn = document.getElementById('mobDoneBtn');
+  var status = document.getElementById('mobDoneStatus');
+  var today = todayKey();
+
+  function setDoneUI(isDone) {
+    btn.textContent = isDone ? 'Mobility Done Today ✓' : "Mark Today's Mobility Done ✓";
+    btn.disabled = isDone;
+    status.textContent = '';
+  }
+
+  var supa = getSupa();
+  if (!supa) return;
+
+  supa.from('app_state').select('data').eq('key', 'health').maybeSingle()
+    .then(function (res) {
+      var list = (res.data && res.data.data && Array.isArray(res.data.data[STRETCH_KEY])) ? res.data.data[STRETCH_KEY] : [];
+      setDoneUI(list.indexOf(today) !== -1);
+    })
+    .catch(function () {});
+
+  btn.addEventListener('click', function () {
+    btn.disabled = true;
+    status.textContent = 'Saving…';
+    supa.from('app_state').select('data').eq('key', 'health').maybeSingle()
+      .then(function (res) {
+        var data = (res.data && res.data.data) ? res.data.data : {};
+        var list = Array.isArray(data[STRETCH_KEY]) ? data[STRETCH_KEY] : [];
+        if (list.indexOf(today) === -1) list = list.concat([today]);
+        data[STRETCH_KEY] = list;
+        return supa.from('app_state').upsert(
+          { key: 'health', data: data, updated_at: new Date().toISOString() },
+          { onConflict: 'key' }
+        );
+      })
+      .then(function (res) {
+        if (res && res.error) { status.textContent = 'Failed to save — try again'; btn.disabled = false; return; }
+        setDoneUI(true);
+      })
+      .catch(function () { status.textContent = 'Failed to save — try again'; btn.disabled = false; });
+  });
 })();
 </script>
 </body>
