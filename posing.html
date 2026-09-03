@@ -674,6 +674,66 @@ html, body {
 </div>
 
 <script>
+(function () {
+  var FC_SUPABASE_URL = window.SUPABASE_CONFIG.URL;
+  var FC_SUPABASE_KEY = window.SUPABASE_CONFIG.KEY;
+  var FC_HISTORY_KEY = 'row:form-coach-history';
+  var fcSupa = null;
+
+  function getFcSupa() {
+    if (!fcSupa && window.supabase) fcSupa = window.supabase.createClient(FC_SUPABASE_URL, FC_SUPABASE_KEY);
+    return fcSupa;
+  }
+
+  // posing.html and form-coach.html load in separate sibling <iframe>s
+  // inside coach.html -- each its own JS scope. This object used to exist
+  // ONLY in form-coach.html, so every posing.html call to
+  // window.FormCoachHistory.logSession() silently no-op'd since the Coach
+  // tab split (39be819) -- every posing session's hold time/symmetry/AI
+  // critique was computed, shown once, and discarded, never reaching
+  // Supabase. Duplicated here rather than shared across iframes, matching
+  // the existing precedent: LiftCamera/PosingCamera are already
+  // deliberately independent per-iframe modules for the same reason. See
+  // docs/superpowers/specs/2026-09-03-row-live-posing-coach-history-design.md.
+  window.FormCoachHistory = {
+    logSession: function (type, data) {
+      var supa = getFcSupa();
+      if (!supa) return;
+      var record = window.FormCoachLogic.buildHistoryRecord(type, data);
+      if (!record) return;
+      supa.from('app_state').select('data').eq('key', FC_HISTORY_KEY).maybeSingle()
+        .then(function (res) {
+          var sessions = (res.data && res.data.data && Array.isArray(res.data.data.sessions)) ? res.data.data.sessions : [];
+          sessions.push(record);
+          return supa.from('app_state').upsert(
+            { key: FC_HISTORY_KEY, data: { sessions: sessions }, updated_at: new Date().toISOString() },
+            { onConflict: 'key' }
+          );
+        })
+        .then(function (res) {
+          if (res && res.error) console.warn('[form-coach-history] write failed:', res.error.message);
+        })
+        .catch(function (err) {
+          console.warn('[form-coach-history] write threw:', err && err.message);
+        });
+    },
+    // New: read-only, for the readiness check-in's per-pose hint. Fails
+    // open (empty array) on any error, same posture as logSession's own
+    // fire-and-forget write failure handling.
+    getSessions: function (type, limit) {
+      var supa = getFcSupa();
+      if (!supa) return Promise.resolve([]);
+      return supa.from('app_state').select('data').eq('key', FC_HISTORY_KEY).maybeSingle()
+        .then(function (res) {
+          var sessions = (res.data && res.data.data && Array.isArray(res.data.data.sessions)) ? res.data.data.sessions : [];
+          return sessions.filter(function (s) { return s.type === type; }).slice(-limit).reverse();
+        })
+        .catch(function () { return []; });
+    }
+  };
+})();
+</script>
+<script>
 (function() {
   // ── Section tab switching (Competition / Content) ──
   var tabs = document.querySelectorAll('.mob-tab-btn');
