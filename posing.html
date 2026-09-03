@@ -211,6 +211,7 @@ html, body {
   font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit;
 }
 .pose-log-list { display: flex; flex-direction: column; gap: 6px; }
+.pose-log-hint { font-size: 12px; color: var(--text-3); margin: -6px 0 8px 2px; min-height: 1em; }
 .pose-log-item {
   display: flex; justify-content: space-between; align-items: center;
   padding: 8px 10px; background: rgba(255,255,255,0.02);
@@ -294,17 +295,20 @@ html, body {
       <input id="readinessDate" type="date" class="pose-log-input" />
     </div>
     <div class="pose-log-row">
-      <input id="readinessPose1" type="text" placeholder="Pose 1" class="pose-log-input" />
+      <select id="readinessPose1" class="pose-log-input"><option value="">Pose 1</option></select>
       <select id="readinessScore1" class="pose-log-input"><option value="">Score</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select>
     </div>
+    <div id="readinessHint1" class="pose-log-hint"></div>
     <div class="pose-log-row">
-      <input id="readinessPose2" type="text" placeholder="Pose 2" class="pose-log-input" />
+      <select id="readinessPose2" class="pose-log-input"><option value="">Pose 2</option></select>
       <select id="readinessScore2" class="pose-log-input"><option value="">Score</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select>
     </div>
+    <div id="readinessHint2" class="pose-log-hint"></div>
     <div class="pose-log-row">
-      <input id="readinessPose3" type="text" placeholder="Pose 3" class="pose-log-input" />
+      <select id="readinessPose3" class="pose-log-input"><option value="">Pose 3</option></select>
       <select id="readinessScore3" class="pose-log-input"><option value="">Score</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select>
     </div>
+    <div id="readinessHint3" class="pose-log-hint"></div>
     <div class="pose-log-row">
       <input id="readinessNote" type="text" placeholder="Note (optional)" class="pose-log-input" />
       <button id="readinessAddBtn" class="pose-log-add-btn" type="button">+ Check in</button>
@@ -869,7 +873,12 @@ html, body {
     const listEl = document.getElementById('readinessList');
     listEl.innerHTML = list.slice().reverse().map((e) => {
       const avg = window.ReadinessIndexLogic.averageScore(e);
-      const scoresText = (e.scores || []).map((s) => s.pose + ': ' + s.score).join(', ');
+      // New entries store a POSE_CONFIGS slug (e.g. 'front-double-biceps');
+      // old entries (pre-picker) already have a human-typed string. Map
+      // known slugs to their label, fall back to the raw value otherwise --
+      // never breaks display of pre-existing history.
+      const poseLabel = (p) => (window.FormCoachLogic.POSE_CONFIGS[p] || {}).label || p;
+      const scoresText = (e.scores || []).map((s) => poseLabel(s.pose) + ': ' + s.score).join(', ');
       return '<div class="pose-log-item"><span>' + e.date +
         ' — ' + scoresText + (avg != null ? ' (avg ' + avg.toFixed(1) + ')' : '') +
         (e.note ? ' · ' + e.note : '') +
@@ -904,6 +913,42 @@ html, body {
   });
 
   renderReadinessLog();
+
+  // Pose picker for the readiness check-in, sourced from the same
+  // POSE_CONFIGS taxonomy the live camera uses (posing.html's own
+  // pose-picker chips do this too, further down this file) -- freeform
+  // text before this could never be joined to real session data by pose.
+  (function () {
+    var POSE_SLUGS = Object.keys(window.FormCoachLogic.POSE_CONFIGS);
+    [1, 2, 3].forEach(function (n) {
+      var select = document.getElementById('readinessPose' + n);
+      POSE_SLUGS.forEach(function (slug) {
+        var opt = document.createElement('option');
+        opt.value = slug;
+        opt.textContent = window.FormCoachLogic.POSE_CONFIGS[slug].label;
+        select.appendChild(opt);
+      });
+      select.addEventListener('change', function () {
+        var hintEl = document.getElementById('readinessHint' + n);
+        hintEl.textContent = '';
+        if (!select.value || !window.FormCoachHistory) return;
+        window.FormCoachHistory.getSessions('posing', 20).then(function (sessions) {
+          var match = sessions.find(function (s) { return s.pose === select.value; });
+          if (!match) return;
+          var days = Math.round((Date.now() - new Date(match.timestamp).getTime()) / 86400000);
+          var holdText = typeof match.holdTimeMs === 'number' ? (match.holdTimeMs / 1000).toFixed(1) + 's' : null;
+          var symText = (match.symmetry || [])
+            .filter(function (s) { return s.diffDeg !== null; })
+            .map(function (s) { return s.joint + ' ' + Math.abs(s.diffDeg) + '° ' + (s.diffDeg > 0 ? 'left higher' : s.diffDeg < 0 ? 'right higher' : 'even'); })
+            .join(', ');
+          var parts = [];
+          if (holdText) parts.push('held ' + holdText);
+          if (symText) parts.push(symText);
+          hintEl.textContent = 'Last practiced ' + (days === 0 ? 'today' : days + 'd ago') + (parts.length ? ' — ' + parts.join(', ') : '') + '.';
+        });
+      });
+    });
+  })();
 
   document.addEventListener('DOMContentLoaded', function () {
     if (typeof initCloudSync !== 'function') return;
