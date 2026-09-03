@@ -157,6 +157,12 @@ html, body {
   }
 
   window.FormCoachHistory = {
+    // ponytail: select->push->upsert races on the shared row if a second
+    // writer hits it concurrently -- posing.html now has its own copy of
+    // this exact object (2026-09-03, fixed a cross-iframe scope bug that
+    // had made it a no-op there), so this is no longer a single-writer
+    // situation. Logged, not fixed -- see posing.html's copy for the full
+    // note; real fix is a server-side atomic append, separate infra work.
     logSession: function (type, data) {
       var supa = getFcSupa();
       if (!supa) return;

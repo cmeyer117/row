@@ -700,6 +700,18 @@ html, body {
   // deliberately independent per-iframe modules for the same reason. See
   // docs/superpowers/specs/2026-09-03-row-live-posing-coach-history-design.md.
   window.FormCoachHistory = {
+    // ponytail: select->push->upsert is a read-modify-write race on the
+    // shared row -- two concurrent writers (e.g. two coach.html tabs/
+    // devices open at once, one on Posing one on Form) can lose one
+    // session silently. Pre-existing in form-coach.html's original; this
+    // duplicate inherits it verbatim. Was effectively unreachable before
+    // 2026-09-03 (posing.html's write silently no-op'd, so there was only
+    // ever one real writer) -- now that both write for real, a genuine
+    // collision is possible, though low-odds (same-page tab switches
+    // already stop the inactive camera first, so only cross-page/cross-
+    // device overlap can trigger it). Logged, not fixed: a real fix is a
+    // server-side atomic append (Postgres function or optimistic-
+    // concurrency retry), separate infra work from this feature.
     logSession: function (type, data) {
       var supa = getFcSupa();
       if (!supa) return;
