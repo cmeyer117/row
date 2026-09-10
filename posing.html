@@ -20,6 +20,7 @@
 <script src="readiness-index-logic.js" defer></script>
 <script src="posing-checklists.js" defer></script>
 <script src="form-coach-logic.js"></script>
+<script src="form-coach-history.js"></script>
 <style>
 :root {
   --bg: #000000;
@@ -700,37 +701,20 @@ html, body {
   // deliberately independent per-iframe modules for the same reason. See
   // docs/superpowers/specs/2026-09-03-row-live-posing-coach-history-design.md.
   window.FormCoachHistory = {
-    // ponytail: select->push->upsert is a read-modify-write race on the
-    // shared row -- two concurrent writers (e.g. two coach.html tabs/
-    // devices open at once, one on Posing one on Form) can lose one
-    // session silently. Pre-existing in form-coach.html's original; this
-    // duplicate inherits it verbatim. Was effectively unreachable before
-    // 2026-09-03 (posing.html's write silently no-op'd, so there was only
-    // ever one real writer) -- now that both write for real, a genuine
-    // collision is possible, though low-odds (same-page tab switches
-    // already stop the inactive camera first, so only cross-page/cross-
-    // device overlap can trigger it). Logged, not fixed: a real fix is a
-    // server-side atomic append (Postgres function or optimistic-
-    // concurrency retry), separate infra work from this feature.
+    // The actual write lives in form-coach-history.js (shared with
+    // form-coach.html's copy of this object): an optimistic-concurrency
+    // append that retries when another writer lands between read and
+    // write. This replaced a select->push->upsert that silently lost a
+    // session under two concurrent writers (Codex finding d8178df, fixed
+    // 2026-09-09).
     logSession: function (type, data) {
       var supa = getFcSupa();
       if (!supa) return;
       var record = window.FormCoachLogic.buildHistoryRecord(type, data);
       if (!record) return;
-      supa.from('app_state').select('data').eq('key', FC_HISTORY_KEY).maybeSingle()
-        .then(function (res) {
-          var sessions = (res.data && res.data.data && Array.isArray(res.data.data.sessions)) ? res.data.data.sessions : [];
-          sessions.push(record);
-          return supa.from('app_state').upsert(
-            { key: FC_HISTORY_KEY, data: { sessions: sessions }, updated_at: new Date().toISOString() },
-            { onConflict: 'key' }
-          );
-        })
-        .then(function (res) {
-          if (res && res.error) console.warn('[form-coach-history] write failed:', res.error.message);
-        })
+      window.FormCoachHistoryStore.appendSession(supa, record)
         .catch(function (err) {
-          console.warn('[form-coach-history] write threw:', err && err.message);
+          console.warn('[form-coach-history] write failed:', err && err.message);
         });
     },
     // New: read-only, for the readiness check-in's per-pose hint. Fails
