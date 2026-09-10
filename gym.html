@@ -3919,7 +3919,18 @@ img, video, canvas, svg { max-width: 100%; }
       // Sleep lookup only runs when it could actually matter -- no point
       // parsing health:sleep on a 'hold'/'down' result that this branch
       // never touches.
-      const sleepEntry = getSleepEntryForDate(dateKey);
+      //
+      // 09-10 fleet audit finding #8: this used to read the SAME dateKey as
+      // the pain/recovery checkin (last.date -- the previous session's
+      // date), which is correct for "how did I feel right after that
+      // session" but wrong for sleep. The reason text says "sleep was
+      // short/poor last night" -- that has to mean the night before TODAY'S
+      // workout, not the night before whenever this exercise was last
+      // trained (which can be days ago on a split program). The readiness
+      // card already gets this right (renderReadinessCard uses
+      // wtDateKey(new Date())) -- match it here so a bad night before today
+      // actually caps today's Rx instead of being silently ignored.
+      const sleepEntry = getSleepEntryForDate(wtDateKey(new Date()));
       const sleepPoor = window.GymSleepCheckLogic ? window.GymSleepCheckLogic.isPoorSleepEntry(sleepEntry) : false;
       const macroAdherencePoor = window.__gym.macroAdherencePoor;
       if (recoveryLow || sleepPoor || macroAdherencePoor) {

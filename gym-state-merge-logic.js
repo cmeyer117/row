@@ -88,7 +88,14 @@
     localObj = localObj || {};
     const merged = {};
     const allDates = new Set([...Object.keys(remoteObj), ...Object.keys(localObj)]);
-    const FIELDS = ['pain', 'recovery', 'pump', 'steps'];
+    // 09-10 fleet audit finding #4: persistCheckin() (gym.html) writes 4 more
+    // fields (the post-workout autopsy debrief) that this list never carried --
+    // every remote sync pull rebuilt checkins from this list alone, silently
+    // erasing rxSummary/deviationReason/deviationNote/suggestedChange even on a
+    // single device (the realtime echo stripped them, the stripped copy pushed
+    // back). Real data loss, invisible because the selfcheck only asserted the
+    // original 4 fields.
+    const FIELDS = ['pain', 'recovery', 'pump', 'steps', 'rxSummary', 'deviationReason', 'deviationNote', 'suggestedChange'];
     for (const dk of allDates) {
       const r = remoteObj[dk] || {};
       const l = localObj[dk] || {};

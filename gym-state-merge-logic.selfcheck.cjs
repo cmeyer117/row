@@ -78,22 +78,45 @@ assertEqual(
     { '2026-08-04': { pain: 'med', recovery: null, pump: null, steps: null } },
     { '2026-08-04': { pain: null, recovery: null, pump: null, steps: 9200 } }
   ),
-  { '2026-08-04': { pain: 'med', recovery: null, pump: null, steps: 9200 } },
+  { '2026-08-04': { pain: 'med', recovery: null, pump: null, steps: 9200, rxSummary: null, deviationReason: null, deviationNote: null, suggestedChange: null } },
   'remote pain and local-only steps both survive for the same day'
 );
 
 // A day present only locally (never synced) is not dropped.
 assertEqual(
   mergeCheckins({}, { '2026-08-04': { pain: 'low', recovery: null, pump: null, steps: null } }),
-  { '2026-08-04': { pain: 'low', recovery: null, pump: null, steps: null } },
+  { '2026-08-04': { pain: 'low', recovery: null, pump: null, steps: null, rxSummary: null, deviationReason: null, deviationNote: null, suggestedChange: null } },
   'local-only day is not erased by an empty remote checkins object'
 );
 
 // A day present only remotely (from another device) is picked up.
 assertEqual(
   mergeCheckins({ '2026-08-03': { pain: null, recovery: 'high', pump: null, steps: 7000 } }, {}),
-  { '2026-08-03': { pain: null, recovery: 'high', pump: null, steps: 7000 } },
+  { '2026-08-03': { pain: null, recovery: 'high', pump: null, steps: 7000, rxSummary: null, deviationReason: null, deviationNote: null, suggestedChange: null } },
   'remote-only day from another device is not lost'
+);
+
+// 09-10 fleet audit finding #4 (the actual regression): persistCheckin()
+// writes 4 autopsy debrief fields (rxSummary/deviationReason/deviationNote/
+// suggestedChange) that FIELDS never carried -- every remote sync pull
+// rebuilt checkins from a 4-field list, silently dropping them even on a
+// single device (the realtime echo stripped them, the stripped copy pushed
+// back). This must survive a round-trip like every other field.
+assertEqual(
+  mergeCheckins(
+    { '2026-08-05': { pain: null, recovery: null, pump: null, steps: null, rxSummary: 'On track, kept intensity high.', deviationReason: null, deviationNote: null, suggestedChange: null } },
+    {}
+  ),
+  { '2026-08-05': { pain: null, recovery: null, pump: null, steps: null, rxSummary: 'On track, kept intensity high.', deviationReason: null, deviationNote: null, suggestedChange: null } },
+  'autopsy debrief field (rxSummary) survives a merge instead of being silently dropped'
+);
+assertEqual(
+  mergeCheckins(
+    { '2026-08-05': { pain: null, recovery: null, pump: null, steps: null, rxSummary: null, deviationReason: 'joint_pain', deviationNote: 'Left shoulder', suggestedChange: 'Swap incline press' } },
+    {}
+  ),
+  { '2026-08-05': { pain: null, recovery: null, pump: null, steps: null, rxSummary: null, deviationReason: 'joint_pain', deviationNote: 'Left shoulder', suggestedChange: 'Swap incline press' } },
+  'all four autopsy debrief fields survive a merge together'
 );
 
 // Genuine same-field conflict: remote wins (no per-field timestamp to
@@ -104,7 +127,7 @@ assertEqual(
     { '2026-08-04': { pain: 'high', recovery: null, pump: null, steps: null } },
     { '2026-08-04': { pain: 'low', recovery: null, pump: null, steps: null } }
   ),
-  { '2026-08-04': { pain: 'high', recovery: null, pump: null, steps: null } },
+  { '2026-08-04': { pain: 'high', recovery: null, pump: null, steps: null, rxSummary: null, deviationReason: null, deviationNote: null, suggestedChange: null } },
   'genuine same-field conflict on the same day: remote wins'
 );
 
