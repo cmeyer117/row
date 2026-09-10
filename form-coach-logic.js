@@ -376,6 +376,41 @@
     });
   }
 
+  // Concentric velocity per rep (rom / concentric-phase duration) compared
+  // against the set's own EARLY-rep baseline, not the whole-set average --
+  // unlike romFlag/tempoFlag (see form-coach.html's renderLiveResult
+  // comment), a baseline fixed after the first baselineRepCount reps never
+  // shifts retroactively as later reps are added, so this field is safe to
+  // show live without a verdict flipping mid-set. flagPct default 0.8 (a
+  // 20% velocity drop) matches the velocity-loss threshold used in real
+  // strength-training auto-regulation research (Pareja-Blanco et al.).
+  // Baseline reps themselves get velocityPct/velocityFlag of null/false --
+  // there's nothing yet to compare them against.
+  function scoreVelocity(reps, baselineRepCount, flagPct) {
+    baselineRepCount = typeof baselineRepCount === 'number' ? baselineRepCount : 2;
+    flagPct = typeof flagPct === 'number' ? flagPct : 0.8;
+    if (!reps.length) return [];
+    var phases = reps.map(phaseDurations);
+    var velocities = reps.map(function (r, idx) {
+      var concentricMs = phases[idx].concentricMs;
+      return concentricMs > 0 ? r.rom / concentricMs : null;
+    });
+    var baselineSamples = velocities.slice(0, baselineRepCount).filter(function (v) { return v != null; });
+    var baseline = baselineSamples.length
+      ? baselineSamples.reduce(function (s, v) { return s + v; }, 0) / baselineSamples.length
+      : null;
+    return velocities.map(function (v, idx) {
+      var isBaselineRep = idx < baselineRepCount;
+      var pct = (!isBaselineRep && v != null && baseline) ? v / baseline : null;
+      return {
+        index: idx + 1,
+        concentricVelocity: v == null ? null : round2(v),
+        velocityPct: pct == null ? null : round2(pct),
+        velocityFlag: pct != null && pct < flagPct
+      };
+    });
+  }
+
   // stabilitySamples: [{t: ms, jitter: number}, ...] — per-frame
   // magnitude of a stability landmark's (e.g. hip midpoint) frame-to-
   // frame movement, supplied by the caller. Flags a rep whose average
@@ -406,6 +441,7 @@
     var reps = segmentReps(samples, minAmplitude);
     var romTempo = scoreReps(reps);
     var stability = scoreStability(stabilitySamples, reps);
+    var velocity = scoreVelocity(reps);
     return romTempo.map(function (r, idx) {
       var phases = phaseDurations(reps[idx]);
       var depth = scoreDepth(reps[idx], benchmark || null);
@@ -420,7 +456,10 @@
         tempoRatio: r.tempoRatio,
         tempoFlag: r.tempoFlag,
         avgJitter: stability[idx].avgJitter,
-        stabilityFlag: stability[idx].stabilityFlag
+        stabilityFlag: stability[idx].stabilityFlag,
+        concentricVelocity: velocity[idx].concentricVelocity,
+        velocityPct: velocity[idx].velocityPct,
+        velocityFlag: velocity[idx].velocityFlag
       };
       if (depth) {
         result.depthDeg = depth.depthDeg;
@@ -489,6 +528,7 @@
     phaseDurations: phaseDurations,
     totalTutMs: totalTutMs,
     scoreReps: scoreReps,
+    scoreVelocity: scoreVelocity,
     scoreStability: scoreStability,
     scoreSet: scoreSet,
     scoreDepth: scoreDepth,

@@ -450,6 +450,7 @@ window.dispatchEvent(new Event('lift-camera-module-ready'));
       if (r.romFlag) flags.push('<span class="fc-rep-flag">Short ROM</span>');
       if (r.tempoFlag) flags.push('<span class="fc-rep-flag">Rushed/bounced</span>');
       if (r.stabilityFlag) flags.push('<span class="fc-rep-flag">Unstable</span>');
+      if (r.velocityFlag) flags.push('<span class="fc-rep-flag">Velocity drop</span>');
       var tempoStr = formatSeconds(r.eccentricMs) + ' down / ' + formatSeconds(r.concentricMs) + ' up';
       var depthStr = ('depthMet' in r) ? (' — ' + r.depthDeg + '°/target ' + r.targetDeg + '° ' + (r.depthMet ? '✓' : '✗')) : '';
       return '<div class="fc-rep-row"><span>Rep ' + r.index + ' — ' + tempoStr + depthStr + '</span><span>' + (flags.join(' ') || 'Good') + '</span></div>';
@@ -513,14 +514,25 @@ window.dispatchEvent(new Event('lift-camera-module-ready'));
   // liveMinAmplitude is frozen -- confirmed stable via the Node trace
   // across multiple seeded-noise runs. The relative flags remain exactly
   // as they are today, shown only in renderResult() at Stop.
+  //
+  // velocityFlag is the one exception, shown live on purpose: unlike the
+  // flags above, it's baselined on only the set's first 2 reps (see
+  // scoreVelocity's comment in form-coach-logic.js), which never changes
+  // as later reps are added -- so a rep's verdict, once confirmed, cannot
+  // flip retroactively the way a whole-set-average flag could.
   function renderLiveResult(scored, exerciseName) {
+    var fatigueRep = scored.slice().reverse().find(function (r) { return r.velocityFlag; });
     var rows = scored.map(function (r) {
       var tempoStr = formatSeconds(r.eccentricMs) + ' down / ' + formatSeconds(r.concentricMs) + ' up';
       var depthStr = ('depthMet' in r) ? (' — ' + r.depthDeg + '°/target ' + r.targetDeg + '° ' + (r.depthMet ? '✓' : '✗')) : '';
-      return '<div class="fc-rep-row"><span>Rep ' + r.index + ' — ' + tempoStr + depthStr + '</span></div>';
+      var velocityStr = r.velocityFlag ? ' <span class="fc-rep-flag">Velocity drop</span>' : '';
+      return '<div class="fc-rep-row"><span>Rep ' + r.index + ' — ' + tempoStr + depthStr + velocityStr + '</span></div>';
     }).join('');
     var totalTut = window.FormCoachLogic.totalTutMs(scored);
-    resultEl.innerHTML = '<div class="mob-card"><div class="mob-card-body"><strong>' + escape(exerciseName || 'Set') + '</strong> — ' + scored.length + ' rep' + (scored.length === 1 ? '' : 's') + ' so far, ' + formatSeconds(totalTut) + ' TUT</div></div><div class="mob-card">' + rows + '<div class="fc-rep-row"><span style="color:var(--text-3);font-size:12px;">Full ROM/tempo/stability flags appear when you stop the set.</span></div></div>';
+    var banner = fatigueRep
+      ? '<div class="mob-card" style="border-color:var(--bad);"><div class="mob-card-body">⚠ Velocity dropped on rep ' + fatigueRep.index + ' — consider stopping this set.</div></div>'
+      : '';
+    resultEl.innerHTML = '<div class="mob-card"><div class="mob-card-body"><strong>' + escape(exerciseName || 'Set') + '</strong> — ' + scored.length + ' rep' + (scored.length === 1 ? '' : 's') + ' so far, ' + formatSeconds(totalTut) + ' TUT</div></div>' + banner + '<div class="mob-card">' + rows + '<div class="fc-rep-row"><span style="color:var(--text-3);font-size:12px;">Full ROM/tempo/stability flags appear when you stop the set.</span></div></div>';
   }
 
   function liveScoreTick() {
