@@ -2168,6 +2168,11 @@ img, video, canvas, svg { max-width: 100%; }
   flex: 1; min-width: 0;
 }
 .sub-option.is-active .sub-option-name { color: var(--good); }
+.sub-option-last {
+  font-size: 11px; font-weight: 400;
+  color: var(--text-3);
+  margin-top: 2px;
+}
 .sub-option-stars {
   font-size: 11px;
   color: var(--text-3);
@@ -3344,6 +3349,7 @@ img, video, canvas, svg { max-width: 100%; }
 <script src="voice-helpers.js"></script>
 <script src="stt-prompt-logic.js"></script>
 <script src="gym-workout-closeout-logic.js"></script>
+<script src="sub-history-logic.js"></script>
 <script src="training-trajectory-advisory.js"></script>
 <script>
 // ── Seed: bodyweight history (Apr 17 – Jun 10 2026) ──────────────────────────
@@ -4412,17 +4418,27 @@ img, video, canvas, svg { max-width: 100%; }
 
     document.getElementById('subModalTitle').textContent = ex.name;
 
+    // Per-variant last set (2026-09-09): the stars are the coach's rating,
+    // this is Carl's own history -- "what weight do I start at on the cable
+    // version?" Keyed '' for the primary, relative to the active session
+    // date so a back-dated log day reads correctly. Fails open to no line.
+    const variants = [null].concat(ex.subs.map(s => s.name));
+    const lastSets = window.SubHistoryLogic
+      ? window.SubHistoryLogic.lastSetPerVariant(state.logs[exId] || [], variants, getActiveDate())
+      : null;
+    const lastFor = v => lastSets ? window.SubHistoryLogic.formatLastSet(lastSets[v == null ? '' : v]) : null;
+
     const optionsEl = document.getElementById('subModalOptions');
     optionsEl.innerHTML = '';
-    optionsEl.appendChild(buildSubOption(null, ex.name + ' (primary)', null, subPickerSelected === null));
+    optionsEl.appendChild(buildSubOption(null, ex.name + ' (primary)', null, subPickerSelected === null, lastFor(null)));
     ex.subs.forEach(sub => {
-      optionsEl.appendChild(buildSubOption(sub.name, sub.name, sub.stars, subPickerSelected === sub.name));
+      optionsEl.appendChild(buildSubOption(sub.name, sub.name, sub.stars, subPickerSelected === sub.name, lastFor(sub.name)));
     });
 
     document.getElementById('subModalBg').classList.add('show');
   }
 
-  function buildSubOption(value, label, stars, isActive) {
+  function buildSubOption(value, label, stars, isActive, lastText) {
     const div = document.createElement('div');
     div.className = 'sub-option' + (isActive ? ' is-active' : '');
     div.dataset.value = value || '';
@@ -4430,6 +4446,12 @@ img, video, canvas, svg { max-width: 100%; }
     const nameEl = document.createElement('div');
     nameEl.className = 'sub-option-name';
     nameEl.textContent = label;
+    if (lastText) {
+      const lastEl = document.createElement('div');
+      lastEl.className = 'sub-option-last';
+      lastEl.textContent = lastText;
+      nameEl.appendChild(lastEl);
+    }
     div.appendChild(nameEl);
 
     if (stars !== null) {
