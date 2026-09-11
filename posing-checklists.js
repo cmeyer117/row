@@ -2,14 +2,17 @@
 // Pure data + fuzzy lookup, no DOM. Dual export like form-coach-logic.js so
 // this can be self-checked with plain `node` and also loaded as a <script>.
 //
-// Scope (2026-08-21 fleet ideation item 2.1): the 2-3 mandatory poses Carl
-// practices most — Front Double Biceps, Front Lat Spread, Side Chest. Front
-// Lat Spread is called out explicitly in posing.html's own rule banner as a
-// focus area (right-side shoulder mobility limits it), so it's practiced
-// more than the other 4 mandatory poses; Front Double Biceps and Side Chest
-// are the standard default-most-practiced pair. Extend CHECKLISTS with the
-// remaining poses using the same "What judges should see" section of the
-// source note when there's a reason to.
+// Scope (2026-08-21 fleet ideation item 2.1, extended 2026-09-11 per the
+// idea ledger's "Live Posing Coach" item): started with the 2-3 mandatory
+// poses Carl practices most — Front Double Biceps, Front Lat Spread, Side
+// Chest. Front Lat Spread is called out explicitly in posing.html's own
+// rule banner as a focus area (right-side shoulder mobility limits it), so
+// it's practiced more than the other 4 mandatory poses; Front Double Biceps
+// and Side Chest are the standard default-most-practiced pair. Extended
+// 2026-09-11 to cover all 7 poses form-coach-logic.js's POSE_CONFIGS tracks
+// live (Most Muscular has no live tracking, so no checklist entry either --
+// consistent with the "don't add what isn't tracked" scope, and covered by
+// this file's own selfcheck asserting it stays unmatched).
 //
 // Checklist items are copied verbatim from the "What judges should see"
 // bullet list for each pose in the ROW Competition Posing Manual
@@ -56,6 +59,54 @@
         'Hamstring, adductor and quad thickness',
         'Calf development',
         'Waist control and torso rotation'
+      ]
+    },
+    'side-triceps': {
+      label: 'Side Triceps',
+      names: ['side triceps', 'side-triceps'],
+      items: [
+        'Triceps size and separation',
+        'Delt and arm tie-in',
+        'Chest and serratus detail',
+        'Abdominal control',
+        'Hamstring, quad and calf presentation',
+        'Clean side silhouette'
+      ]
+    },
+    'back-double-biceps': {
+      label: 'Back Double Biceps',
+      names: ['back double biceps', 'back-double-biceps', 'double biceps back', 'bdb'],
+      items: [
+        'Back width and density',
+        'Left-right symmetry',
+        'Rear delts and arm peaks',
+        'Lower-back detail',
+        'Glute conditioning',
+        'Hamstring and calf balance'
+      ]
+    },
+    'back-lat-spread': {
+      label: 'Back Lat Spread',
+      names: ['back lat spread', 'back-lat-spread', 'lat spread back'],
+      items: [
+        'Lat width and symmetry',
+        'Taper from shoulders to waist',
+        'Back thickness beneath the spread',
+        'Glute-ham detail',
+        'Calf balance',
+        'Ability to expand without shrugging'
+      ]
+    },
+    'abdominal-thigh': {
+      label: 'Abdominal & Thigh',
+      names: ['abdominal and thigh', 'abdominal & thigh', 'abdominal-thigh', 'abs and thigh', 'ab and thigh'],
+      items: [
+        'Abdominal definition and symmetry',
+        'Serratus and oblique detail',
+        'Quad size and separation',
+        'Waist control',
+        'Chest-to-waist proportion',
+        'Overall conditioning'
       ]
     }
   };
