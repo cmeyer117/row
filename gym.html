@@ -4665,8 +4665,25 @@ img, video, canvas, svg { max-width: 100%; }
     const factorsLine = readiness.factors.length
       ? '<div class="po-checkin-row-label" style="opacity:0.7;font-size:0.85em;">' + readiness.factors.join(' · ') + '</div>'
       : '';
+    // Season↔readiness cross-post (see loadVesselSeason above) -- display
+    // only, no effect on the readiness level itself.
+    const seasonLine = (vesselSeasonCache && vesselSeasonCache.season)
+      ? '<div class="po-checkin-row-label" style="opacity:0.6;font-size:0.8em;">Vessel: ' + vesselSeasonCache.season + ' season</div>'
+      : '';
 
-    wrap.innerHTML = '<div class="po-checkin-row-label" style="font-weight:600;margin-bottom:6px;">Readiness — ' + readiness.label + '</div>' + factorsLine + sleepLine + checkinLine;
+    wrap.innerHTML = '<div class="po-checkin-row-label" style="font-weight:600;margin-bottom:6px;">Readiness — ' + readiness.label + '</div>' + factorsLine + seasonLine + sleepLine + checkinLine;
+
+    // Write side of the cross-post: Vessel reads this the same way this
+    // page just read vessel:spiritual_season. Fire-and-forget best-effort --
+    // renderReadinessCard is called synchronously from several places and
+    // must not become async just to await this.
+    if (pcSupa) {
+      pcSupa.from('app_state').upsert(
+        { key: 'row:readiness', data: { level: readiness.level, label: readiness.label, computedAt: new Date().toISOString() } },
+        { onConflict: 'key' }
+      ).then(function (res) { if (res && res.error) console.warn('row:readiness write failed:', res.error); })
+        .catch(function (e) { console.warn('row:readiness write failed:', e); });
+    }
     wireSleepQuickAdd();
   }
   function renderSleepQuickAdd() {
@@ -8176,6 +8193,26 @@ document.addEventListener('DOMContentLoaded', function () {
   // see docs/superpowers/specs/2026-08-27-training-trajectory-coach-integration-design.md
   // for the write side. Read-only, independent app_state key from the main
   // Row sync (APP_KEY) above; a failure here never blocks it.
+  // Season↔readiness cross-post (2026-09-11 pass, item A5): Vessel and Row
+  // share the same Supabase project/user identity and app_state table
+  // (vessel already reads Row's po-coach row the same way) -- this just
+  // adds the read going the other direction. Read-only, independent
+  // app_state key, same best-effort pattern as loadTrajectoryAdvisory
+  // above; a failure here never blocks the main sync.
+  let vesselSeasonCache = null;
+  async function loadVesselSeason() {
+    if (!pcSupa) return;
+    try {
+      const { data, error } = await pcSupa
+        .from('app_state').select('data').eq('key', 'vessel:spiritual_season').maybeSingle();
+      if (error || !data || !data.data) return;
+      vesselSeasonCache = data.data;
+      renderReadinessCard();
+    } catch (e) {
+      // best-effort -- the chip just doesn't show
+    }
+  }
+
   async function loadTrajectoryAdvisory() {
     if (!pcSupa || !window.TrainingTrajectoryAdvisory) return;
     try {
@@ -8307,6 +8344,7 @@ document.addEventListener('DOMContentLoaded', function () {
     });
     await pcPullRemote();
     loadTrajectoryAdvisory(); // best-effort, independent app_state key -- never blocks the main sync above
+    loadVesselSeason(); // best-effort, independent app_state key -- never blocks the main sync above
     pcSupa.channel('app_state_' + APP_KEY)
       .on('postgres_changes', {
         event: '*',
