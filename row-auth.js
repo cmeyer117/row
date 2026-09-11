@@ -31,6 +31,19 @@
   // in every caller (2026-08-13: root cause of "Could not reach Jarvis" on
   // gym.html's debrief -- the request never even left the browser, Vercel
   // logs showed zero invocations).
+  // A REJECTED promise also resolves to `fallback`, same as a timeout --
+  // deliberate, not an oversight. luna Codex pass (offline-first sync work)
+  // asked whether this could let a genuinely revoked/invalid refresh token
+  // reach the offline-retry overlay instead of forcing a real re-login.
+  // Verified against the installed @supabase/auth-js source directly
+  // (GoTrueClient.js's __loadSession()): a definitive invalid-refresh-token
+  // response from the server RESOLVES with { session: null, error } -- it
+  // does not reject the promise. That already routes correctly through
+  // ensure()'s own `if (got.data.session)` check straight to showLogin(),
+  // completely unaffected by this function. The reject branch here is only
+  // ever reached by a genuine transport failure (fetch throwing, DNS,
+  // network unreachable) -- exactly the "can't reach the server" case this
+  // function's fallback value is meant to represent.
   function withTimeout(promise, ms, fallback) {
     return new Promise(function (resolve) {
       var settled = false;
@@ -52,6 +65,22 @@
   // review catch, 2026-08-20: ensure() called getSession() with no
   // timeout at all, unlike getAccessToken() below which already had this
   // exact bound for the exact same reason).
+  // Offline-first sync (2026-09-11 idea ledger item): a TIMEOUT on
+  // getSession() overwhelmingly means a previously-cached token needed
+  // refreshing and the network call is hanging -- a genuinely new,
+  // never-authenticated device resolves near-instantly to session:null and
+  // routes to showLogin() instead, never hitting this path at all. That
+  // makes "Continue offline" here a safe, opt-in escape hatch, not a
+  // weakening of the login wall: it only ever appears for a device that has
+  // almost certainly been signed in before. Resolves with null, not a fake
+  // session -- every real caller either ignores ensure()'s resolved value
+  // (just awaits it as a gate) or separately calls getAccessToken() for an
+  // actual token, which already degrades to null offline on its own bound
+  // (see that function) -- so no caller can mistake this for a verified
+  // session. Local writes (sync.js) already work purely off localStorage
+  // regardless of auth state; this just lets the PAGE become visible so
+  // Carl can use them in a basement/dead zone instead of staring at a
+  // Retry-only dead end.
   function showOfflineRetry(retry) {
     return new Promise(function (resolve, reject) {
       var overlay = document.createElement('div');
@@ -60,8 +89,9 @@
       overlay.innerHTML =
         '<div style="width:100%;max-width:340px;padding:36px 30px;border-radius:20px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.04);display:flex;flex-direction:column;gap:12px;align-items:center;text-align:center;">' +
         '<div style="color:#FAFAFA;font-size:16px;font-weight:700;">Can&#39;t reach the server</div>' +
-        '<div style="color:rgba(250,250,250,0.6);font-size:13px;">Check your connection, then retry.</div>' +
+        '<div style="color:rgba(250,250,250,0.6);font-size:13px;">Check your connection, then retry -- or continue offline if you know you&#39;re out of signal. Local logging still works; it&#39;ll sync once you&#39;re back online.</div>' +
         '<button type="button" id="ra-offline-retry" style="padding:12px 20px;border-radius:12px;border:0;background:#FAFAFA;color:#0A0A0B;font-size:14px;font-weight:700;cursor:pointer;">Retry</button>' +
+        '<button type="button" id="ra-offline-continue" style="padding:8px 12px;border-radius:12px;border:0;background:none;color:rgba(250,250,250,0.5);font-size:13px;cursor:pointer;text-decoration:underline;">Continue offline</button>' +
         '</div>';
       appendWhenReady(overlay);
       overlay.querySelector('#ra-offline-retry').addEventListener('click', async function () {
@@ -77,6 +107,10 @@
         } catch (err) {
           reject(err);
         }
+      });
+      overlay.querySelector('#ra-offline-continue').addEventListener('click', function () {
+        overlay.remove();
+        resolve(null);
       });
     });
   }
@@ -156,10 +190,21 @@
         if (got.data.session && isOwner(got.data.session)) { markAuthed(); return got.data.session; }
         if (got.data.session) await supa.auth.signOut();
         return showLogin(supa);
-      })().catch(function (err) {
+      })();
+      _ensurePromise.catch(function (err) {
         _ensurePromise = null;
         throw err;
       });
+      // luna Codex catch (offline-first sync work): a "Continue offline"
+      // resolution (null, not a real session) must ALSO clear the cache --
+      // otherwise every later call for the rest of the page's lifetime
+      // keeps returning that same cached null, even once connectivity
+      // genuinely returns. Row's own sync.js doesn't depend on this cache
+      // (it creates its own independent Supabase client, unaffected), but
+      // any other future caller of ensure() should still get a real retry,
+      // not a permanently-stuck offline state -- same fix as Vessel's
+      // equivalent, for consistency and defense-in-depth.
+      _ensurePromise.then(function (result) { if (result === null) _ensurePromise = null; });
       return _ensurePromise;
     },
     // Real session token for server-side verifyOwner() checks (paid-API

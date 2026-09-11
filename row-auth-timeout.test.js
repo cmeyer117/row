@@ -28,13 +28,19 @@ const OWNER_SESSION = {
   data: { session: { user: { email: 'carl.meyer.business@gmail.com' }, access_token: 'tok123' } },
 };
 
-// Minimal DOM stub for ensure()'s offline-retry overlay -- captures the
-// Retry button's click handler so the test can invoke it directly instead
-// of needing a real DOM/click simulation.
+// Minimal DOM stub for ensure()'s offline-retry overlay -- captures BOTH
+// buttons' click handlers, keyed by selector (a real querySelector) so the
+// test can invoke either directly instead of needing a real DOM/click
+// simulation. Was a single shared stub before the "Continue offline" button
+// existed -- with two buttons, a shared stub would have let the second
+// addEventListener call silently clobber the first's handler.
 function makeAuthWithDom(getSessionImpl) {
-  let retryHandler = null;
-  const btnStub = { addEventListener: (evt, fn) => { retryHandler = fn; } };
-  const overlayStub = { style: {}, innerHTML: '', querySelector: () => btnStub, remove: () => {} };
+  const handlers = {};
+  const overlayStub = {
+    style: {}, innerHTML: '',
+    querySelector: (sel) => ({ addEventListener: (evt, fn) => { handlers[sel] = fn; } }),
+    remove: () => {},
+  };
   const sandbox = {
     window: {
       supabase: { createClient: () => ({ auth: { getSession: getSessionImpl, signOut: () => Promise.resolve() } }) },
@@ -46,7 +52,11 @@ function makeAuthWithDom(getSessionImpl) {
   };
   vm.createContext(sandbox);
   vm.runInContext(source, sandbox);
-  return { RowAuth: sandbox.window.RowAuth, triggerRetry: () => retryHandler() };
+  return {
+    RowAuth: sandbox.window.RowAuth,
+    triggerRetry: () => handlers['#ra-offline-retry'](),
+    triggerContinueOffline: () => handlers['#ra-offline-continue'](),
+  };
 }
 
 const cases = [];
@@ -138,6 +148,45 @@ async function run() {
     const session = await RowAuth.ensure();
     cases.push(['ensure(): a new call after a rejected retry tries again and can still succeed', session.user.email === 'carl.meyer.business@gmail.com']);
     cases.push(['ensure(): getSession called exactly 3 times -- hang, failed retry, fresh success', callCount === 3]);
+  }
+
+  // Offline-first sync (2026-09-11 idea ledger item): "Continue offline"
+  // resolves ensure() with null -- never a fake session -- letting the page
+  // become visible for local-only logging without pretending auth
+  // succeeded. Real callers either ignore ensure()'s resolved value (just
+  // await it as a gate) or separately call getAccessToken(), which already
+  // degrades to null offline on its own independent bound.
+  {
+    const { RowAuth, triggerContinueOffline } = makeAuthWithDom(() => new Promise(() => {})); // permanently hung
+    const ensurePromise = RowAuth.ensure();
+    await new Promise((resolve) => setTimeout(resolve, 10200)); // past the 10s bound
+    triggerContinueOffline();
+    const session = await ensurePromise;
+    cases.push(['ensure(): Continue offline resolves with null, not a fake session', session === null]);
+  }
+
+  // luna Codex catch: a null (offline-continue) resolution must clear
+  // _ensurePromise too, same as a rejection already does -- otherwise every
+  // later ensure() call for the rest of the page's lifetime keeps returning
+  // that same cached null, even once connectivity genuinely returns.
+  {
+    let callCount = 0;
+    const { RowAuth, triggerContinueOffline } = makeAuthWithDom(() => {
+      callCount++;
+      // First call hangs (forces the offline-retry overlay); a LATER,
+      // separate ensure() call (simulating connectivity having returned)
+      // succeeds immediately.
+      return callCount === 1 ? new Promise(() => {}) : Promise.resolve(OWNER_SESSION);
+    });
+    const firstEnsure = RowAuth.ensure();
+    await new Promise((resolve) => setTimeout(resolve, 10200));
+    triggerContinueOffline();
+    const firstResult = await firstEnsure;
+    cases.push(['ensure(): first call resolves null after Continue offline', firstResult === null]);
+
+    const secondResult = await RowAuth.ensure();
+    cases.push(['ensure(): a later call after Continue offline re-attempts real auth instead of returning the same cached null', secondResult !== null && secondResult.user.email === 'carl.meyer.business@gmail.com']);
+    cases.push(['ensure(): getSession called exactly twice -- the hang, then a fresh real attempt', callCount === 2]);
   }
 
   let failed = 0;
