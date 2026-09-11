@@ -111,6 +111,9 @@ html, body {
   </div>
 
   <button class="fc-btn fc-btn-primary" id="recordSetBtn" type="button">Record Set</button>
+  <label class="fc-voice-toggle" style="display:flex;align-items:center;gap:6px;margin:8px 0;font-size:13px;color:var(--text-2);">
+    <input type="checkbox" id="voiceCoachToggle"> 🔊 Voice cue on velocity drop
+  </label>
   <div id="liftResult"></div>
 
   <div class="mob-divider"></div>
@@ -282,6 +285,18 @@ window.dispatchEvent(new Event('lift-camera-module-ready'));
   var liveScoreInterval = null;
   var liveMinAmplitude = null; // frozen once calibrated, reset per recording -- see liveScoreTick
   var liveCalPrev = null; // previous tick's { range, usedBenchmark } while calibrating, reset per recording
+  var lastSpokenVelocityFlagIndex = null; // one-way latch: null until the first velocity-flag cue speaks this recording, then never re-fires -- reset per recording, see recordBtn handler
+
+  var voiceCoachToggle = document.getElementById('voiceCoachToggle');
+  // Private-browsing/storage-restricted contexts can throw on localStorage
+  // access -- degrading to "toggle doesn't persist, defaults to off" is an
+  // acceptable failure mode here (see design spec's toggle section).
+  try {
+    voiceCoachToggle.checked = localStorage.getItem('row:voice-coach-enabled') === '1';
+  } catch (e) {}
+  voiceCoachToggle.addEventListener('change', function () {
+    try { localStorage.setItem('row:voice-coach-enabled', voiceCoachToggle.checked ? '1' : '0'); } catch (e) {}
+  });
 
   // Form cues lookup (Coach tab split Part B, 2026-08-25) -- reuses
   // FormCoachLogic.matchBenchmark's proven fuzzy-match scoring (same
@@ -514,6 +529,10 @@ window.dispatchEvent(new Event('lift-camera-module-ready'));
   // flip retroactively the way a whole-set-average flag could.
   function renderLiveResult(scored, exerciseName) {
     var fatigueRep = scored.slice().reverse().find(function (r) { return r.velocityFlag; });
+    if (fatigueRep && voiceCoachToggle.checked && lastSpokenVelocityFlagIndex === null) {
+      lastSpokenVelocityFlagIndex = fatigueRep.index; // set before speak() -- defensive ordering
+      window.RowVoice.speak('Velocity dropping on rep ' + fatigueRep.index);
+    }
     var rows = scored.map(function (r) {
       var tempoStr = formatSeconds(r.eccentricMs) + ' down / ' + formatSeconds(r.concentricMs) + ' up';
       var depthStr = ('depthMet' in r) ? (' — ' + r.depthDeg + '°/target ' + r.targetDeg + '° ' + (r.depthMet ? '✓' : '✗')) : '';
@@ -580,6 +599,7 @@ window.dispatchEvent(new Event('lift-camera-module-ready'));
       recordingExerciseName = document.getElementById('liftExerciseName').value.trim();
       liveMinAmplitude = null; // recalibrate fresh for this recording
       liveCalPrev = null;
+      lastSpokenVelocityFlagIndex = null; // fresh latch for this recording
       liveScoreInterval = setInterval(liveScoreTick, 1500);
     } else {
       clearInterval(liveScoreInterval);
