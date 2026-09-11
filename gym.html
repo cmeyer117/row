@@ -4650,11 +4650,23 @@ img, video, canvas, svg { max-width: 100%; }
       checkinLine = '<div class="po-checkin-row-label">No checkin yet</div>';
     }
 
-    const sleepPoor = window.GymSleepCheckLogic ? window.GymSleepCheckLogic.isPoorSleepEntry(todaySleep) : false;
-    const checkinPoor = !!checkin && (checkin.recovery === 'low' || checkin.pain === 'high');
-    const tag = (sleepPoor || checkinPoor) ? 'Watch it' : 'Good';
+    // 09-10 fleet audit Tier-2 build: unifies sleep + the pain/recovery/pump
+    // checkin into one graduated level (rest/caution/ready/primed) instead
+    // of the old binary Good/Watch-it tag, which only checked
+    // (sleepPoor || checkinPoor) and threw away everything else the two
+    // signals could tell you together. Pure logic lives in
+    // gym-daily-readiness-logic.js -- this just renders it. Does not change
+    // getRx()/applyCheckinOverride()'s actual Rx decision, only what's
+    // shown here -- see that file's own header comment for why.
+    const isPoorSleepFn = window.GymSleepCheckLogic ? window.GymSleepCheckLogic.isPoorSleepEntry : null;
+    const readiness = window.GymDailyReadinessLogic
+      ? window.GymDailyReadinessLogic.computeDailyReadiness(todaySleep, checkin, isPoorSleepFn)
+      : { level: 'ready', label: 'Ready', factors: [] };
+    const factorsLine = readiness.factors.length
+      ? '<div class="po-checkin-row-label" style="opacity:0.7;font-size:0.85em;">' + readiness.factors.join(' · ') + '</div>'
+      : '';
 
-    wrap.innerHTML = '<div class="po-checkin-row-label" style="font-weight:600;margin-bottom:6px;">Readiness — ' + tag + '</div>' + sleepLine + checkinLine;
+    wrap.innerHTML = '<div class="po-checkin-row-label" style="font-weight:600;margin-bottom:6px;">Readiness — ' + readiness.label + '</div>' + factorsLine + sleepLine + checkinLine;
     wireSleepQuickAdd();
   }
   function renderSleepQuickAdd() {
@@ -7635,6 +7647,7 @@ img, video, canvas, svg { max-width: 100%; }
 <script src="gym-rx-deload-logic.js"></script>
 <script src="gym-peak-phase-logic.js"></script>
 <script src="gym-sleep-check-logic.js"></script>
+<script src="gym-daily-readiness-logic.js"></script>
 <script src="gym-bonus-templates-logic.js"></script>
 <script src="gym-debrief-logic.js"></script>
 <script src="gym-season-logic.js"></script>
