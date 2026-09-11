@@ -4992,6 +4992,47 @@ img, video, canvas, svg { max-width: 100%; }
     }
   }
   function isRestName(name) { return /^rest\b/i.test(name || ''); }
+
+  // Progression prescriber cross-post (2026-09-11 idea ledger item, Jarvis's
+  // morning brief) -- deliberately reuses getRx() itself rather than
+  // reimplementing any of its math elsewhere: getRx already applies phase
+  // adjustments, check-in overrides (pain/recovery/sleep), deload/stuck
+  // detection and RIR awareness, and this is exactly the risk of a parallel
+  // implementation drifting from the one Row actually uses to prescribe
+  // load. Writing Row's own real Rx output for today's exercises to
+  // app_state (same "compute here, read there" pattern as row:readiness
+  // and row:training_trajectory) means Jarvis's morning brief can only ever
+  // relay what Row itself would say, never a second opinion that could be
+  // wrong in a training-load-affecting way.
+  function computeNextTargets() {
+    try {
+      const split = todaySplit();
+      if (isRestName(split.name)) return [];
+      // split.name is a display name ("Push"); state.exercises[].day holds
+      // the lowercase id ("push") -- same mismatch dayIdForSplitName()
+      // exists to resolve elsewhere in this file (defined a little further
+      // down; hoisted function declaration, safe to call from here).
+      const dayId = dayIdForSplitName(split.name);
+      if (!dayId) return [];
+      const todaysExercises = (state.exercises || []).filter(function (e) { return e.day === dayId; });
+      return todaysExercises.map(function (ex) {
+        const logs = (state.logs[ex.id] || []).slice().sort(function (a, b) { return a.date.localeCompare(b.date); });
+        if (!logs.length) return null;
+        const rx = getRx(ex, logs);
+        if (!rx) return null;
+        return {
+          name: ex.name,
+          type: rx.type,
+          weight: rx.bw ? null : rx.weight,
+          reps: rx.reps,
+          tag: rx.tag,
+          reason: rx.reason,
+        };
+      }).filter(Boolean);
+    } catch (e) {
+      return [];
+    }
+  }
   // state.splitRotation already holds display names ("Push", "Legs A", ...)
   // sourced from CONFIG.days[].name — state.exercises[].day uses the
   // lowercase ids ("push", "legsA") instead, so look the id up via
@@ -8345,6 +8386,21 @@ document.addEventListener('DOMContentLoaded', function () {
     await pcPullRemote();
     loadTrajectoryAdvisory(); // best-effort, independent app_state key -- never blocks the main sync above
     loadVesselSeason(); // best-effort, independent app_state key -- never blocks the main sync above
+
+    // Progression prescriber write side (see computeNextTargets above).
+    // Best-effort, fire-and-forget, independent app_state key -- runs once
+    // per page load after the main pull above. luna Codex catch: this is a
+    // PUBLISHED snapshot, not a live value -- Jarvis's morning brief sees
+    // whatever this was the last time Row was opened, not necessarily what
+    // Row would compute right now (a check-in logged since would change the
+    // real Rx). morning-brief.ts gates on computedAt's own staleness.
+    if (pcSupa) {
+      pcSupa.from('app_state').upsert(
+        { key: 'row:next_targets', data: { targets: computeNextTargets(), computedAt: new Date().toISOString() } },
+        { onConflict: 'key' }
+      ).then(function (res) { if (res && res.error) console.warn('row:next_targets write failed:', res.error); })
+        .catch(function (e) { console.warn('row:next_targets write failed:', e); });
+    }
     pcSupa.channel('app_state_' + APP_KEY)
       .on('postgres_changes', {
         event: '*',
