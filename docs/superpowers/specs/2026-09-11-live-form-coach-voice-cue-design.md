@@ -27,13 +27,18 @@ A checkbox near the record button, labeled "🔊 Voice cue on velocity drop," de
 Inside `renderLiveResult()` (or immediately after its call in `liveScoreTick()` — implementation's choice, whichever keeps the function's existing single responsibility clean), after `fatigueRep` is found:
 
 ```
-if (fatigueRep && voiceCoachEnabled && lastSpokenVelocityFlagIndex === null) {
-  lastSpokenVelocityFlagIndex = fatigueRep.index; // set before speak() -- defensive ordering, no reliance on speak()'s own timing
-  window.RowVoice.speak('Velocity dropping on rep ' + fatigueRep.index);
+if (voiceCoachEnabled && lastSpokenVelocityFlagIndex === null) {
+  var firstFlaggedRep = scored.find(function (r) { return r.velocityFlag; }); // forward find -- the FIRST flagged rep, deliberately not fatigueRep (which is reverse-found, the LATEST)
+  if (firstFlaggedRep) {
+    lastSpokenVelocityFlagIndex = firstFlaggedRep.index; // set before speak() -- defensive ordering, no reliance on speak()'s own timing
+    window.RowVoice.speak('Velocity dropping on rep ' + firstFlaggedRep.index);
+  }
 }
 ```
 
-**Correction (Codex review, 2026-09-11):** the first draft used `fatigueRep.index > lastSpokenVelocityFlagIndex`, which does NOT fire exactly once — it re-fires on every tick where a *later* rep becomes the new most-recent flagged rep (e.g. rep 3 flagged → speak, latch=3; rep 4 also flags on a later tick → `4 > 3` → speaks again). The corrected guard is a strict null-check: once `lastSpokenVelocityFlagIndex` is set to anything (not null), no further cue speaks for the rest of this recording, regardless of which rep is later found as `fatigueRep`. This is what actually matches Carl's pick of "once per set, first flag only."
+**Correction (Codex review, 2026-09-11, first pass):** the first draft used `fatigueRep.index > lastSpokenVelocityFlagIndex`, which does NOT fire exactly once — it re-fires on every tick where a *later* rep becomes the new most-recent flagged rep (e.g. rep 3 flagged → speak, latch=3; rep 4 also flags on a later tick → `4 > 3` → speaks again). Fixed to a strict null-check: once `lastSpokenVelocityFlagIndex` is set to anything (not null), no further cue speaks for the rest of this recording.
+
+**Correction (Codex review, 2026-09-11, second pass, on the committed implementation):** the fix above still reused `fatigueRep` — `renderLiveResult`'s existing reverse-found "most recent flagged rep," used for the visual banner — as the rep to announce. That's the wrong rep for the voice cue specifically: if a single tick catches multiple newly-flagged reps at once (a fast/short set, or a slow tick), `fatigueRep` would be the *latest* of them, not the *first* one that actually crossed the threshold — contradicting this section's own title. Fixed by adding a separate forward `find()` (`firstFlaggedRep`) used only for the voice-cue decision; `fatigueRep` is untouched and still drives the visual banner exactly as before.
 
 ### 4. Cue text: plain and factual
 

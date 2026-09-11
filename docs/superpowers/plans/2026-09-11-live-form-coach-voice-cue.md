@@ -105,12 +105,24 @@ Replace with:
 ```javascript
   function renderLiveResult(scored, exerciseName) {
     var fatigueRep = scored.slice().reverse().find(function (r) { return r.velocityFlag; });
-    if (fatigueRep && voiceCoachToggle.checked && lastSpokenVelocityFlagIndex === null) {
-      lastSpokenVelocityFlagIndex = fatigueRep.index; // set before speak() -- defensive ordering
-      window.RowVoice.speak('Velocity dropping on rep ' + fatigueRep.index);
+    // Deliberately a separate forward find() from fatigueRep above (which is
+    // the LATEST flagged rep, used for the visual banner) -- the voice cue
+    // must announce the FIRST rep that ever flagged, not whichever one this
+    // tick happens to find last. Same array, different selection: a tick
+    // that catches multiple newly-flagged reps at once (a fast/short set, or
+    // a slow tick) would otherwise announce a later rep number than the one
+    // that actually first crossed the threshold (Codex review, 2026-09-11).
+    if (voiceCoachToggle.checked && lastSpokenVelocityFlagIndex === null) {
+      var firstFlaggedRep = scored.find(function (r) { return r.velocityFlag; });
+      if (firstFlaggedRep) {
+        lastSpokenVelocityFlagIndex = firstFlaggedRep.index; // set before speak() -- defensive ordering
+        window.RowVoice.speak('Velocity dropping on rep ' + firstFlaggedRep.index);
+      }
     }
     var rows = scored.map(function (r) {
 ```
+
+**Post-execution note (Codex review, 2026-09-11, on the committed implementation):** this Step 4 code block was updated from what was originally planned (which reused `fatigueRep` directly) after Codex's review of the actual commit caught that `fatigueRep` is the reverse-found *latest* flagged rep, not the first — wrong for a voice cue meant to announce whichever rep first crossed the threshold. See the design spec's own "second pass" correction note for the full explanation.
 
 - [ ] **Step 5: Live browser trace verification**
 

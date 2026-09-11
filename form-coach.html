@@ -529,9 +529,19 @@ window.dispatchEvent(new Event('lift-camera-module-ready'));
   // flip retroactively the way a whole-set-average flag could.
   function renderLiveResult(scored, exerciseName) {
     var fatigueRep = scored.slice().reverse().find(function (r) { return r.velocityFlag; });
-    if (fatigueRep && voiceCoachToggle.checked && lastSpokenVelocityFlagIndex === null) {
-      lastSpokenVelocityFlagIndex = fatigueRep.index; // set before speak() -- defensive ordering
-      window.RowVoice.speak('Velocity dropping on rep ' + fatigueRep.index);
+    // Deliberately a separate forward find() from fatigueRep above (which is
+    // the LATEST flagged rep, used for the visual banner) -- the voice cue
+    // must announce the FIRST rep that ever flagged, not whichever one this
+    // tick happens to find last. Same array, different selection: a tick
+    // that catches multiple newly-flagged reps at once (a fast/short set, or
+    // a slow tick) would otherwise announce a later rep number than the one
+    // that actually first crossed the threshold (Codex review, 2026-09-11).
+    if (voiceCoachToggle.checked && lastSpokenVelocityFlagIndex === null) {
+      var firstFlaggedRep = scored.find(function (r) { return r.velocityFlag; });
+      if (firstFlaggedRep) {
+        lastSpokenVelocityFlagIndex = firstFlaggedRep.index; // set before speak() -- defensive ordering
+        window.RowVoice.speak('Velocity dropping on rep ' + firstFlaggedRep.index);
+      }
     }
     var rows = scored.map(function (r) {
       var tempoStr = formatSeconds(r.eccentricMs) + ' down / ' + formatSeconds(r.concentricMs) + ' up';
