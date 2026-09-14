@@ -13,7 +13,7 @@ const source = readFileSync(new URL('./form-coach-history.js', import.meta.url),
 const sandbox = { window: {} };
 vm.createContext(sandbox);
 vm.runInContext(source, sandbox);
-const { appendSession, HISTORY_KEY, MAX_TRIES } = sandbox.window.FormCoachHistoryStore;
+const { appendSession, HISTORY_KEY, MAX_TRIES, MAX_SESSIONS } = sandbox.window.FormCoachHistoryStore;
 
 // Minimal supabase-js v2 shape for exactly the calls appendSession makes.
 // `store.row` is the single app_state row (or null). `onRead` fires after
@@ -124,4 +124,17 @@ function otherWriterAppends(id) {
   assert.equal(n, MAX_TRIES);
 }
 
-console.log('form-coach-history: all 6 passed');
+// 7. append past MAX_SESSIONS drops the oldest entry, not the newest
+{
+  const full = [];
+  for (let i = 0; i < MAX_SESSIONS; i++) full.push({ id: 'old' + i });
+  const store = { row: { key: HISTORY_KEY, data: { sessions: full }, updated_at: 'T1' } };
+  const r = await appendSession(fakeSupa(store), { id: 'new' });
+  assert.equal(r.ok, true);
+  const ids = sessionsOf(store);
+  assert.equal(ids.length, MAX_SESSIONS);
+  assert.equal(ids[0], 'old1', 'oldest entry (old0) was dropped');
+  assert.equal(ids[ids.length - 1], 'new', 'newest entry survives');
+}
+
+console.log('form-coach-history: all 7 passed');

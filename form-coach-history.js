@@ -17,6 +17,7 @@
 (function () {
   var HISTORY_KEY = 'row:form-coach-history';
   var MAX_TRIES = 4; // ponytail: bounded retry, no backoff -- contention is two humans tapping "end session" within the same ~200ms
+  var MAX_SESSIONS = 200; // ponytail: fixed cap, no pruning-by-age -- add if the list ever needs more history
 
   function appendSession(supa, record, tries) {
     tries = tries || 1;
@@ -30,6 +31,7 @@
         var row = res.data;
         var sessions = (row && row.data && Array.isArray(row.data.sessions)) ? row.data.sessions.slice() : [];
         sessions.push(record);
+        sessions = sessions.slice(-MAX_SESSIONS);
         var data = { sessions: sessions };
         var now = new Date().toISOString();
 
@@ -51,7 +53,7 @@
       });
   }
 
-  var api = { appendSession: appendSession, HISTORY_KEY: HISTORY_KEY, MAX_TRIES: MAX_TRIES };
+  var api = { appendSession: appendSession, HISTORY_KEY: HISTORY_KEY, MAX_TRIES: MAX_TRIES, MAX_SESSIONS: MAX_SESSIONS };
   if (typeof window !== 'undefined') window.FormCoachHistoryStore = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })();
