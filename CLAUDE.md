@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Shared checkout — concurrent-session risk
+
+`C:\Users\gregm\row` is a native clone, not a per-session worktree — Drive-side worktree sessions fall back here for Node/npm/git execution, and multiple concurrent sessions can and do write to it at once (confirmed collision 2026-08-19: another session stashed this session's uncommitted work mid-edit). Before starting work: `git log -3 --oneline` + `git status` + `git stash list`. Before every commit: `git diff --cached --stat` (not just `git status --short`) to confirm exactly what's staged — never a bare `git add .`/`-A`. Before every push: `git log --oneline -3 origin/master..HEAD`. Treat any surprise in any of these as stop-and-inspect, not something to push through. Full incident history: `feedback-check-shared-clone-before-building.md` in Claude's global memory.
+
 ## Continuity — corrected 2026-07-20
 
 The Memory Sync Rule, Context Window Rule, Token Efficiency mandatory-skill-preload list, and `TASK_STATE.json` checkpoint pattern that used to live in this section were all stale: `carl-meyer-context-backup.md`/`-v2.md` was replaced by `HANDOFF.md` back on 2026-06-17, and this repo's own `PROJECT_REGISTRY.md`/`TASK_STATE.json` haven't had real content updates since 2026-06-16 (`TASK_STATE.json` describes an unrelated, already-finished "Second Brain" knowledge-base rebuild, not Row app work). None of it matched how sessions actually run in this workspace.
