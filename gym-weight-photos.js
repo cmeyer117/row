@@ -26,7 +26,8 @@
     } catch (e) { return []; }
   }
   function wtSave(arr) {
-    try { localStorage.setItem(WT_KEY, JSON.stringify(arr)); } catch (e) {}
+    try { localStorage.setItem(WT_KEY, JSON.stringify(arr)); return true; }
+    catch (e) { return false; }
   }
   function wtDateKey(d) {
     return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
@@ -55,7 +56,7 @@
     const existing = wtEntries.find(e => e.dateKey === key);
     if (existing) existing.weight = weight;
     else { wtEntries.push({ dateKey: key, weight }); wtEntries.sort((a,b) => a.dateKey.localeCompare(b.dateKey)); }
-    wtSave(wtEntries);
+    if (!wtSave(wtEntries)) alert('Phone storage is full — this weight entry was not saved.');
     window.__gym.resetChipToToday('wtDateChip', 'wtDateInput');
     wtRender();
     if (window.__gym.$('wtHistList').style.display !== 'none') wtRenderHistory();
@@ -88,7 +89,7 @@
         window.__gym.$('wtDateChip').childNodes[0].textContent = window.__gym.fmtDateChipLabel(entry.dateKey);
         window.__gym.$('wtDateChip').classList.toggle('is-past', entry.dateKey !== window.__gym.getActiveDate());
         wtEntries.splice(idx, 1);
-        wtSave(wtEntries);
+        if (!wtSave(wtEntries)) alert('Phone storage is full — this change was not saved.');
         window.__gym.$('wtLocked').classList.add('hidden');
         window.__gym.$('wtInputRow').classList.remove('hidden');
         wtRender();
@@ -100,7 +101,7 @@
       btn.addEventListener('click', () => {
         if (!confirm('Delete this entry?')) return;
         wtEntries.splice(parseInt(btn.dataset.wtDel, 10), 1);
-        wtSave(wtEntries);
+        if (!wtSave(wtEntries)) alert('Phone storage is full — this change was not saved.');
         wtRender();
         wtRenderHistory();
       });
@@ -774,6 +775,8 @@
   window.wtRender = wtRender;
   window.photosRender = photosRender;
   window.wtLoad = wtLoad;
+  window.wtSave = wtSave;
+  window.wtSaveEntry = wtSaveEntry;
   window.wtSetEntries = function (arr) { wtEntries = arr; };
   window.photosSetAll = function (arr) { photos = arr; };
   window.compressPhotoDataUrl = compressPhotoDataUrl;
