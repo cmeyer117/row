@@ -3,7 +3,7 @@
 // gated by the caller's real owner session (verifyOwner), matching the
 // pattern already used by jarvis-chat.js/vision-talk.js.
 import { verifyOwner } from './_lib/verify-owner.js';
-import { buildSubscribeUpsertRequest } from './_lib/subscribe-push-logic.js';
+import { buildSubscribeUpsertRequest, validateSubscription } from './_lib/subscribe-push-logic.js';
 
 const SUPABASE_URL = 'https://vikpcejlyxieguorwysf.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_EvWPtfW1FBW5Vf-H6w0yHw_PcXK4imv';
@@ -17,15 +17,12 @@ export default async function handler(req, res) {
     res.status(401).json({ error: 'Unauthorized' });
     return;
   }
-  const { endpoint, keys } = req.body || {};
-  if (!endpoint || typeof endpoint !== 'string' || endpoint.length > 2048 || !endpoint.startsWith('https://')) {
-    res.status(400).json({ error: 'Missing or invalid endpoint' });
+  const validation = validateSubscription(req.body);
+  if (!validation.ok) {
+    res.status(400).json({ error: validation.error });
     return;
   }
-  if (!keys || typeof keys.p256dh !== 'string' || typeof keys.auth !== 'string' || keys.p256dh.length > 256 || keys.auth.length > 256) {
-    res.status(400).json({ error: 'Missing or invalid subscription keys' });
-    return;
-  }
+  const { endpoint, keys } = validation;
   try {
     const { url, options } = buildSubscribeUpsertRequest('row', endpoint, keys);
     const r = await fetch(url, options);

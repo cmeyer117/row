@@ -1,6 +1,16 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildSubscribeUpsertRequest } from './subscribe-push-logic.js';
+import { buildSubscribeUpsertRequest, validateSubscription } from './subscribe-push-logic.js';
+
+test('validateSubscription rejects a bare "https://" with no host', () => {
+  const result = validateSubscription({ endpoint: 'https://', keys: { p256dh: 'x', auth: 'y' } });
+  assert.equal(result.ok, false);
+});
+
+test('validateSubscription accepts a real Web Push endpoint URL', () => {
+  const result = validateSubscription({ endpoint: 'https://fcm.googleapis.com/fcm/send/abc123', keys: { p256dh: 'x', auth: 'y' } });
+  assert.equal(result.ok, true);
+});
 
 test('buildSubscribeUpsertRequest: new subscription — POST with merge-duplicates on endpoint conflict', () => {
   const req = buildSubscribeUpsertRequest('row', 'https://fcm.example/abc', { p256dh: 'p1', auth: 'a1' });
