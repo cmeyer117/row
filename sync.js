@@ -311,7 +311,16 @@
         if (pendingRerun) { pendingRerun = false; pushNow(); }
       }
     }
-    registerRetryHook(function forceRetry() { clearTimeout(retryTimer); pushNow(); });
+    // If the initial pull never succeeded, pushNow() is permanently a no-op
+    // (guarded by syncReady) -- a retry must redo the pull, not call pushNow()
+    // straight away, or a write made while offline can never reach Supabase
+    // until a full page reload. Once syncReady is true, retrying just means
+    // pushing again as before.
+    registerRetryHook(function forceRetry() {
+      clearTimeout(retryTimer);
+      if (!syncReady) initialPull();
+      else pushNow();
+    });
     function schedulePush() {
       status = 'pending';
       broadcastStatus();
@@ -348,18 +357,12 @@
         }).catch(() => {});
       } catch (e) {}
     }
-    (async function init() {
-      supa = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-      async function refreshToken() {
-        try {
-          const { data } = await supa.auth.getSession();
-          cachedAccessToken = (data && data.session) ? data.session.access_token : null;
-        } catch (e) { cachedAccessToken = null; }
-      }
-      await refreshToken();
-      supa.auth.onAuthStateChange(function (_event, session) {
-        cachedAccessToken = session ? session.access_token : null;
-      });
+    // The initial `app_state` pull. Must succeed at least once before
+    // pushNow() will do anything (see syncReady above). Broken out into its
+    // own function so it can be re-run by the retry hook / an `online` event
+    // when the first attempt fails, instead of only ever running once at
+    // page load.
+    async function initialPull() {
       try {
         const { data, error } = await supa.from('app_state').select('data').eq('key', appKey).maybeSingle();
         if (!error) {
@@ -393,6 +396,20 @@
         status = 'error';
         broadcastStatus();
       }
+    }
+    (async function init() {
+      supa = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+      async function refreshToken() {
+        try {
+          const { data } = await supa.auth.getSession();
+          cachedAccessToken = (data && data.session) ? data.session.access_token : null;
+        } catch (e) { cachedAccessToken = null; }
+      }
+      await refreshToken();
+      supa.auth.onAuthStateChange(function (_event, session) {
+        cachedAccessToken = session ? session.access_token : null;
+      });
+      await initialPull();
       supa.channel('app_state_' + appKey)
         .on('postgres_changes', {
           event: '*', schema: 'public', table: 'app_state', filter: 'key=eq.' + appKey,
@@ -408,5 +425,9 @@
     window.addEventListener('beforeunload', flushOnUnload);
     window.addEventListener('pagehide', flushOnUnload);
     window.addEventListener('storage', (e) => { if (e.key && matches(e.key)) schedulePush(); });
+    // Coming back online is otherwise not a trigger for anything -- if the
+    // initial pull failed while offline, only a full page reload (or the
+    // user finding the visible "Retry now" control) could ever recover.
+    window.addEventListener('online', () => { if (!syncReady) initialPull(); });
   };
 })();

@@ -12,7 +12,7 @@ const source = readFileSync(new URL('./sync.js', import.meta.url), 'utf8');
 // Minimal in-memory localStorage + window/CustomEvent/fetch mock. supaImpl
 // controls what supa.from('app_state').upsert(...) resolves/rejects to;
 // fetchImpl controls the flushOnUnload() keepalive fetch's outcome.
-function makeSync({ supaImpl, fetchImpl, initialRemoteData } = {}) {
+function makeSync({ supaImpl, fetchImpl, initialRemoteData, selectImpl } = {}) {
   const store = {};
   // listAllKeys() iterates via localStorage.key(i) over localStorage.length --
   // real localStorage guarantees stable key-order iteration; this mock backs
@@ -40,7 +40,7 @@ function makeSync({ supaImpl, fetchImpl, initialRemoteData } = {}) {
           onAuthStateChange: () => {},
         },
         from: () => ({
-          select: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve({ data: initialRemoteData ? { data: initialRemoteData } : null, error: null }) }) }),
+          select: () => ({ eq: () => ({ maybeSingle: () => (selectImpl ? selectImpl() : Promise.resolve({ data: initialRemoteData ? { data: initialRemoteData } : null, error: null })) }) }),
           upsert: () => (supaImpl ? supaImpl() : Promise.resolve({ error: null })),
         }),
         channel: () => ({ on: () => ({ subscribe: () => {} }) }),
@@ -198,6 +198,36 @@ async function run() {
       env.window.dispatchEvent({ type }); // triggers both real listeners registered for that type
     }
     assertEqual(fetchCalls, 2, 'both beforeunload and pagehide genuinely attempted the flush, neither skipped believing the other already succeeded');
+  }
+
+  // --- initial pull fails (syncReady never set) -> a local write made while
+  // offline must still reach Supabase once retried, not be stranded forever.
+  // Before the fix, the init IIFE only set syncReady = true on the success
+  // branch, so a failed initial pull left pushNow() permanently no-op'ing --
+  // and registerRetryHook()'s forceRetry just called pushNow() again, which
+  // still did nothing. ---
+  {
+    let selectCalls = 0, upsertCalls = 0;
+    const env = makeSync({
+      selectImpl: () => {
+        selectCalls++;
+        return selectCalls === 1
+          ? Promise.resolve({ data: null, error: { message: 'offline' } })
+          : Promise.resolve({ data: null, error: null });
+      },
+      supaImpl: () => { upsertCalls++; return Promise.resolve({ error: null }); },
+    });
+    env.window.initCloudSync({ appKey: 'test7', syncedKeys: ['foo'] });
+    await new Promise((r) => setTimeout(r, 150));
+    assertEqual(env.statusEvents().slice(-1)[0].detail.status, 'error', 'a failed initial pull broadcasts error');
+
+    env.localStorage.setItem('foo', JSON.stringify([{ id: 1 }]));
+    await new Promise((r) => setTimeout(r, 400)); // past the 250ms debounce -- pushNow() no-ops, syncReady still false
+    assertEqual(upsertCalls, 0, 'sanity: nothing pushed yet -- initial pull never succeeded');
+
+    env.window.__rowSyncRetry['test7'](); // the visible "Retry now" action / an online listener firing
+    await new Promise((r) => setTimeout(r, 500)); // retried pull succeeds, then the pending local write should push
+    assertEqual(upsertCalls >= 1, true, 'retrying after a failed initial pull actually reaches Supabase with the pending local write');
   }
 
   console.log('sync-status.test.js: all cases passed');
