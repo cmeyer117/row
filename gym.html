@@ -3612,7 +3612,13 @@ img, video, canvas, svg { max-width: 100%; }
   }
 
   function saveState() {
-    try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch (e) {}
+    // fix (2026-09-15, finding 3): same silent-failure mode wtSave() had
+    // before its 2026-09-14 fix -- every logged set/check-in/closeout/
+    // config-edit routes through this, and base64 progress photos share
+    // the same localStorage quota, so a full-quota write here used to
+    // fail silently and just lose the edit.
+    try { localStorage.setItem(LS_KEY, JSON.stringify(state)); return true; }
+    catch (e) { return false; }
   }
   let state = loadState();
 
@@ -5760,7 +5766,7 @@ img, video, canvas, svg { max-width: 100%; }
       doneDays[todayKey] = new Date().toISOString();
       if (state.viewMode === 'bonus') {
         state.bonusSessionDates[todayKey] = true;
-        saveState();
+        if (!saveState()) alert('Phone storage is full — this bonus session mark was not saved.');
       }
       // Row Hype Director session-close wind-down (2026-08-25) -- only on the
       // marking-done transition, never on undo.
@@ -6910,7 +6916,8 @@ img, video, canvas, svg { max-width: 100%; }
     resetChipToToday('logDateChip', 'logDateInput');
     startRestTimer(ex, eventType, dateKey);
     if (window.__gym && typeof window.__gym.pcArmReceipt === 'function') window.__gym.pcArmReceipt();
-    saveState(); renderAll();
+    if (!saveState()) alert('Phone storage is full — this set was not saved.');
+    renderAll();
     // Strength changed → composition estimate may shift
     if (typeof wtRender === 'function') wtRender();
     // Show undo button after logging
@@ -7948,6 +7955,15 @@ document.addEventListener('DOMContentLoaded', function () {
   // JSON of the last state we sent or received — used to ignore
   // realtime echoes of our own pushes so we don't infinite-loop.
   let pcLastSyncedJson = null;
+  // fix (2026-09-15, finding 1): PC_SYNCED_KEYS written locally since the
+  // last successful push. pcPushNow()'s pre-push pcPullRemote({force:true})
+  // otherwise lets remote's pre-edit snapshot win wholesale for
+  // po_coach_workout_done and po_coach_v1's non-history fields -- a
+  // just-made local edit (e.g. tapping "Done") would get silently reverted
+  // by its own push. pcApplyRemoteState checks this set and keeps the
+  // local value for any key written since the last confirmed push; cleared
+  // once pcPushNow's upsert actually succeeds.
+  let pcDirtyKeys = new Set();
 
   // Set save-state receipt (#logReceipt) — armed by the "Log set" handler
   // right after a set is written to localStorage, then updated as pcPushNow
@@ -7985,13 +8001,13 @@ document.addEventListener('DOMContentLoaded', function () {
   localStorage.setItem = function(k, v) {
     _pcOrigSet(k, v);
     try {
-      if (!pcSuppressSync && PC_SYNCED_KEYS.indexOf(k) !== -1) pcSchedulePush();
+      if (!pcSuppressSync && PC_SYNCED_KEYS.indexOf(k) !== -1) { pcDirtyKeys.add(k); pcSchedulePush(); }
     } catch (e) {}
   };
   localStorage.removeItem = function(k) {
     _pcOrigRemove(k);
     try {
-      if (!pcSuppressSync && PC_SYNCED_KEYS.indexOf(k) !== -1) pcSchedulePush();
+      if (!pcSuppressSync && PC_SYNCED_KEYS.indexOf(k) !== -1) { pcDirtyKeys.add(k); pcSchedulePush(); }
     } catch (e) {}
   };
 
@@ -8071,7 +8087,14 @@ document.addEventListener('DOMContentLoaded', function () {
           try { localPhotos = JSON.parse(localStorage.getItem(k) || '[]'); } catch {}
           const remotePhotos = Array.isArray(remote[k]) ? remote[k] : [];
           const remoteIds = new Set(remotePhotos.map((p) => p && p.id));
-          const localOnly = localPhotos.filter((p) => p && !p.url && !remoteIds.has(p.id));
+          // fix (2026-09-15, finding 2): used to require !p.url, meaning a
+          // photo dropped its entry the instant upload finished (url set)
+          // but before the next push landed it in remote -- url-presence
+          // was never a real delete signal, there's no photo delete path
+          // in this codebase at all (gym-weight-photos.js) or any
+          // tombstone field, so id-absence-from-remote is always safe to
+          // treat as "keep local, not yet synced."
+          const localOnly = localPhotos.filter((p) => p && !remoteIds.has(p.id));
           const merged = [...remotePhotos, ...localOnly];
           const incoming = JSON.stringify(merged);
           if (localStorage.getItem(k) !== incoming) {
@@ -8116,7 +8139,12 @@ document.addEventListener('DOMContentLoaded', function () {
           const mergedJointPain = window.GymStateMergeLogic.mergeJointPain(remote[k].jointPain, localObj.jointPain);
           const mergedCheckins = window.GymStateMergeLogic.mergeCheckins(remote[k].checkins, localObj.checkins);
           const mergedExerciseCloseouts = window.GymStateMergeLogic.mergeExerciseCloseouts(remote[k].exerciseCloseouts, localObj.exerciseCloseouts);
-          const merged = Object.assign({}, remote[k], { logs: mergedLogs, jointPain: mergedJointPain, checkins: mergedCheckins, exerciseCloseouts: mergedExerciseCloseouts });
+          // fix (2026-09-15, finding 1): if po_coach_v1 has a local edit
+          // not yet pushed (e.g. a config change alongside a set log),
+          // remote's pre-edit config fields (exercises/days/gyms/settings)
+          // must not win over it -- keep localObj's config base instead.
+          const configBase = pcDirtyKeys.has(k) ? localObj : remote[k];
+          const merged = Object.assign({}, configBase, { logs: mergedLogs, jointPain: mergedJointPain, checkins: mergedCheckins, exerciseCloseouts: mergedExerciseCloseouts });
           const incoming = JSON.stringify(merged);
           if (localStorage.getItem(k) !== incoming) {
             try { _pcOrigSet(k, incoming); changed = true; } catch {}
@@ -8158,6 +8186,13 @@ document.addEventListener('DOMContentLoaded', function () {
             // review catch, 2026-08-20 -- same gap as sync.js's applyRemote()).
             changed = true;
           }
+          continue;
+        }
+        if (pcDirtyKeys.has(k)) {
+          // fix (2026-09-15, finding 1): a local write to this key hasn't
+          // been pushed yet (this is exactly pcPushNow's pre-push pull) --
+          // remote is that pre-edit snapshot. Keep the local value; the
+          // push right after this merge returns sends the real one.
           continue;
         }
         if (k in remote) {
@@ -8257,7 +8292,7 @@ document.addEventListener('DOMContentLoaded', function () {
           { key: APP_KEY, data: state, updated_at: new Date().toISOString() },
           { onConflict: 'key' }
         );
-      if (!error) { pcLastSyncedJson = json; pcDebug('push-success', { weightCount }); pcSetStatus('synced'); }
+      if (!error) { pcLastSyncedJson = json; pcDirtyKeys.clear(); pcDebug('push-success', { weightCount }); pcSetStatus('synced'); }
       else { pcDebug('push-returned-error', { msg: error.message, weightCount }); pcSetStatus('error'); }
     } catch (e) { pcDebug('push-threw', { msg: e && e.message, weightCount }); pcSetStatus('error'); }
   }
@@ -8292,7 +8327,14 @@ document.addEventListener('DOMContentLoaded', function () {
         body: JSON.stringify({ key: APP_KEY, data: state, updated_at: new Date().toISOString() }),
         keepalive: true,
       }).catch(() => {});
-      pcLastSyncedJson = json;
+      // fix (2026-09-15, finding 4): used to mark pcLastSyncedJson here
+      // right after firing the keepalive fetch, before it had actually
+      // completed -- if the page survives (cancelled nav, bfcache) or the
+      // fetch fails, state got marked synced anyway and pcPushNow() then
+      // skipped pushing the real edit until the JSON changed again. Same
+      // bug class already fixed in sync.js:337-346. Don't optimistically
+      // mark synced; only a real successful push (pcPushNow) should do
+      // that.
     } catch (_) {}
   }
 
