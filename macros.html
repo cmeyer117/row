@@ -305,7 +305,10 @@ function saveTargets(targets) {
   // updated_at drives the conflict-aware merge in sync.js's mergeObjects()
   // -- see docs/superpowers/specs/2026-08-20-object-key-conflict-merge-design.md.
   targets.updated_at = new Date().toISOString();
-  try { localStorage.setItem(LS_KEY, JSON.stringify(targets)); } catch (e) {}
+  // fix (2026-09-15, finding M2): same silent-failure mode saveState() had
+  // before its 2026-09-15 fix -- return boolean instead of swallowing.
+  try { localStorage.setItem(LS_KEY, JSON.stringify(targets)); return true; }
+  catch (e) { return false; }
 }
 
 // Carl's own saved multi-ingredient meals (e.g. protein pancakes) -- same
@@ -327,12 +330,15 @@ function loadCustomMealsRaw() {
   } catch (e) { return []; }
 }
 function saveCustomMealsRaw(meals) {
-  try { localStorage.setItem(CUSTOM_MEALS_KEY, JSON.stringify(meals)); } catch (e) {}
+  // fix (2026-09-15, finding M2): same silent-failure mode saveState() had
+  // before its 2026-09-15 fix -- return boolean instead of swallowing.
+  try { localStorage.setItem(CUSTOM_MEALS_KEY, JSON.stringify(meals)); return true; }
+  catch (e) { return false; }
 }
 function addCustomMeal(label, rows) {
   const meals = loadCustomMealsRaw();
   meals.push({ id: 'meal_' + Date.now(), label, rows, updated_at: new Date().toISOString() });
-  saveCustomMealsRaw(meals);
+  return saveCustomMealsRaw(meals);
 }
 function deleteCustomMeal(id) {
   const meals = loadCustomMealsRaw();
@@ -519,7 +525,7 @@ $('mtTargetsSave').addEventListener('click', () => {
     fatG: Number($('mtTargetFat').value) || 0,
     calories: Number($('mtTargetCalories').value) || 0,
   };
-  saveTargets(targets);
+  if (!saveTargets(targets)) showEntryError('Phone storage is full — these targets were not saved.');
   closeTargetsModal();
   refresh();
 });
@@ -926,7 +932,7 @@ $('mtCalcSaveMeal').addEventListener('click', () => {
   const label = input.value.trim();
   if (!label) { input.focus(); return; }
   const rows = collectCalcRows().filter((r) => r.foodName && r.grams > 0);
-  addCustomMeal(label, rows);
+  if (!addCustomMeal(label, rows)) showEntryError('Phone storage is full — this meal was not saved.');
   field.style.display = 'none';
   renderMyMeals();
 });

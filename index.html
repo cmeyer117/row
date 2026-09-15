@@ -793,7 +793,10 @@ body::after {
       try { return JSON.parse(localStorage.getItem('health:sleep') || '[]'); } catch (e) { return []; }
     }
     function saveSleep(list) {
-      try { localStorage.setItem('health:sleep', JSON.stringify(list)); } catch (e) {}
+      // fix (2026-09-15, finding M2): same silent-failure mode saveState()
+      // had before its 2026-09-15 fix -- return boolean instead of swallowing.
+      try { localStorage.setItem('health:sleep', JSON.stringify(list)); return true; }
+      catch (e) { return false; }
     }
     function loadExisting() {
       const list = loadSleep();
@@ -808,7 +811,7 @@ body::after {
       const idx = list.findIndex(function (e) { return e.date === dk; });
       const entry = idx >= 0 ? Object.assign({}, list[idx], { hours: val }) : { date: dk, hours: val, quality: null };
       if (idx >= 0) list[idx] = entry; else list.push(entry);
-      saveSleep(list);
+      if (!saveSleep(list)) { alert('Phone storage is full — this sleep entry was not saved.'); return; }
       saved.classList.add('show');
       setTimeout(function () { saved.classList.remove('show'); }, 2000);
     });

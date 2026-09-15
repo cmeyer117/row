@@ -89,6 +89,16 @@
     // legitimately-empty local state on tab-close and overwrite good remote
     // data with nothing -- this happened for real 2026-07-25 (see SESSION_LOG).
     let syncReady = false;
+    // fix (2026-09-15, finding M3): keys written locally while syncReady is
+    // still false. The generic (non-array, non-mergeable-object) branch of
+    // applyRemote() below replaces those keys wholesale with initialPull()'s
+    // remote snapshot -- for goals:*, morning_launch:*, morning_outcomes_v1,
+    // stack:*, perfectDay:template this silently threw away an edit made
+    // before the first successful pull. Same pattern as gym.html's
+    // pcDirtyKeys (finding 1 of the 2026-09-15 audit): a key in this set on
+    // the first apply keeps its local value and pushes it back instead.
+    // Cleared once that push actually lands.
+    let preSyncDirtyKeys = new Set();
 
     function matches(k) {
       if (!k) return false;
@@ -126,11 +136,11 @@
     const origRemove = localStorage.removeItem.bind(localStorage);
     localStorage.setItem = function (k, v) {
       origSet(k, v);
-      try { if (!suppressSync && matches(k)) schedulePush(); } catch (e) {}
+      try { if (!suppressSync && matches(k)) { if (!syncReady) preSyncDirtyKeys.add(k); schedulePush(); } } catch (e) {}
     };
     localStorage.removeItem = function (k) {
       origRemove(k);
-      try { if (!suppressSync && matches(k)) schedulePush(); } catch (e) {}
+      try { if (!suppressSync && matches(k)) { if (!syncReady) preSyncDirtyKeys.add(k); schedulePush(); } } catch (e) {}
     };
     function mergeArrays(remoteArr, localArr) {
       const byKey = new Map();
@@ -184,6 +194,13 @@
             try { localValue = JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) {}
             incomingValue = window.RowSyncMergeObjects(incomingValue, localValue);
             merged = true;
+          }
+          if (!merged && preSyncDirtyKeys.has(k)) {
+            // fix (2026-09-15, finding M3): local edit made before the first
+            // successful pull -- this remote value is its pre-edit snapshot.
+            // Keep the local value; push it back instead of overwriting.
+            needsPushBack = true;
+            continue;
           }
           const incoming = JSON.stringify(incomingValue);
           if (merged && incoming !== rawRemoteJson) needsPushBack = true;
@@ -295,6 +312,7 @@
             status = 'synced';
             retryDelayMs = 0;
             clearTimeout(retryTimer);
+            preSyncDirtyKeys.clear();
             broadcastStatus();
           } else {
             status = 'error';

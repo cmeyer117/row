@@ -31,11 +31,12 @@ At the start of any Cowork session, immediately request access to `G:\My Drive\C
 
 This repo (`row`) is the Row fitness dashboard: a single static multi-page vanilla HTML/JS app with Supabase for persistence, no build step, no framework. Deployed to Vercel at `https://row-sage.vercel.app`.
 
-Pages: `index.html`, `main.html`, `health.html`, `gym.html`, `mobility.html`, `po-water.html`. Coaching-client business features (client intake/plan/log/billing) were removed 2026-08-24 — that's now its own standalone app. Personal finance (income/credit/targets) lives in the standalone `steward` app, not this repo.
+Pages: `index.html`, `main.html`, `health.html`, `gym.html`, `mobility.html`, `macros.html`, `planner.html`, `coach.html`, `cooking.html`, `form-coach.html`, `posing.html`, `road-to-pro.html`, `row-wrapped.html`, `state-of-me.html`, `weekly-review.html` (plus utility pages `offline.html`, `reset-password.html`). Coaching-client business features (client intake/plan/log/billing) were removed 2026-08-24 — that's now its own standalone app. Personal finance (income/credit/targets) lives in the standalone `steward` app, not this repo.
 
 Shared logic:
 - `sync.js` — cloud sync to a Supabase `app_state` table
-- `topbar.js` — nav + passphrase gate (`AUTH_PASS`/`AUTH_KEY` in-file)
+- `row-auth.js` — real Supabase Auth gate for every page (replaced the old `topbar.js` client-side passphrase, `AUTH_PASS`/`AUTH_KEY`, which no longer exist)
+- `topbar.js` — nav only
 
 Jarvis (AI assistant) lives in a separate repo, `cmeyer117/claude-workspace`, subfolder `jarvis/` — it is not part of this repo. `accounting-automation` and `content-system` are not built yet as of this writing.
 
@@ -51,7 +52,7 @@ This repo has zero TypeScript/React (plain vanilla JS) — the old "TypeScript R
 
 ## Commands
 
-No build step. Open any `.html` file directly, or serve statically for local dev. Run a module's self-check with `node path/to/file.selfcheck.js`.
+No build step. Open any `.html` file directly, or serve statically for local dev. Run a module's self-check with `node path/to/file.selfcheck.cjs`.
 
 ## Architecture Intentions
 

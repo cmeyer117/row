@@ -1011,10 +1011,14 @@ body::after {
     try { return JSON.parse(localStorage.getItem(key)); } catch (e) { return null; }
   }
   function storeSet(key, value) {
-    try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) {}
+    // fix (2026-09-15, finding M2): same silent-failure mode saveState() had
+    // before its 2026-09-15 fix -- return boolean instead of swallowing.
+    let ok = true;
+    try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) { ok = false; }
     if (typeof key === 'string' && key.indexOf('goals:') === 0) {
       window.dispatchEvent(new CustomEvent('goals-changed'));
     }
+    return ok;
   }
 
   // --- Daily routine checklist: Vessel read + local checkbox state ---
@@ -1092,7 +1096,7 @@ body::after {
     const g = storeGet(key);
     return Array.isArray(g) ? g : [];
   }
-  function setGoals(key, list) { storeSet(key, list); }
+  function setGoals(key, list) { return storeSet(key, list); }
 
   // ---------- rollover: pull undone older goals into today ----------
   function rollover() {
@@ -1723,7 +1727,7 @@ body::after {
     function plainAdd(text) {
       const list = getGoals(key);
       list.push({ text, done: false, id: newId('g') });
-      setGoals(key, list);
+      if (!setGoals(key, list)) alert('Phone storage is full — this goal was not saved.');
       input.value = '';
       reload();
     }
@@ -1996,7 +2000,7 @@ body::after {
     const o = storeGet(ML_OUTCOMES_KEY);
     return (o && Array.isArray(o.outcomes)) ? o : { outcomes: [], reviewedAt: null };
   }
-  function mlOutcomesSave(o) { storeSet(ML_OUTCOMES_KEY, o); }
+  function mlOutcomesSave(o) { return storeSet(ML_OUTCOMES_KEY, o); }
   function mlSessionLoad() {
     const s = storeGet(mlSessionKey());
     if (!s || s.version !== 1) return window.MorningLaunchLogic.newSession(getActiveDateString());
@@ -2006,8 +2010,8 @@ body::after {
     if (s.spokenAt === undefined) s.spokenAt = null;
     return s;
   }
-  function mlSessionSaveQuiet(s) { storeSet(mlSessionKey(), s); }
-  function mlSessionSave(s) { storeSet(mlSessionKey(), s); mlRender(); }
+  function mlSessionSaveQuiet(s) { return storeSet(mlSessionKey(), s); }
+  function mlSessionSave(s) { const ok = storeSet(mlSessionKey(), s); mlRender(); return ok; }
   function mlGoalsByDateKey() {
     const map = {};
     storeListKeys('goals:').forEach(k => { map[k] = getGoals(k); });

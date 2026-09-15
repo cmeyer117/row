@@ -10,11 +10,31 @@
   const SUPABASE_URL = window.SUPABASE_CONFIG.URL;
   const SUPABASE_KEY = window.SUPABASE_CONFIG.KEY;
 
+  // fix (2026-09-15, finding M6): one lazily-created module-level client
+  // instead of a fresh createClient() per call -- saveSet()'s exercise-rx
+  // tracking chain alone can call into this file up to 3x per logged set,
+  // each spinning up its own GoTrue instance, which Supabase documents as
+  // undefined behavior under concurrent token refresh. This file never
+  // authenticates a user (no Authorization header anywhere below, just the
+  // anon key) and doesn't need a session, so persistSession/autoRefreshToken
+  // are off -- same fix shape as Vessel's equivalent, which made this safe
+  // by disabling session handling rather than by adding client-reuse
+  // bookkeeping for a client that doesn't need one.
+  let _decisionsSupa = null;
+  function getSupa() {
+    if (!_decisionsSupa) {
+      _decisionsSupa = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+        auth: { persistSession: false, autoRefreshToken: false },
+      });
+    }
+    return _decisionsSupa;
+  }
+
   window.recordDecision = function (fields) {
     if (!window.supabase) return Promise.reject(new Error('supabase-js not loaded'));
     if (!fields || !fields.decision_text) return Promise.reject(new Error('decision_text is required'));
 
-    const supa = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    const supa = getSupa();
     return supa.from('decisions').insert({
       app: 'row',
       category: fields.category || null,
@@ -37,7 +57,7 @@
   window.getOpenDueDecision = function (category) {
     if (!window.supabase) return Promise.reject(new Error('supabase-js not loaded'));
     const today = new Date().toISOString().slice(0, 10);
-    const supa = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    const supa = getSupa();
     return supa.from('decisions')
       .select('*')
       .eq('app', 'row')
@@ -60,7 +80,7 @@
   // so this scopes down to exactly one exercise's most recent open row.
   window.getOpenDecisionForExercise = function (category, exerciseId) {
     if (!window.supabase) return Promise.reject(new Error('supabase-js not loaded'));
-    const supa = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    const supa = getSupa();
     return supa.from('decisions')
       .select('*')
       .eq('app', 'row')
@@ -81,7 +101,7 @@
   // getOpenDueDecision().
   window.getLatestOpenDecision = function (category) {
     if (!window.supabase) return Promise.reject(new Error('supabase-js not loaded'));
-    const supa = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    const supa = getSupa();
     return supa.from('decisions')
       .select('*')
       .eq('app', 'row')
@@ -102,7 +122,7 @@
   window.closeDecision = function (id, verdict, outcomeNote, details) {
     if (!window.supabase) return Promise.reject(new Error('supabase-js not loaded'));
     if (!id || !verdict) return Promise.reject(new Error('id and verdict are required'));
-    const supa = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    const supa = getSupa();
     const update = {
       verdict: verdict,
       outcome_note: outcomeNote || null,

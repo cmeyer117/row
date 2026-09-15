@@ -1,4 +1,4 @@
-// Shared voice capture (MediaRecorder -> /api/vision-stt) + playback
+// Shared voice capture (MediaRecorder -> /api/vision-talk?mode=stt) + playback
 // (/api/vision-talk?mode=tts -> Audio) primitive for gym.html and main.html.
 // Replaces the old SpeechRecognition-based mic, which iOS WebKit silently
 // disables in standalone/home-screen PWA mode (bug 185448) -- MediaRecorder
@@ -156,7 +156,7 @@ window.RowVoice = (function () {
   }
 
   // Records until the caller calls stop() (or MAX_RECORD_MS elapses), then
-  // POSTs to /api/vision-stt. Calls onTranscript(text) on success,
+  // POSTs to /api/vision-talk?mode=stt. Calls onTranscript(text) on success,
   // onError(msg) on failure. Returns a controller with stop().
   function startCapture(onTranscript, onError, opts) {
     opts = opts || {};

@@ -141,7 +141,9 @@ html, body {
   'use strict';
 
   function storeGet(key) { try { return JSON.parse(localStorage.getItem(key)); } catch (e) { return null; } }
-  function storeSet(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) {} }
+  // fix (2026-09-15, finding M2): same silent-failure mode saveState() had
+  // before its 2026-09-15 fix -- return boolean instead of swallowing.
+  function storeSet(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); return true; } catch (e) { return false; } }
   function newId(prefix) { return (prefix || 'id') + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
   function pad2(n) { return String(n).padStart(2, '0'); }
   function dateToKey(d) { return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); }
@@ -151,7 +153,7 @@ html, body {
     return dateToKey(now);
   }
   function getPlannerItems() { const v = storeGet('planner:items'); return Array.isArray(v) ? v : []; }
-  function setPlannerItems(list) { storeSet('planner:items', list); }
+  function setPlannerItems(list) { return storeSet('planner:items', list); }
 
   const DAY_NAMES = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
   const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -254,7 +256,7 @@ html, body {
     if (!title) return;
     const items = getPlannerItems();
     items.push({ id: newId('pl'), date: selectedDate, title: title, note: noteEl.value.trim() || undefined });
-    setPlannerItems(items);
+    if (!setPlannerItems(items)) alert('Phone storage is full — this planner item was not saved.');
     titleEl.value = ''; noteEl.value = '';
     renderWeek(); renderSelectedDay();
   });

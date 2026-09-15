@@ -5518,7 +5518,10 @@ img, video, canvas, svg { max-width: 100%; }
     catch (e) { return {}; }
   }
   function saveDoneDays(d) {
-    try { localStorage.setItem(WORKOUT_DONE_KEY, JSON.stringify(d)); } catch (e) {}
+    // fix (2026-09-15, finding M2): same silent-failure mode saveState() had
+    // before its 2026-09-15 fix -- return boolean, alert at the call site.
+    try { localStorage.setItem(WORKOUT_DONE_KEY, JSON.stringify(d)); return true; }
+    catch (e) { return false; }
   }
   let doneDays = loadDoneDays();
 
@@ -5772,7 +5775,7 @@ img, video, canvas, svg { max-width: 100%; }
       // marking-done transition, never on undo.
       if (window.HypeAudio) window.HypeAudio.playStateMode('locked_in');
     }
-    saveDoneDays(doneDays);
+    if (!saveDoneDays(doneDays)) alert('Phone storage is full — this workout-done mark was not saved.');
     renderTodaysWorkout();
     renderPastWorkouts();
     if (wasUndone && typeof window.__gym_openCheckinModal === 'function') {
@@ -6832,7 +6835,14 @@ img, video, canvas, svg { max-width: 100%; }
     if (window.ExerciseRxTracking && window.getOpenDecisionForExercise && window.recordDecision && window.closeDecision) {
       try {
         const rxForTracking = getRx(ex, priorLogs);
-        if (rxForTracking && typeof rxForTracking.stalled === 'boolean' && !exerciseRxTrackingLock[ex.id]) {
+        // fix (2026-09-15, finding M4): the design spec resolves a verdict
+        // "on the next exposure" (i.e. the next session), not the next set --
+        // saveSet() runs on every set, so a 3-set exercise used to create
+        // three decision rows per session instead of one. Gate on this being
+        // the first set logged today for this exercise.
+        const lastPriorDateKey = priorLogs.length ? priorLogs[priorLogs.length - 1].date.slice(0, 10) : null;
+        const isFirstSetOfDay = lastPriorDateKey !== dateKey;
+        if (isFirstSetOfDay && rxForTracking && typeof rxForTracking.stalled === 'boolean' && !exerciseRxTrackingLock[ex.id]) {
           // priorLogs.length > 0 is guaranteed here -- getRx() returns null
           // (via its own `if (!logs.length) return null` guard) when there's
           // no prior exposure, which the outer `if` above already excludes.
@@ -7814,7 +7824,7 @@ document.addEventListener('DOMContentLoaded', function () {
     // docs/superpowers/specs/2026-08-19-morning-readiness-card-design.md.
     window.initCloudSync({
       appKey: 'health',
-      syncedKeys: ['stack:items', 'stack:version', 'stack:low', 'macro_targets', 'custom_meals', 'health:vitals', 'health:labs', 'health:measurements', 'health:sleep', 'health:cardio'],
+      syncedKeys: window.HEALTH_SYNC_KEYS,
       syncedPrefixes: ['stack:taken:'],
       // See docs/superpowers/specs/2026-08-20-object-key-conflict-merge-design.md
       mergeableObjectKeys: ['macro_targets'],
@@ -7947,6 +7957,24 @@ document.addEventListener('DOMContentLoaded', function () {
   let pcPushTimer = null;
   let pcSuppressSync = false;
   let pcPendingRemote = null;
+  // fix (2026-09-15, finding M1): ported from sync.js's scheduleRetry/inFlight
+  // (sync.js:242-261) -- gym.html's own pcPushNow had neither. A failed push
+  // used to just set the "will retry on your next edit" receipt and do
+  // nothing else; if no further edit ever came, the failed write was gone
+  // for good. Backoff retry plus an in-flight guard (debounce timer and a
+  // pending retry could otherwise both call pcPushNow concurrently) close
+  // that gap the same way sync.js already does.
+  const PC_RETRY_DELAYS = [5000, 15000, 30000];
+  let pcRetryDelayMs = 0;
+  let pcRetryTimer = null;
+  let pcPushInFlight = false;
+  let pcPendingRerun = false;
+  function pcScheduleRetry() {
+    clearTimeout(pcRetryTimer);
+    const delay = PC_RETRY_DELAYS[Math.min(pcRetryDelayMs, PC_RETRY_DELAYS.length - 1)];
+    pcRetryDelayMs = Math.min(pcRetryDelayMs + 1, PC_RETRY_DELAYS.length - 1);
+    pcRetryTimer = setTimeout(pcPushNow, delay);
+  }
   // A write that happens before the initial remote pull resolves must
   // never push — the local snapshot at that point hasn't been merged
   // with remote yet, so pushing it would overwrite remote history that
@@ -7989,7 +8017,9 @@ document.addEventListener('DOMContentLoaded', function () {
       pcReceiptArmed = false;
       setTimeout(() => { if (!pcReceiptArmed) el.style.display = 'none'; }, 2000);
     } else if (status === 'error') {
-      el.textContent = 'Not synced yet — will retry on your next edit';
+      // fix (2026-09-15, finding M1): pcPushNow now retries with backoff on
+      // its own (PC_RETRY_DELAYS) instead of only on the next edit.
+      el.textContent = 'Not synced yet — retrying…';
     }
   }
 
@@ -8014,8 +8044,14 @@ document.addEventListener('DOMContentLoaded', function () {
   // ponytail: diagnostic-only trail so a sync failure on a device we
   // can't physically inspect (Carl's phone) is visible via Supabase
   // instead of guessed at. Remove once the PWA-sync bug is confirmed fixed.
+  // fix (2026-09-15, finding L7): still no confirmation the underlying bug
+  // is fixed (no commit/session-log reference), so not removed -- gated
+  // behind this flag instead so it can be switched off without a redeploy
+  // once it is.
+  const PC_DEBUG_ENABLED = true;
   let pcDebugLog = [];
   function pcDebug(event, extra) {
+    if (!PC_DEBUG_ENABLED) return;
     pcDebugLog.push({ t: new Date().toISOString(), event, extra: extra || null });
     if (pcDebugLog.length > 30) pcDebugLog = pcDebugLog.slice(-30);
     if (!pcAccessToken) return;
@@ -8200,7 +8236,18 @@ document.addEventListener('DOMContentLoaded', function () {
           const local = localStorage.getItem(k);
           if (local !== incoming) { try { _pcOrigSet(k, incoming); changed = true; } catch {} }
         } else if (localStorage.getItem(k) != null) {
-          try { _pcOrigRemove(k); changed = true; } catch {}
+          // fix (2026-09-15, finding M5): `k` missing from `remote` used to
+          // mean "delete the local copy" -- but no consumer of this file has
+          // a delete-a-whole-key feature (same fact sync.js's isTrivial()
+          // relies on), and Supabase's `data` JSON column is one blob per
+          // row: any OTHER writer of this row (Vision's log_workout, e.g.)
+          // that upserts its own partial payload makes every key it omits
+          // vanish from `remote`, wiping it locally here on every device.
+          // Without a real per-key tombstone (none exists), the only safe
+          // read of "key absent" is "this writer doesn't know about it" --
+          // leave local untouched and push it back to restore it in
+          // Supabase, same as the other local-wins merges above.
+          changed = true;
         }
       }
     } finally {
@@ -8263,6 +8310,17 @@ document.addEventListener('DOMContentLoaded', function () {
 
   async function pcPushNow() {
     if (!pcSupa) return;
+    if (pcPushInFlight) { pcPendingRerun = true; return; }
+    pcPushInFlight = true;
+    try {
+      await pcPushNowInner();
+    } finally {
+      pcPushInFlight = false;
+      if (pcPendingRerun) { pcPendingRerun = false; pcPushNow(); }
+    }
+  }
+
+  async function pcPushNowInner() {
     // fix (2026-08-11): merge remote first so a concurrent writer (Vision's
     // log_workout, another device) that landed since our last pull isn't
     // silently overwritten by this blind push. pcPullRemote() already
@@ -8292,9 +8350,11 @@ document.addEventListener('DOMContentLoaded', function () {
           { key: APP_KEY, data: state, updated_at: new Date().toISOString() },
           { onConflict: 'key' }
         );
-      if (!error) { pcLastSyncedJson = json; pcDirtyKeys.clear(); pcDebug('push-success', { weightCount }); pcSetStatus('synced'); }
-      else { pcDebug('push-returned-error', { msg: error.message, weightCount }); pcSetStatus('error'); }
-    } catch (e) { pcDebug('push-threw', { msg: e && e.message, weightCount }); pcSetStatus('error'); }
+      if (!error) {
+        pcLastSyncedJson = json; pcDirtyKeys.clear(); pcDebug('push-success', { weightCount }); pcSetStatus('synced');
+        pcRetryDelayMs = 0; clearTimeout(pcRetryTimer);
+      } else { pcDebug('push-returned-error', { msg: error.message, weightCount }); pcSetStatus('error'); pcScheduleRetry(); }
+    } catch (e) { pcDebug('push-threw', { msg: e && e.message, weightCount }); pcSetStatus('error'); pcScheduleRetry(); }
   }
 
   function pcSchedulePush() {
