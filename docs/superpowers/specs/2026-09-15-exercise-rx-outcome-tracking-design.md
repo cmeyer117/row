@@ -1,7 +1,7 @@
 # Per-exercise Rx outcome tracking — design
 
 **Date:** 2026-09-15
-**Status:** Approved in brainstorming, pending spec review
+**Status:** Implemented 2026-09-15.
 
 ## Context
 
