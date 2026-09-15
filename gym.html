@@ -6797,6 +6797,12 @@ img, video, canvas, svg { max-width: 100%; }
   // through the exact same path -- PR classification, milestones, rest
   // timer, receipt, and Undo all need to fire identically regardless of how
   // weight/reps were captured.
+  // Per-exercise lock for the Rx outcome tracking block below (keyed by
+  // ex.id) -- without it, two saveSet() calls for the same exercise close
+  // together (a double-tap, or edit-then-resave) can both read the same
+  // prior open decision before either write lands, producing two orphaned
+  // open rows instead of one correctly resolved one. Codex review, 2026-09-15.
+  const exerciseRxTrackingLock = {};
   function saveSet(ex, w, reps, entry) {
     entry = entry || {};
     // Intensifiers feature (2026-08-27) -- consumes whatever technique was
@@ -6811,50 +6817,62 @@ img, video, canvas, svg { max-width: 100%; }
     const isoDate = new Date(dateKey + 'T12:00:00').toISOString();
     const arr = state.logs[ex.id] || [];
     const priorLogs = arr.slice();
-    // Per-exercise Rx outcome tracking -- fire-and-forget, must never block
-    // or fail the actual logging flow. See
+    // Per-exercise Rx outcome tracking -- fire-and-forget from saveSet()'s
+    // own perspective (never blocks or fails the actual logging flow), but
+    // internally sequenced: recording this exposure's new row waits on the
+    // prior exposure's close, and is SKIPPED entirely if that close fails,
+    // rather than piling a fresh open row on top of an unresolved one. See
     // docs/superpowers/specs/2026-09-15-exercise-rx-outcome-tracking-design.md.
     if (window.ExerciseRxTracking && window.getOpenDecisionForExercise && window.recordDecision && window.closeDecision) {
       try {
         const rxForTracking = getRx(ex, priorLogs);
-        if (rxForTracking && typeof rxForTracking.stalled === 'boolean') {
+        if (rxForTracking && typeof rxForTracking.stalled === 'boolean' && !exerciseRxTrackingLock[ex.id]) {
           // priorLogs.length > 0 is guaranteed here -- getRx() returns null
           // (via its own `if (!logs.length) return null` guard) when there's
           // no prior exposure, which the outer `if` above already excludes.
           const priorWeightForTracking = priorLogs[priorLogs.length - 1].weight;
+          exerciseRxTrackingLock[ex.id] = true;
           window.getOpenDecisionForExercise('exercise-rx', ex.id).then(function (prior) {
-            if (prior) {
-              const verdict = window.ExerciseRxTracking.resolvePriorRxDecision(
-                prior.details.classification,
-                rxForTracking.stalled
+            const afterClose = prior
+              ? window.closeDecision(
+                  prior.id,
+                  window.ExerciseRxTracking.resolvePriorRxDecision(prior.details.classification, rxForTracking.stalled),
+                  null
+                )
+              : Promise.resolve();
+            return afterClose.then(function () {
+              const classification = window.ExerciseRxTracking.classifyRxOutcome(
+                { type: rxForTracking.type, weight: rxForTracking.weight, reps: rxForTracking.reps },
+                { weight: w, reps: reps },
+                priorWeightForTracking
               );
-              window.closeDecision(prior.id, verdict, null).catch(function (err) {
-                console.error('[exercise-rx-tracking] closeDecision failed', err);
+              return window.recordDecision({
+                category: 'exercise-rx',
+                decision_text: ex.name + ': ' + rxForTracking.tag,
+                details: {
+                  exerciseId: ex.id,
+                  exerciseName: ex.name,
+                  rxType: rxForTracking.type,
+                  rxWeight: rxForTracking.weight,
+                  rxReps: rxForTracking.reps,
+                  actualWeight: w,
+                  actualReps: reps,
+                  classification: classification,
+                },
               });
-            }
-            const classification = window.ExerciseRxTracking.classifyRxOutcome(
-              { type: rxForTracking.type, weight: rxForTracking.weight, reps: rxForTracking.reps },
-              { weight: w, reps: reps },
-              priorWeightForTracking
-            );
-            window.recordDecision({
-              category: 'exercise-rx',
-              decision_text: ex.name + ': ' + rxForTracking.tag,
-              details: {
-                exerciseId: ex.id,
-                exerciseName: ex.name,
-                rxType: rxForTracking.type,
-                rxWeight: rxForTracking.weight,
-                rxReps: rxForTracking.reps,
-                actualWeight: w,
-                actualReps: reps,
-                classification: classification,
-              },
-            }).catch(function (err) {
-              console.error('[exercise-rx-tracking] recordDecision failed', err);
+            }, function (err) {
+              // closeDecision failed -- do NOT record a new open row on top
+              // of an unresolved prior one, which would compound the
+              // problem into two stale rows instead of one. Skip this
+              // exposure's write; the still-open prior row waits for the
+              // next successful exposure to resolve it (Codex review,
+              // 2026-09-15).
+              console.error('[exercise-rx-tracking] closeDecision failed, skipping this exposure\'s record', err);
             });
           }).catch(function (err) {
-            console.error('[exercise-rx-tracking] getOpenDecisionForExercise failed', err);
+            console.error('[exercise-rx-tracking] tracking chain failed', err);
+          }).finally(function () {
+            delete exerciseRxTrackingLock[ex.id];
           });
         }
       } catch (err) {
