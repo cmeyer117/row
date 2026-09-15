@@ -14,6 +14,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="supabase-config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="decisions.js"></script>
 <script src="sync.js" defer></script>
 <script src="row-auth.js" defer></script>
 <script src="topbar.js" defer></script>
@@ -6810,6 +6811,56 @@ img, video, canvas, svg { max-width: 100%; }
     const isoDate = new Date(dateKey + 'T12:00:00').toISOString();
     const arr = state.logs[ex.id] || [];
     const priorLogs = arr.slice();
+    // Per-exercise Rx outcome tracking -- fire-and-forget, must never block
+    // or fail the actual logging flow. See
+    // docs/superpowers/specs/2026-09-15-exercise-rx-outcome-tracking-design.md.
+    if (window.ExerciseRxTracking && window.getOpenDecisionForExercise && window.recordDecision && window.closeDecision) {
+      try {
+        const rxForTracking = getRx(ex, priorLogs);
+        if (rxForTracking && typeof rxForTracking.stalled === 'boolean') {
+          // priorLogs.length > 0 is guaranteed here -- getRx() returns null
+          // (via its own `if (!logs.length) return null` guard) when there's
+          // no prior exposure, which the outer `if` above already excludes.
+          const priorWeightForTracking = priorLogs[priorLogs.length - 1].weight;
+          window.getOpenDecisionForExercise('exercise-rx', ex.id).then(function (prior) {
+            if (prior) {
+              const verdict = window.ExerciseRxTracking.resolvePriorRxDecision(
+                prior.details.classification,
+                rxForTracking.stalled
+              );
+              window.closeDecision(prior.id, verdict, null).catch(function (err) {
+                console.error('[exercise-rx-tracking] closeDecision failed', err);
+              });
+            }
+            const classification = window.ExerciseRxTracking.classifyRxOutcome(
+              { type: rxForTracking.type, weight: rxForTracking.weight, reps: rxForTracking.reps },
+              { weight: w, reps: reps },
+              priorWeightForTracking
+            );
+            window.recordDecision({
+              category: 'exercise-rx',
+              decision_text: ex.name + ': ' + rxForTracking.tag,
+              details: {
+                exerciseId: ex.id,
+                exerciseName: ex.name,
+                rxType: rxForTracking.type,
+                rxWeight: rxForTracking.weight,
+                rxReps: rxForTracking.reps,
+                actualWeight: w,
+                actualReps: reps,
+                classification: classification,
+              },
+            }).catch(function (err) {
+              console.error('[exercise-rx-tracking] recordDecision failed', err);
+            });
+          }).catch(function (err) {
+            console.error('[exercise-rx-tracking] getOpenDecisionForExercise failed', err);
+          });
+        }
+      } catch (err) {
+        console.error('[exercise-rx-tracking] tracking block failed', err);
+      }
+    }
     // Only compare like-for-like weight bases -- a plates-per-side count vs a
     // total-lb figure would false-positive/false-negative against each other.
     // Legacy entries predate the weightBasis field, so resolve it the same
@@ -7711,6 +7762,7 @@ img, video, canvas, svg { max-width: 100%; }
 <script src="gym-debrief-logic.js"></script>
 <script src="gym-season-logic.js"></script>
 <script src="gym-volume-logic.js"></script>
+<script src="exercise-rx-tracking.js"></script>
 <script src="gym-autopsy-logic.js"></script>
 <script src="macro-calc.js"></script>
 <script src="plate-calc.js"></script>
