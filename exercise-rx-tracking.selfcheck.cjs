@@ -84,4 +84,38 @@ assertEqual(
   "hold rx: a 'hold' has no up/down direction to contradict, so any deviation is edited, never rejected"
 );
 
-console.log('exercise-rx-tracking.selfcheck.cjs: all classifyRxOutcome cases passed');
+const { resolvePriorRxDecision } = sandbox.window.ExerciseRxTracking;
+
+// --- resolvePriorRxDecision ---
+assertEqual(
+  resolvePriorRxDecision('accepted', false),
+  'worked',
+  "accepted + not stalled next time = worked"
+);
+assertEqual(
+  resolvePriorRxDecision('edited', false),
+  'worked',
+  "edited + not stalled next time = worked"
+);
+assertEqual(
+  resolvePriorRxDecision('accepted', true),
+  'wrong',
+  "accepted + stalled next time = wrong"
+);
+assertEqual(
+  resolvePriorRxDecision('edited', true),
+  'wrong',
+  "edited + stalled next time = wrong"
+);
+assertEqual(
+  resolvePriorRxDecision('rejected', false),
+  'partly_worked',
+  "rejected (Carl's own call) + not stalled = partly_worked"
+);
+assertEqual(
+  resolvePriorRxDecision('rejected', true),
+  'inconclusive',
+  "rejected + stalled = inconclusive, no causation claimed"
+);
+
+console.log('exercise-rx-tracking.selfcheck.cjs: all classifyRxOutcome and resolvePriorRxDecision cases passed');
