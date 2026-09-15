@@ -3836,6 +3836,7 @@ img, video, canvas, svg { max-width: 100%; }
     // volume is bad advice when the reason is pain, not a plateau.
     const stalled = result.type === 'down' || result.tag === 'Reassess';
     const finalResult = applyCheckinOverride(result, last, ex, stuck);
+    finalResult.stalled = stalled;
     // Advisory only -- does not change type/weight/reps above. bw exercises
     // have no formal stall concept in this function (no stuckThreshold
     // check), so skipped here; they're typically accessories/finishers
