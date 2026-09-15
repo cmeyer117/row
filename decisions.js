@@ -52,6 +52,29 @@
       });
   };
 
+  // Returns the most recent OPEN decision for a specific exercise within a
+  // category, filtering the JSONB details column -- distinct from
+  // getOpenDueDecision/getLatestOpenDecision, which only filter by category
+  // and are keyed to the single-row-per-category weekly-coach-loop shape.
+  // exercise-rx has many concurrent open rows (one per tracked exercise),
+  // so this scopes down to exactly one exercise's most recent open row.
+  window.getOpenDecisionForExercise = function (category, exerciseId) {
+    if (!window.supabase) return Promise.reject(new Error('supabase-js not loaded'));
+    const supa = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    return supa.from('decisions')
+      .select('*')
+      .eq('app', 'row')
+      .eq('category', category)
+      .eq('status', 'open')
+      .eq('details->>exerciseId', exerciseId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .then(function (res) {
+        if (res.error) throw new Error('getOpenDecisionForExercise failed: ' + res.error.message);
+        return res.data && res.data[0] ? res.data[0] : null;
+      });
+  };
+
   // Returns the most recently created open decision for a category, whether
   // its review date is still in the future or is already due. Dashboard
   // surfaces use this; weekly-review closeout must keep using
