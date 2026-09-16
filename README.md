@@ -1,3 +1,4 @@
+<!-- server-derived-diff smoke test 2, safe to reject -->
 # Row
 
 Carl Meyer's personal fitness/life dashboard — a set of vanilla HTML/JS pages, no build step, no framework. Deployed to Vercel at [row-sage.vercel.app](https://row-sage.vercel.app).
